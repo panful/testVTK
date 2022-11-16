@@ -16,6 +16,7 @@ int main(int, char* [])
     //mapper
     vtkNew<vtkPolyDataMapper> cubeMapper;
     cubeMapper->SetInputConnection(cube->GetOutputPort());
+    //cubeMapper->SetInputData(cube->GetOutput()); // 不能使用vtkPolyData，只能用管道方式
 
     //actor
     vtkNew<vtkActor> cubeActor;

@@ -11,12 +11,12 @@
 10.2D直线 vtkGlyph3D 矢量图箭头方向，箭头起始段末端翻转
 11.获取OpenGL版本  https://gitlab.kitware.com/vtk/vtk/-/blob/v9.1.0/Rendering/OpenGL2/Testing/Cxx/TestWindowBlits.cxx
 12.网格中心vtkCenterOfMass
-13.vtkMultiThreader  dem文件  多线程渲染
+13.多边形每条边的外法向量 https://zhuanlan.zhihu.com/p/272517099
 14.从输入的多个polydata获取交集并集差集vtkBooleanOperationPolyDataFilter
 15.vtkOrientationMarkerWidget左键事件屏蔽对父窗口的响应
 16.网格模型的特征边与封闭性检测 https://www.cnblogs.com/ybqjymy/p/14241831.html
 17.按键盘p键显示物体的包围盒，边框
-18.vtkLODActor 加载大型网格
+18.vtkLODActor 加载大型网格  vtkSelectPolyData 多边形剪切
 19.拾取 cellpick
 20.按钮 vtkButtonWidget
 21.vtkFeatureEdges 封闭性检测 TEST16 标注边界的类型  https://kitware.github.io/vtk-examples/site/Cxx/Meshes/BoundaryEdges/
@@ -31,13 +31,18 @@
 30.三角剖分 https://zhuanlan.zhihu.com/p/459884570
 31.
 32.
-33. vtkCaptionWidget
-34. vtkElevationFilter 沿指定方向生成Scalars https://kitware.github.io/vtk-examples/site/Cxx/Visualization/ProjectSphere/
-35  拾取标记
-36. 矢量图箭头大小
+33.vtkCaptionWidget
+34.vtkElevationFilter 沿指定方向生成Scalars https://kitware.github.io/vtk-examples/site/Cxx/Visualization/ProjectSphere/
+35 拾取并标记
+36.矢量图箭头大小
+37.异步创建actor std::future 多线程
+38.vtkMultiThreader
+39 MPI
+40 vtkDataSet 和 vtkPolyData
+41.vtk序列化反序列化 https://vtk.org/doc/nightly/html/classvtkDataWriter.html
 */
 
-#define TEST36
+#define TEST40
 
 #ifdef TEST1
 
@@ -1847,148 +1852,7 @@ int main(int, char* [])
 
 #endif // TEST12
 
-#ifdef TEST13
 
-
-#include <iostream>
-using namespace std;
-#include "vtkSmartPointer.h"
-
-#include "vtkDEMReader.h"
-#include "vtkPolyData.h"
-#include "vtkPolyDataMapper.h"
-#include "vtkActor.h"
-#include "vtkRenderer.h"
-#include "vtkRenderWindow.h"
-#include "vtkRenderWindowInteractor.h"
-#include "vtkProperty.h"
-#include "vtkCamera.h"
-#include "vtkImageDataGeometryFilter.h"
-#include "vtkWarpScalar.h"
-#include "vtkPolyDataNormals.h"
-#include "vtkLODActor.h"
-#include "vtkImageData.h"
-#include "vtkLookupTable.h"
-#include "vtkPoints.h"
-#include "vtkCellArray.h"
-#include "vtkPolyDataCollection.h"
-#include "vtkTriangleFilter.h"
-#include "vtkImageResample.h"
-#include "vtkHandleWidget.h"
-#include "vtkSphereHandleRepresentation.h"
-#include "vtkTestUtilities.h"
-#include "vtkTesting.h"
-#include "vtkAbstractWidget.h"
-#include "vtkDataSetWriter.h"
-#include "vtkMultiThreader.h"
-#include "vtkWarpScalar.h"
-
-int main(int argc, char* argv[])
-{
-
-    //读入海拔高度图.SainteHelens.dem
-    std::string fname = "D:/Qt/VTK6.3.0/vtkExampleModelFiles/SainteHelens.dem";
-
-    vtkMultiThreader::SetGlobalMaximumNumberOfThreads(2); // 多线程
-
-    // Read height field.
-    //
-    vtkSmartPointer<vtkDEMReader> demReader = vtkSmartPointer<vtkDEMReader>::New();
-    demReader->SetFileName(fname.c_str());
-
-    vtkSmartPointer<vtkImageResample>  resample = vtkSmartPointer<vtkImageResample>::New();
-    resample->SetInputConnection(demReader->GetOutputPort());
-    resample->SetDimensionality(2);
-    resample->SetAxisMagnificationFactor(0, 1);
-    resample->SetAxisMagnificationFactor(1, 1);
-
-    // Extract geometry
-    vtkSmartPointer<vtkImageDataGeometryFilter> surface = vtkSmartPointer<vtkImageDataGeometryFilter>::New();
-    surface->SetInputConnection(resample->GetOutputPort());
-
-    // The Dijkistra interpolator will not accept cells that aren't triangles
-    vtkSmartPointer<vtkTriangleFilter> triangleFilter = vtkSmartPointer<vtkTriangleFilter>::New();
-    triangleFilter->SetInputConnection(surface->GetOutputPort());
-    triangleFilter->Update();
-
-    vtkSmartPointer<vtkWarpScalar> warp = vtkSmartPointer<vtkWarpScalar>::New();
-    warp->SetInputConnection(triangleFilter->GetOutputPort());
-    warp->SetScaleFactor(1);
-    warp->UseNormalOn();
-    warp->SetNormal(0, 0, 1);
-    warp->Update();
-
-    // cout << warp->GetOutput()->GetNumberOfCells() << endl;
-
-    // vtkSmartPointer<vtkDataSetWriter> writer = vtkSmartPointer<vtkDataSetWriter>::New();
-    // writer->SetInputConnection(resample->GetOutputPort());
-    // writer->SetFileName("foo.vtk");
-    // writer->Write();
-
-    // Define a LUT mapping for the height field
-
-    double lo = demReader->GetOutput()->GetScalarRange()[0];
-    double hi = demReader->GetOutput()->GetScalarRange()[1];
-
-    vtkSmartPointer<vtkLookupTable> lut = vtkSmartPointer<vtkLookupTable>::New();
-    lut->SetHueRange(0.6, 0);
-    lut->SetSaturationRange(1.0, 0);
-    lut->SetValueRange(0.5, 1.0);
-
-    vtkSmartPointer<vtkPolyDataNormals> normals = vtkSmartPointer<vtkPolyDataNormals>::New();
-
-    vtkSmartPointer<vtkPolyDataMapper> demMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    demMapper->SetInputConnection(warp->GetOutputPort());
-    demMapper->SetScalarRange(lo, hi);
-    demMapper->SetLookupTable(lut);
-
-    vtkSmartPointer<vtkActor> demActor = vtkSmartPointer<vtkActor>::New();
-    demActor->SetMapper(demMapper);
-
-    // Create the RenderWindow, Renderer and the DEM + path actors.
-    vtkSmartPointer<vtkRenderer> ren1 = vtkSmartPointer<vtkRenderer>::New();
-    vtkSmartPointer<vtkRenderWindow> renWin = vtkSmartPointer<vtkRenderWindow>::New();
-    renWin->AddRenderer(ren1);
-    vtkSmartPointer<vtkRenderWindowInteractor> iren =
-        vtkSmartPointer<vtkRenderWindowInteractor>::New();
-    iren->SetRenderWindow(renWin);
-
-    // Add the actors to the renderer, set the background and size
-    ren1->AddActor(demActor);
-    ren1->GetActiveCamera()->SetViewUp(0, 0, 1);
-    ren1->GetActiveCamera()->SetPosition(-99900, -21354, 131801);
-    ren1->GetActiveCamera()->SetFocalPoint(41461, 41461, 2815);
-    ren1->ResetCamera();
-    ren1->ResetCameraClippingRange();
-
-    // Here comes the surface constrained handle widget stuff.....
-    vtkSmartPointer<vtkHandleWidget> widget = vtkSmartPointer<vtkHandleWidget>::New();
-    widget->SetInteractor(iren);
-    vtkSmartPointer<vtkSphereHandleRepresentation> rep = vtkSmartPointer<vtkSphereHandleRepresentation>::New();
-    widget->SetRepresentation(rep);
-
-    // Let the surface constrained point-placer be the sole constraint dictating
-    // the placement of handles. Lets not over-constrain it allowing axis
-    // constrained interactions.
-    widget->EnableAxisConstraintOff();
-
-    // Set some defaults on the handle widget
-    double d[3] = { 562532, 5.11396e+06, 2618.62 };
-    rep->SetWorldPosition(d);
-    rep->GetProperty()->SetColor(1.0, 0.0, 0.0);
-    rep->GetProperty()->SetLineWidth(1.0);
-    rep->GetSelectedProperty()->SetColor(0.2, 0.0, 1.0);
-    renWin->Render();
-    iren->Initialize();
-    widget->EnabledOn();
-    renWin->Render();
-    ren1->ResetCamera();
-    ren1->ResetCameraClippingRange();
-    return vtkTesting::InteractorEventLoop(argc, argv, iren);
-    return 0;
-}
-
-#endif // TEST13
 
 #ifdef TEST14
 
@@ -2690,7 +2554,7 @@ int main(int, char* [])
     vtkNew<vtkLODActor> clipActor;
     clipActor->SetMapper(clipMapper);
     clipActor->SetBackfaceProperty(backProp);
-    clipActor->GetProperty()->SetColor(colors->GetColor3d("Banana").GetData());
+    clipActor->GetProperty()->SetColor(0, 1, 0);
 
     vtkNew<vtkRenderer> renderer;
 
@@ -5707,3 +5571,572 @@ int main(int, char* [])
 }
 
 #endif // TEST36
+
+#ifdef TEST37
+
+
+#include <vtkCubeSource.h>
+#include <vtkSmartPointer.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkSphereSource.h>
+
+#include <chrono>
+#include <thread>
+#include <future>
+
+constexpr size_t MaxNumOfActors = 1000;
+
+vtkSmartPointer<vtkActor> CreateActor(double x, double y, double z)
+{
+    vtkNew<vtkCubeSource> cube;
+    cube->SetCenter(x, y, z);
+
+    //mapper
+    vtkNew<vtkPolyDataMapper> cubeMapper;
+    cubeMapper->SetInputConnection(cube->GetOutputPort());
+
+    //actor
+    vtkNew<vtkActor> cubeActor;
+    cubeActor->SetMapper(cubeMapper);
+    cubeActor->GetProperty()->SetColor(0, 1, 0);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    return cubeActor;
+}
+
+//#define MultiThread
+
+int main(int argc, char* argv[])
+{
+    vtkNew<vtkRenderer> renderer;
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+#ifdef MultiThread
+    std::vector<std::future<vtkSmartPointer<vtkActor>>> vecActors;
+    vecActors.reserve(MaxNumOfActors);
+
+    for (size_t i = 0; i < MaxNumOfActors; ++i)
+    {
+        auto axis = static_cast<double>(i);
+        vecActors.emplace_back(std::async(std::launch::async, CreateActor, axis, axis, axis));
+    }
+
+    for (auto& actor : vecActors)
+    {
+        renderer->AddActor(actor.get());
+    }
+#else
+    for (size_t i = 0; i < MaxNumOfActors; ++i)
+    {
+        auto axis = static_cast<double>(i);
+        renderer->AddActor(CreateActor(axis, axis, axis));
+    }
+
+#endif // MultiThread
+
+    std::cout << "took:\t" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count() << std::endl;
+    renderer->ResetCamera();
+
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(600, 600);//设置window大小
+
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    //数据交互
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST37
+
+#ifdef TEST38
+
+#include "vtkMultiThreader.h"
+#include "vtkSmartPointer.h"
+
+#include <thread>
+#include <chrono>
+#include <iostream>
+#include <vector>
+
+VTK_THREAD_RETURN_TYPE MyFunction(void*)
+{
+    //for (const auto& elem : { 1,2,3,4,5 })
+    //{
+    //    std::cout << elem << '\t';
+    //}
+    //std::cout << '\n';
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+
+    return VTK_THREAD_RETURN_VALUE;
+}
+
+int main()
+{
+    auto start = std::chrono::high_resolution_clock::now();
+
+    constexpr size_t TreadNum = 8;
+
+    // vtk多线程
+    {
+        vtkNew<vtkMultiThreader> multiThread;
+        // 设置共有8个线程
+        multiThread->SetNumberOfThreads(TreadNum);
+        // 将MyFunction放在多线程中执行
+        multiThread->SetSingleMethod(MyFunction, nullptr);
+        // 执行线程
+        multiThread->SingleMethodExecute();
+    }
+    auto vtkTookTime = std::chrono::high_resolution_clock::now();
+    std::cout << "vtk took:\t" << std::chrono::duration_cast<std::chrono::milliseconds>(vtkTookTime - start).count() << '\n';
+
+    // 标准库多线程
+    {
+        std::vector<std::thread> vecThreads;
+        vecThreads.reserve(TreadNum);
+
+        for (size_t i = 0; i < TreadNum; ++i)
+        {
+            vecThreads.emplace_back(std::thread(MyFunction, nullptr));
+        }
+        for (auto& thread : vecThreads)
+        {
+            thread.join();
+        }
+    }
+
+    // 以上两种方式效果是一样的
+    std::cout << "std took:\t" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - vtkTookTime).count() << '\n';
+
+}
+
+#endif // TEST38
+
+#ifdef TEST39
+
+#endif // TEST39
+
+#ifdef TEST40
+
+// vtkPolyData的使用
+// https://zhuanlan.zhihu.com/p/336743251
+
+// vtkDataSet的使用
+// http://t.zoukankan.com/ybqjymy-p-14241014.html
+
+// vtkUnstructuredGrid的使用以及vtk单元类型枚举
+// https://blog.csdn.net/liushao1031177/article/details/120708061
+
+// example https://kitware.github.io/vtk-examples/site/Cxx/StructuredGrid/SGrid/
+
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkDoubleArray.h>
+#include <vtkHedgeHog.h>
+#include <vtkMath.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkStructuredGrid.h>
+#include <vtkPolyData.h>
+#include <vtkDataSet.h>
+#include <vtkExtractGrid.h>
+#include <vtkCellData.h>
+#include <vtkPointData.h>
+#include <vtkFloatArray.h>
+#include <vtkCellArray.h>
+#include <vtkDataSetMapper.h>
+#include <vtkDataSetToDataObjectFilter.h>
+
+#include <vector>
+#include <fstream>
+
+int main(int, char* [])
+{
+    std::ofstream ofs1("file1.txt");
+    std::ofstream ofs2("file2.txt");
+    std::ofstream ofs3("file3.txt");
+    std::ofstream ofs4("file4.txt");
+
+    double x[3], v[3], rMin = 0.5, rMax = 1.0, deltaRad, deltaZ;
+    double radius, theta;
+    static int dims[3] = { 13, 11, 11 };
+
+    // Create the structured grid.
+    vtkNew<vtkStructuredGrid> sgrid;
+    sgrid->SetDimensions(dims);  // 设置这个才会有单元 即sgrid->GetNumberOfCells()返回非0
+
+    // We also create the points and vectors. The points
+    // form a hemi-cylinder of data.
+    vtkNew<vtkDoubleArray> vectors;
+    vectors->SetNumberOfComponents(3);
+    vectors->SetNumberOfTuples(dims[0] * dims[1] * dims[2]);
+    vtkNew<vtkPoints> points;
+    points->Allocate(dims[0] * dims[1] * dims[2]);
+
+    deltaZ = 2.0 / (dims[2] - 1);
+    deltaRad = (rMax - rMin) / (dims[1] - 1);
+    v[2] = 0.0;
+    for (auto k = 0; k < dims[2]; k++)
+    {
+        x[2] = -1.0 + k * deltaZ;
+        auto kOffset = k * dims[0] * dims[1];
+        for (auto j = 0; j < dims[1]; j++)
+        {
+            radius = rMin + j * deltaRad;
+            auto jOffset = j * dims[0];
+            for (auto i = 0; i < dims[0]; i++)
+            {
+                theta = i * vtkMath::RadiansFromDegrees(15.0);
+                x[0] = radius * cos(theta);
+                x[1] = radius * sin(theta);
+                v[0] = -x[1];
+                v[1] = x[0];
+
+                auto offset = i + jOffset + kOffset;
+                //points->InsertPoint(offset, x);
+                points->InsertNextPoint(x);
+                vectors->InsertTuple(offset, v);
+                //vectors->InsertNextTuple3(v[0], v[1], v[2]);
+
+                //std::cout << x[0] << '\n' << x[1] << '\n' << x[2] << '\n';
+                ofs1<< x[0] << '\n' << x[1] << '\n' << x[2] << '\n';
+                ofs4<< v[0] << '\n' << v[1] << '\n' << v[2] << '\n';
+            }
+        }
+    }
+    sgrid->SetPoints(points);
+    auto num = sgrid->GetNumberOfCells();
+    sgrid->GetPointData()->SetVectors(vectors);
+
+    // We create a simple pipeline to display the data.
+    vtkNew<vtkHedgeHog> hedgehog;
+    hedgehog->SetInputData(sgrid);
+    hedgehog->SetScaleFactor(0.1);
+
+    vtkNew<vtkPolyDataMapper> sgridMapper;
+    sgridMapper->SetInputConnection(hedgehog->GetOutputPort());
+
+    //vtkNew<vtkDataSetMapper> sgridMapper;
+    //sgridMapper->SetInputData(sgrid);
+
+    vtkNew<vtkActor> sgridActor;
+    sgridActor->SetMapper(sgridMapper);
+    sgridActor->GetProperty()->SetColor(0, 1, 0);
+
+    // 提取结构化网格的一部分
+    //vtkNew<vtkExtractGrid> extractGrid;
+    //extractGrid->SetVOI(0, 13, 0, 11, 0, 11);
+    //extractGrid->SetInputData(sgrid);
+    //extractGrid->Update();
+    //vtkStructuredGrid* dataset = extractGrid->GetOutput();
+
+    auto dataSet = vtkDataSet::SafeDownCast(sgrid);
+    auto numOfPoint1 = dataSet->GetNumberOfPoints();
+    auto numOfCell = dataSet->GetNumberOfCells();
+
+    vtkCellData* cellData = dataSet->GetCellData();
+    vtkPointData* pointData = dataSet->GetPointData();
+    vtkPoints* dataSetPoints = sgrid->GetPoints();
+    vtkCellData* cellData2 = sgrid->GetCellData();
+    auto numOfCell2 = sgrid->GetNumberOfCells();
+
+    vtkCell* cell = sgrid->GetCell(0);
+
+    for (size_t i = 0; i < sgrid->GetNumberOfCells(); ++i)
+    {
+
+        auto type = sgrid->GetCellType(i);
+        vtkNew<vtkIdList> pts;
+        sgrid->GetCellPoints(i, pts); // 获取指定单元由那些点构成
+        auto numOfIds = pts->GetNumberOfIds();
+    }
+
+    for (size_t i = 0; i < sgrid->GetNumberOfPoints(); ++i)
+    {
+        vtkNew<vtkIdList> pts;
+        sgrid->GetPointCells(i, pts); // 获取指定的点由那些单元使用
+    }
+
+    auto numOfPoint = dataSetPoints->GetNumberOfPoints();
+    auto numOfArrPoint2 = pointData->GetNumberOfArrays();
+    auto numOfArrCell = cellData->GetNumberOfArrays();
+
+    vtkDataArray* cellArr = cellData->GetArray(0);
+    vtkDataArray* pointArr = pointData->GetArray(0);
+    auto pointVectors = pointData->GetVectors();
+
+    auto num1 = pointArr->GetNumberOfValues();
+    auto num2 = pointArr->GetNumberOfComponents();
+    auto num3 = pointArr->GetNumberOfTuples();
+    auto num4 = pointArr->GetArrayType();
+    auto num5 = pointArr->GetDataSize();
+    auto num6 = pointArr->GetDataTypeAsString();
+    auto num7 = pointArr->GetSize();
+
+    std::cout << "---------------------\n";
+    for (size_t i = 0; i < num3; ++i)
+    {
+        auto tuple3 = pointArr->GetTuple3(i);
+        //std::cout << tuple3[0] << '\n' << tuple3[1] << '\n' << tuple3[2] << '\n';
+        ofs2<< tuple3[0] << '\n' << tuple3[1] << '\n' << tuple3[2] << '\n';
+    }
+    std::cout << "---------------------\n";
+    for (size_t i = 0; i < num1; ++i)
+    {
+        vtkVariant varValue = pointArr->GetVariantValue(i);
+        auto strType = varValue.GetTypeAsString();
+        auto value = varValue.ToDouble();
+        //std::cout << value << '\n';
+        ofs3 << value << '\n';
+    }
+    ofs1.close();
+    ofs2.close();
+    ofs3.close();
+
+    void* voidVectors = vectors->GetVoidPointer(0);
+    double* floatVectors = reinterpret_cast<double*>(voidVectors);
+
+    //vtkNew<vtkPolyData> polyData;
+    //vtkNew<vtkPoints> points;
+    //points->SetData(point);
+    //vtkNew<vtkCellArray> cell;
+
+
+    //auto polydata = dynamic_cast<vtkPolyData*>(sgrid.GetPointer());
+    //auto num = polydata->GetNumberOfPoints();
+    //vtkNew<vtkPolyDataMapper> mapper;
+    //mapper->SetInputData(polydata);
+    //vtkNew<vtkActor> actor;
+    //actor->SetMapper(mapper);
+
+
+    //vtkNew<vtkPolyData> polyData;
+    //vtkNew<vtkCellArray> cellArray;
+    //polyData->SetPoints(points);
+    //polyData->SetLines(cellArray);
+    //polyData->SetPolys(cellArray);
+
+    //vtkNew<vtkDataSet> dataSet;
+
+
+    //vtkNew<vtkPoints> points1;
+
+    ////vtkNew<vtkStructuredData> structuredData;
+
+
+    //vtkNew<vtkExtractGrid> extractGrid;
+
+
+    //vtkNew<vtkDataSetToDataObjectFilter> dataSetToObj;
+    //dataSetToObj->SetInputData(sgrid);
+    //dataSetToObj->TopologyOn();
+    //dataSetToObj->GeometryOn();
+    ////dataSetToObj->
+    //dataSetToObj->Update();
+    //dataSetToObj->UpdateDataObject();
+    //auto out = dataSetToObj->GetOutput();
+    //auto poly = vtkPolyData::SafeDownCast(out);
+
+
+
+
+    // Create the usual rendering stuff
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetWindowName("SGrid");
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    //renderer->AddActor(actor);
+    renderer->AddActor(sgridActor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->ResetCamera();
+    renderer->GetActiveCamera()->Elevation(60.0);
+    renderer->GetActiveCamera()->Azimuth(30.0);
+    renderer->GetActiveCamera()->Dolly(1.0);
+    renWin->SetSize(640, 480);
+
+    // interact with data
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST40
+
+#ifdef TEST41
+
+// This example shows how to manually create a structured grid.
+// The basic idea is to instantiate vtkStructuredGrid, set its dimensions,
+// and then assign points defining the grid coordinate. The number of
+// points must equal the number of points implicit in the dimensions
+// (i.e., dimX*dimY*dimZ). Also, data attributes (either point or cell)
+// can be added to the dataset.
+//
+//
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkDoubleArray.h>
+#include <vtkHedgeHog.h>
+#include <vtkMath.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkStructuredGrid.h>
+
+#include <vtkStructuredGridWriter.h>
+#include <vtkDataSetWriter.h>
+#include <vtkWriter.h>
+#include <vtkStructuredGridReader.h>
+#include <vtkStructuredGridGeometryFilter.h>
+
+#include <vtkDataSetMapper.h>
+
+#include <fstream>
+
+int main(int, char* [])
+{
+    double x[3], v[3], rMin = 0.5, rMax = 1.0, deltaRad, deltaZ;
+    double radius, theta;
+    static int dims[3] = { 13, 11, 11 };
+
+    // Create the structured grid.
+    vtkNew<vtkStructuredGrid> sgrid;
+    sgrid->SetDimensions(dims);
+
+    // We also create the points and vectors. The points
+    // form a hemi-cylinder of data.
+    vtkNew<vtkDoubleArray> vectors;
+    vectors->SetNumberOfComponents(3);
+    vectors->SetNumberOfTuples(dims[0] * dims[1] * dims[2]);
+    vtkNew<vtkPoints> points;
+    points->Allocate(dims[0] * dims[1] * dims[2]);
+
+    deltaZ = 2.0 / (dims[2] - 1);
+    deltaRad = (rMax - rMin) / (dims[1] - 1);
+    v[2] = 0.0;
+    for (auto k = 0; k < dims[2]; k++)
+    {
+        x[2] = -1.0 + k * deltaZ;
+        auto kOffset = k * dims[0] * dims[1];
+        for (auto j = 0; j < dims[1]; j++)
+        {
+            radius = rMin + j * deltaRad;
+            auto jOffset = j * dims[0];
+            for (auto i = 0; i < dims[0]; i++)
+            {
+                theta = i * vtkMath::RadiansFromDegrees(15.0);
+                x[0] = radius * cos(theta);
+                x[1] = radius * sin(theta);
+                v[0] = -x[1];
+                v[1] = x[0];
+                auto offset = i + jOffset + kOffset;
+                points->InsertPoint(offset, x);
+                vectors->InsertTuple(offset, v);
+            }
+        }
+    }
+    sgrid->SetPoints(points);
+    sgrid->GetPointData()->SetVectors(vectors);
+
+    //---------------写文件-----------------
+    vtkNew< vtkStructuredGridWriter> writer;
+    writer->SetFileTypeToASCII();
+    writer->SetFileName("writerStructuredGrid.txt");
+    writer->SetInputData(sgrid);
+    writer->Write();
+
+    // 写文件的具体代码：
+    // vtkStructuredGridWriter.cxx -> line:30
+    // void vtkStructuredGridWriter::WriteData();
+
+    vtkNew<vtkDataSetWriter> writer2;
+    writer2->SetFileName("writerDataSet.txt");
+    writer2->SetFileTypeToASCII();
+    writer2->SetInputData(vtkDataSet::SafeDownCast(sgrid));
+    writer2->Write();
+    //--------------------------------
+
+    //----------------读文件----------------
+    vtkNew<vtkStructuredGridReader> reader;
+    reader->SetFileName("writerStructuredGrid.txt");
+    reader->Update();
+
+    vtkNew<vtkStructuredGridGeometryFilter> geometryFilter;
+    geometryFilter->SetInputConnection(reader->GetOutputPort());
+    geometryFilter->Update();
+    //--------------------------------
+    
+    // Mapper
+    // 读上来的DataSet转为PolyData拓扑结构有些问题
+    vtkNew<vtkPolyDataMapper> mapperPolyData;
+    //mapperPolyData->SetInputConnection(geometryFilter->GetOutputPort());
+    mapperPolyData->SetInputData(geometryFilter->GetOutput());
+
+    vtkNew<vtkDataSetMapper> mapperDataSet;
+    mapperDataSet->SetInputData(sgrid);
+    //mapperDataSet->SetInputData(reader->GetOutput());
+
+    // Actor
+    vtkNew<vtkActor> sgridActor;
+    //sgridActor->SetMapper(mapperDataSet);
+    sgridActor->SetMapper(mapperPolyData);
+
+    sgridActor->GetProperty()->SetColor(0, 1, 0);
+
+
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetWindowName("SGrid");
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    renderer->AddActor(sgridActor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->ResetCamera();
+    renWin->SetSize(640, 480);
+
+    // interact with data
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+
+#endif // TEST41
+
+
+

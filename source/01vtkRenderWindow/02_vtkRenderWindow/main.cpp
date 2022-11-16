@@ -72,7 +72,7 @@
 59.微信群里文件
 60.文字显示，汉字
 61.2D橡皮筋交互模式，重载鼠标事件  vtkCallbackCommand::SetCallback  使用回调函数替代vtkCommand::Execute() 
-62.vtkInteractorStyleRubberBandPick 款选拾取
+62.vtkInteractorStyleRubberBandPick 框选拾取
 63.vtkImageData转QImage
 64.DICOM  MPR 医学ct图四象限
 65.vtkBorderWidget事件
@@ -80,7 +80,7 @@
 67.vtkBoxWidget
 68.vtkBalloonWidget 鼠标放在图元上一会可以显示文本提示或者图像提示
 */
-#define TEST17
+#define TEST3
 
 //在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 //#include <vtkAutoInit.h>
@@ -3446,7 +3446,11 @@ int main(int, char* [])
 #include <vtkRenderer.h>
 #include <vtkSphereSource.h>
 
+#include <map>
+
 namespace {
+    std::map<vtkSmartPointer<vtkActor>, int> theActors;
+
     // Handle mouse events
     class MouseInteractorHighLightActor : public vtkInteractorStyleTrackballCamera
     {
@@ -3466,7 +3470,7 @@ namespace {
         }
         virtual void OnLeftButtonDown() override
         {
-            std::cout << "start\t";
+            std::cout << "start picking\t";
             vtkNew<vtkNamedColors> colors;
 
             int* clickPos = this->GetInteractor()->GetEventPosition();
@@ -3479,13 +3483,15 @@ namespace {
             if (this->LastPickedActor)
             {
                 // 用来将上一次拾取的图元恢复颜色
-                std::cout << "1\t";
+                //std::cout << "restore color\t";
                 this->LastPickedActor->GetProperty()->DeepCopy(this->LastPickedProperty);
             }
             this->LastPickedActor = picker->GetActor();
             if (this->LastPickedActor)
             {
-                std::cout << "2\t";
+                std::cout << "picked actor:\t" << theActors[this->LastPickedActor] << '\t';
+
+                //std::cout << "set color\t";
                 // Save the property of the picked actor so that we can
 
                 // 将上一次拾取的图元恢复颜色
@@ -3496,7 +3502,7 @@ namespace {
                 // Highlight the picked actor by changing its properties
                 this->LastPickedActor->GetProperty()->SetColor(colors->GetColor3d("Red").GetData());
 
-                std::cout << LastPickedActor->GetClassName();
+                //std::cout << LastPickedActor->GetClassName();
 
 
                 //this->LastPickedActor->GetProperty()->SetDiffuse(1.0);
@@ -3507,7 +3513,7 @@ namespace {
             // Forward events
             vtkInteractorStyleTrackballCamera::OnLeftButtonDown();
 
-            std::cout << "end\n";
+            std::cout << "end picking\n";
         }
 
     private:
@@ -3524,10 +3530,7 @@ int main(int argc, char* argv[])
     vtkNew<vtkNamedColors> colors;
 
     int numberOfSpheres = 10;
-    if (argc > 1)
-    {
-        numberOfSpheres = atoi(argv[1]);
-    }
+
     // A renderer and render window
     vtkNew<vtkRenderer> renderer;
     vtkNew<vtkRenderWindow> renderWindow;
@@ -3582,6 +3585,8 @@ int main(int argc, char* argv[])
         actor->GetProperty()->SetSpecularColor(
             colors->GetColor3d("White").GetData());
         actor->GetProperty()->SetSpecularPower(30.0);
+
+        theActors.emplace(actor, i);
         renderer->AddActor(actor);
     }
 
