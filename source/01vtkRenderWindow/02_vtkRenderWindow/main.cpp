@@ -18,7 +18,7 @@
 5.通过定义三个指定x-y-z方向坐标的阵列来创建直线栅格。
 6.批量生成一大堆线条
 7.点构成线条，使用索引
-8.获取网格的最大最小边界，无限放大缩小 照相机属性以及交互方式 vtkInteractorStyle*** https://blog.csdn.net/liushao1031177/article/details/116903698
+8.照相机属性以及交互方式，获取网格的最大最小边界，无限放大缩小  vtkInteractorStyle*** https://blog.csdn.net/liushao1031177/article/details/116903698
 9.绘制点，线，面，类似Opengl 顶点+索引的绘制方式
 10.2D网格绘制
 11.拟合样条曲线生成柱状体
@@ -29,34 +29,34 @@
 16.云图 stl文件
 17.矢量图 vtkGlyph3D，从vtkGlyph3D获取源数据
 18.带流场参数的立方体
-19.颜色映射表示例图
+19.vtkDistancePolyDataFilter 计算两个vtkPolyData的距离
 20.可以随意拖动的坐标轴
 21.官方例子，球面法向量  矢量图
 22.将点（向量）投影到平面
-23.照相机交互方式 左键画框，右键旋转，中键缩放平移
-24.云图，渐变线，点和单元设置流场参数，颜色过渡方式，颜色映射表
+23.鼠标双击事件 DoubleClick
+24.云图，渐变线，点和单元设置流场参数，颜色过渡方式，颜色映射表，色卡
 25.颜色过渡，同一个窗口两个绘制对象，同一数据，不同相机 （viewPort)
 26.纹理，光照
-27.框选拾取
+27.框选拾取 vtk拾取相关的类 https://blog.csdn.net/lovelanjuan/article/details/7301773
 28.actor拾取
-29.框选拾取actor
-30.比例尺(scalarBar)
+29.框选拾取actor，基于范围拾取
+30.范围拾取 vtkAreaPicker 点到actor的最短距离 vtkCellLocator
 31.比例尺(vtkLegendScaleActor)
-32.colorlegend
+32.vtkColorLegend  https://vtk.org/doc/nightly/html/classvtkColorLegend.html
 33.vtkContourFilter  等值面
 34.vtkprobefilter    探针
-35.流线图  展示流体流动的轨迹和流动方向 有点像线框式的云图
+35.vtkStreamTracer 流线图 展示流体流动的轨迹和流动方向 有点像线框式的云图 vtkOpenFOAMReader
 36.探针
 37.探针 https://blog.csdn.net/liushao1031177/article/details/122860254
 38.plot https://kitware.github.io/vtk-examples/site/Cxx/Plotting/LinePlot/
 39.以单元形式设置标量数据
-40.单元标量数据转顶点数据，等值线vtkContourFilter
-41.顶点标量数据转单元数据
-42.获取单元中心即格心，并用球体标注格心(矢量图）
+40.vtkCellDataToPointData 单元标量数据转顶点数据，等值线vtkContourFilter
+41.vtkPointDataToCellData 顶点标量数据转单元数据
+42.vtkCellCenters 获取单元中心即格心，并用球体标注格心(矢量图）
 43.reverse access ,从经过算法(vtkAlgorithm,vtkPolyDataAlgorithm)变换的数据中获取源数据（vtkPolyData,vtkDataSet）
 44.vtkChart https://kitware.github.io/vtk-examples/site/Cxx/DataStructures/OctreeTimingDemo/
 45.从Actor中获取polyData，并修改polyData的属性会改变原来Actor的状态，深拷贝可以不改变源Actor状态
-46.寻找最近点 一个点到网格上最近距离的点 https://blog.csdn.net/minmindianzi/article/details/103474941
+46.vtkCellLocator 寻找最近点 一个点到网格上最近距离的点 https://blog.csdn.net/minmindianzi/article/details/103474941
 47.保存图片 (位图，矢量图）  qt框选截图 https://blog.csdn.net/GoForwardToStep/article/details/54237689
 48.矢量图svg保存
 49.vtkImageView  https://blog.csdn.net/liushao1031177/article/details/115799500
@@ -71,16 +71,17 @@
 58.窗口大小改变回调函数 resizeWindowEvent
 59.微信群里文件
 60.文字显示，汉字
-61.2D橡皮筋交互模式，重载鼠标事件  vtkCallbackCommand::SetCallback  使用回调函数替代vtkCommand::Execute() 
+61.2D橡皮筋交互模式，重载鼠标事件  vtkCallbackCommand::SetCallback  使用回调函数替代vtkCommand::Execute()
 62.vtkInteractorStyleRubberBandPick 框选拾取
 63.vtkImageData转QImage
 64.DICOM  MPR 医学ct图四象限
 65.vtkBorderWidget事件
 66.shared actor 多个vtkRenderWindow共享actor
 67.vtkBoxWidget
-68.vtkBalloonWidget 鼠标放在图元上一会可以显示文本提示或者图像提示
+
 */
-#define TEST3
+
+#define TEST24
 
 //在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 //#include <vtkAutoInit.h>
@@ -778,9 +779,10 @@ int main(int argc, char* argv[])
 #include <vtkRenderWindowInteractor.h>
 #include <vtkLegendScaleActor.h>
 #include <vtkProperty.h>
-#include <vtkInteractorStyleRubberBand3D.h>
 #include <vtkButtonWidget.h>
 #include <vtkObjectFactory.h>
+
+#include <vtkInteractorStyleRubberBand3D.h>
 
 #include <vector>
 #include <iostream>
@@ -933,7 +935,7 @@ protected:
             std::cout << "------------------------\n";
         }
         static int index = 0;
-        std::cout <<index++ << "\tactive camera CB\n";
+        std::cout << index++ << "\tactive camera CB\n";
 
         this->SetAbortFlag(2);
     }
@@ -2219,6 +2221,8 @@ int main()
 
 #ifdef TEST19
 
+// https://gitlab.kitware.com/vtk/vtk/-/blob/v9.2.0/Filters/General/Testing/Cxx/TestDistancePolyDataFilter.cxx
+
 #include <vtkSmartPointer.h>
 
 #include <vtkActor.h>
@@ -2231,22 +2235,22 @@ int main()
 #include <vtkScalarBarActor.h>
 #include <vtkSphereSource.h>
 
-#include <vtkScalarsToColors.h>
+#include <iostream>
 
 int main(int, char* [])
 {
-    // 球体
     vtkSmartPointer<vtkSphereSource> model1 = vtkSmartPointer<vtkSphereSource>::New();
-    model1->SetPhiResolution(11);
-    model1->SetThetaResolution(11);
-    model1->SetCenter(0.0, 0.0, 0.0);
+    model1->SetPhiResolution(100);
+    model1->SetThetaResolution(30);
+    model1->SetRadius(2);
+    model1->SetCenter(0.0, -1, 0.0);
 
     vtkSmartPointer<vtkSphereSource> model2 = vtkSmartPointer<vtkSphereSource>::New();
-    model2->SetPhiResolution(11);
-    model2->SetThetaResolution(11);
-    model2->SetCenter(0.2, 0.3, 0.0);
+    model2->SetPhiResolution(100);
+    model2->SetThetaResolution(30);
+    model2->SetRadius(1);
+    model2->SetCenter(0, 4, 0.0);
 
-    // 用来计算两个模型之间的距离
     vtkSmartPointer<vtkDistancePolyDataFilter> distanceFilter =
         vtkSmartPointer<vtkDistancePolyDataFilter>::New();
 
@@ -2254,46 +2258,33 @@ int main(int, char* [])
     distanceFilter->SetInputConnection(1, model2->GetOutputPort());
     distanceFilter->Update();
 
-    // mapper
+    auto scalars1 = distanceFilter->GetOutput()->GetPointData()->GetScalars();
+    auto scalars2 = distanceFilter->GetSecondDistanceOutput()->GetPointData()->GetScalars();
+
+    // 两个vtkPolyData之间的距离，可以为负值
+    std::cout << "model 1 range: " << scalars1->GetRange()[0] << ',' << scalars1->GetRange()[1] << '\n';
+    std::cout << "model 2 range: " << scalars2->GetRange()[0] << ',' << scalars2->GetRange()[1] << '\n';
+
     vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
     mapper->SetInputConnection(distanceFilter->GetOutputPort());
-    auto range1 = distanceFilter->GetOutput()->GetPointData()->GetScalars()->GetRange()[0];
-    auto range2 = distanceFilter->GetOutput()->GetPointData()->GetScalars()->GetRange()[1];
-    mapper->SetScalarRange(range1, range2);     // 颜色映射表标签文字的范围
+    mapper->SetScalarRange(scalars1->GetRange()[0], scalars1->GetRange()[1]);
+
+    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
+    actor->SetMapper(mapper);
 
     vtkSmartPointer<vtkPolyDataMapper> mapper2 = vtkSmartPointer<vtkPolyDataMapper>::New();
     mapper2->SetInputConnection(distanceFilter->GetOutputPort(1));
-    auto range3 = distanceFilter->GetSecondDistanceOutput()->GetPointData()->GetScalars()->GetRange()[0];
-    auto range4 = distanceFilter->GetSecondDistanceOutput()->GetPointData()->GetScalars()->GetRange()[1];
-    mapper2->SetScalarRange(range3, range4);
-
-    // actor
-    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-    actor->SetMapper(mapper);
+    mapper2->SetScalarRange(scalars2->GetRange()[0], scalars2->GetRange()[1]);
 
     vtkSmartPointer<vtkActor> actor2 = vtkSmartPointer<vtkActor>::New();
     actor2->SetMapper(mapper2);
 
-    // 设置颜色映射表标签文字范围，
-    vtkSmartPointer<vtkScalarsToColors> colorMap = vtkSmartPointer<vtkScalarsToColors>::New();
-    colorMap->SetRange(-10, 10);
-
-
     vtkSmartPointer<vtkScalarBarActor> scalarBar = vtkSmartPointer<vtkScalarBarActor>::New();
     //scalarBar->SetLookupTable(mapper->GetLookupTable());
-    scalarBar->SetLookupTable(colorMap);
-    //scalarBar->SetTitle("Title");     //颜色映射表标题
-    scalarBar->SetNumberOfLabels(10);   //标签文本个数
-    scalarBar->SetTextPad(5);           //设置文本框周围的填充量，就是标签文本距离颜色映射表的距离
-    //scalarBar->SetPosition(0, 0);     //设置位置
-    scalarBar->FixedAnnotationLeaderLineColorOn();
-
-    //scalarBar->SetUseOpacity(1);  //设置不透明度
-    //scalarBar->UseOpacityOn();
-    scalarBar->SetMaximumNumberOfColors(10); //设置映射表中颜色分段个数，默认64
-    //scalarBar->SetTextureGridWidth(10);
-    //scalarBar->SetDrawAnnotations(0);
-
+    scalarBar->SetLookupTable(mapper2->GetLookupTable());
+    scalarBar->SetTitle("Distance");
+    scalarBar->SetNumberOfLabels(5);
+    scalarBar->SetTextPad(4);
     vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
 
     vtkSmartPointer<vtkRenderWindow> renWin = vtkSmartPointer<vtkRenderWindow>::New();
@@ -2314,6 +2305,7 @@ int main(int, char* [])
 
     return EXIT_SUCCESS;
 }
+
 #endif // TEST19
 
 #ifdef TEST20
@@ -2583,7 +2575,9 @@ namespace {
 #endif // TEST21
 
 #ifdef TEST22
+
  // https://blog.csdn.net/minmindianzi/article/details/87071213
+
 #include <vtkSmartPointer.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkActor.h>
@@ -2684,6 +2678,19 @@ int main(int, char* [])
 #ifdef TEST23
 
 #include <vtkActor.h>
+#include <vtkCallbackCommand.h>
+#include <vtkInteractorStyleRubberBand2D.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+
+#include <vtkActor.h>
 #include <vtkInteractorStyleRubberBand3D.h>
 #include <vtkNamedColors.h>
 #include <vtkNew.h>
@@ -2696,26 +2703,47 @@ int main(int, char* [])
 #include <vtkRenderer.h>
 #include <vtkSphereSource.h>
 
+#include <iostream>
+
 namespace {
 
-    class MyRubberBand3D : public vtkInteractorStyleRubberBand3D
+    class MyRubberBand : public vtkInteractorStyleRubberBand3D
     {
     public:
-        static MyRubberBand3D* New();
-        vtkTypeMacro(MyRubberBand3D, vtkInteractorStyleRubberBand3D);
+        static MyRubberBand* New();
+        vtkTypeMacro(MyRubberBand, vtkInteractorStyleRubberBand3D);
 
-        virtual void OnLeftButtonUp() override
+        void OnLeftButtonUp() override
         {
-            // Forward events
-            vtkInteractorStyleRubberBand3D::OnLeftButtonUp();
+            std::cout << "left button up\n";
+            //Superclass::OnLeftButtonUp();
+        }
 
-            std::cout << "Start position: " << this->StartPosition[0] << " "
-                << this->StartPosition[1] << std::endl;
-            std::cout << "End position: " << this->EndPosition[0] << " "
-                << this->EndPosition[1] << std::endl;
+        void OnLeftButtonDown() override
+        {
+            std::cout << "left button down\n";
+            //Superclass::OnLeftButtonDown();
+        }
+
+        void OnLeftButtonDoubleClick() override
+        {
+            std::cout << "left button double click\n";
+            Superclass::OnLeftButtonDoubleClick();
+        }
+
+        void OnMouseMove() override
+        {
+            Superclass::OnMouseMove();
+        }
+        void OnChar() override
+        {
+            auto ret = this->Interactor->GetKeyCode();
+            std::cout << "press key: " << ret << '\n';
+            Superclass::OnChar();
         }
     };
-    vtkStandardNewMacro(MyRubberBand3D);
+
+    vtkStandardNewMacro(MyRubberBand);
 
 } // namespace
 
@@ -2737,7 +2765,7 @@ int main(int, char* [])
     vtkNew<vtkRenderer> renderer;
     vtkNew<vtkRenderWindow> renderWindow;
     renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("RubberBand3D");
+    renderWindow->SetWindowName("Double Click");
 
     // An interactor
     vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
@@ -2747,9 +2775,12 @@ int main(int, char* [])
     renderer->AddActor(actor);
     renderer->SetBackground(colors->GetColor3d("SlateGray").GetData());
 
+    // Render
+    renderWindow->SetSize(800, 600);
     renderWindow->Render();
 
-    vtkNew<MyRubberBand3D> style;
+
+    vtkNew<MyRubberBand> style;
     renderWindowInteractor->SetInteractorStyle(style);
 
     // Begin mouse interaction
@@ -2779,201 +2810,495 @@ int main(int, char* [])
 #include <vtkProperty.h>
 #include <vtkTextProperty.h>
 #include <vtkImageMapToColors.h>
+#include <vtkViewport.h>
+#include <vtkCommand.h>
+#include <vtkScalarBarWidget.h>
+
+class Callback :
+    public vtkCommand
+{
+public:
+    static Callback* New()
+    {
+        return new Callback;
+    }
+    virtual void Execute(vtkObject* caller, unsigned long x, void* y)
+    {
+        if (auto interactor = vtkRenderWindowInteractor::SafeDownCast(caller))
+        {
+            auto size = interactor->GetRenderWindow()->GetSize();
+            std::cout << "Window size : " << size[0] << ',' << size[1] << '\t';
+
+            std::cout << "Mouse pos : " << interactor->GetEventPosition()[0] << ',' << interactor->GetEventPosition()[1] << '\n';
+        }
+
+        if (m_bar && m_renderer)
+        {
+            // 色卡的色带部分在渲染窗口中的像素位置
+            int rect[4]{ 0 };
+            m_bar->GetScalarBarRect(rect, m_renderer);
+            std::cout << "ScalarBarRect : " << rect[0] << '\t' << rect[1] << '\t' << rect[2] << '\t' << rect[3] << '\n';
+        }
+    }
+
+    void SetScalarBar(vtkSmartPointer<vtkScalarBarActor> bar)
+    {
+        m_bar = bar;
+    }
+
+    void SetRenderer(vtkSmartPointer<vtkRenderer> renderer)
+    {
+        m_renderer = renderer;
+    }
+
+private:
+    vtkSmartPointer<vtkScalarBarActor> m_bar{ nullptr };
+    vtkSmartPointer<vtkRenderer> m_renderer{ nullptr };
+};
+
 
 int main(int, char* [])
 {
+#if(0)
+    // 顶点，共有40个顶点
     vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
     for (size_t i = 0; i < 10; i++)
     {
-        points->InsertNextPoint(i, 0, 0);
+        points->InsertNextPoint(i + 0, 0, 0);
         points->InsertNextPoint(i + 1, 1, 0);
-        points->InsertNextPoint(i, 2, 0);
+        points->InsertNextPoint(i + 0, 2, 0);
         points->InsertNextPoint(i + 1, 3, 0);
     }
 
+    // 多边形拓扑，共有27个四边形
     vtkSmartPointer<vtkCellArray> cell_poly = vtkSmartPointer<vtkCellArray>::New();
     for (long long i = 0; i < 33; i += 4)
     {
-        cell_poly->InsertNextCell({ i,i + 1,i + 5,i + 4 });
+        cell_poly->InsertNextCell({ i + 0,i + 1,i + 5,i + 4 });
         cell_poly->InsertNextCell({ i + 1,i + 2,i + 6,i + 5 });
         cell_poly->InsertNextCell({ i + 2,i + 3,i + 7,i + 6 });
     }
 
+    // 线段拓扑，共有66条线段
     vtkSmartPointer<vtkCellArray> cell_line = vtkSmartPointer<vtkCellArray>::New();
-    for (long long i = 0; i < 37; i += 4)
+    for (long long i = 0; i < 37; i += 3)
     {
-        cell_line->InsertNextCell({ i,i + 1 });
-        cell_line->InsertNextCell({ i + 1,i + 2 });
-        cell_line->InsertNextCell({ i + 2 ,i + 3 });
+        cell_line->InsertNextCell({ i + 0, i + 1 });
+        cell_line->InsertNextCell({ i + 1, i + 2 });
+        cell_line->InsertNextCell({ i + 2, i + 3 });
+    }
+    for (long long i = 0; i < 33; i += 4)
+    {
+        cell_line->InsertNextCell({ i + 0,i + 4 });
+        cell_line->InsertNextCell({ i + 1,i + 5 });
+        cell_line->InsertNextCell({ i + 2,i + 6 });
+        cell_line->InsertNextCell({ i + 3,i + 7 });
     }
 
-    int numPts = 40;
+    const int numPoints = 40;
+    const int numPolys = 27;
+    const int numLines = 66;
 
-    vtkSmartPointer<vtkFloatArray> scalars = vtkSmartPointer<vtkFloatArray>::New();        // 创建存储顶点属性的float数组
-    scalars->SetNumberOfValues(numPts);
-    for (int i = 0; i < numPts - 3; i += 4)        // 为属性数组中的每个元素设置标量值（这个标量值可以当作颜色值）
+    // 为每个顶点设置标量属性
+    vtkNew<vtkFloatArray> scalar_points;
+    scalar_points->SetNumberOfValues(numPoints);
+    for (int i = 0; i < numPoints - 3; i += 4)
     {
-        scalars->SetValue(i + 0, i);
-        scalars->SetValue(i + 1, i);
-        scalars->SetValue(i + 2, i);
-        scalars->SetValue(i + 3, i);
+        // 为属性数组中的每个元素设置标量值（这个标量值可以当作颜色值）
+        scalar_points->SetValue(i + 0, i);
+        scalar_points->SetValue(i + 1, i);
+        scalar_points->SetValue(i + 2, i);
+        scalar_points->SetValue(i + 3, i);
     }
 
-    // 两个scalar同时定义，程序结束时会中断
-    //vtkSmartPointer<vtkFloatArray> scalars_cell = vtkSmartPointer<vtkFloatArray>::New();        // 创建存储顶点属性的float数组
-    //scalars_cell->SetNumberOfValues(numPts);
-    //for (int i = 0; i < numPts; i += 3)        // 为属性数组中的每个元素设置标量值（这个标量值可以当作颜色值）
-    //{
-    //    scalars_cell->SetValue(i, 0);
-    //    scalars_cell->SetValue(i + 1, 1);
-    //    scalars_cell->SetValue(i + 2, 2);
-    //}
+    // 为每个多边形设置标量属性
+    vtkNew<vtkFloatArray> scalar_cell_poly;
+    scalar_cell_poly->SetNumberOfValues(numPolys);
+    for (int i = 0; i < numPolys; i += 3)
+    {
+        scalar_cell_poly->SetValue(i + 0, i);
+        scalar_cell_poly->SetValue(i + 1, i);
+        scalar_cell_poly->SetValue(i + 2, i);
+    }
 
-    vtkSmartPointer<vtkPolyData> poly = vtkSmartPointer<vtkPolyData>::New();
-    poly->SetPoints(points);
-    //poly->SetLines(cell_line);
-    poly->SetPolys(cell_poly);
-    //poly->GetPointData()->SetScalars(scalars);
-    //poly->GetCellData()->SetScalars(scalars_cell);
+    // 为每条线段设置标量属性
+    vtkNew<vtkFloatArray> scalar_cell_line;
+    scalar_cell_line->SetNumberOfValues(numLines);
+    for (long long i = 0; i < 37; i += 3)
+    {
+        scalar_cell_line->SetValue(i + 0, i);
+        scalar_cell_line->SetValue(i + 1, i);
+        scalar_cell_line->SetValue(i + 2, i);
+    }
+    for (long long i = 30; i < 63; i += 4)
+    {
+        scalar_cell_line->SetValue(i + 0, i - 30);
+        scalar_cell_line->SetValue(i + 1, i - 30);
+        scalar_cell_line->SetValue(i + 2, i - 30);
+        scalar_cell_line->SetValue(i + 3, i - 30);
+    }
 
-    vtkSmartPointer<vtkPolyData> poly_line = vtkSmartPointer<vtkPolyData>::New();
-    poly_line->SetPoints(points);
-    poly_line->SetLines(cell_line);
+    // 多边形，格点数据
+    vtkNew<vtkPolyData> polyData_poly_scalarPoint;
+    polyData_poly_scalarPoint->SetPoints(points);
+    polyData_poly_scalarPoint->SetPolys(cell_poly);
+    polyData_poly_scalarPoint->GetPointData()->SetScalars(scalar_points);
+
+    // 线段，格点数据
+    vtkNew<vtkPolyData> polyData_line_scalarPoint;
+    polyData_line_scalarPoint->SetPoints(points);
+    polyData_line_scalarPoint->SetLines(cell_line);
+    polyData_line_scalarPoint->GetPointData()->SetScalars(scalar_points);
+
+    // 多边形，格心数据
+    vtkNew<vtkPolyData> polyData_poly_scalarCell;
+    polyData_poly_scalarCell->SetPoints(points);
+    polyData_poly_scalarCell->SetPolys(cell_poly);
+    polyData_poly_scalarCell->GetCellData()->SetScalars(scalar_cell_poly);
+
+    // 线段，格心数据
+    vtkNew<vtkPolyData> polyData_line_scalarCell;
+    polyData_line_scalarCell->SetPoints(points);
+    polyData_line_scalarCell->SetLines(cell_line);
+    polyData_line_scalarCell->GetPointData()->SetScalars(scalar_cell_line);
 
     // 创建颜色查找表
     vtkSmartPointer<vtkLookupTable> hueLut = vtkSmartPointer<vtkLookupTable>::New();
-    //hueLut->SetNumberOfColors(numPts);        // 指定颜色查找表中有多少种颜色，默认256
-    hueLut->SetHueRange(0.67, 0.0);            // 设定HSV颜色范围，色调H取值范围为0°～360°，从红色开始按逆时针方向计算，红色为0°/0.0，绿色为120°/0.34,蓝色为240°/0.67
+    hueLut->SetHueRange(0.67, 0.0);
     hueLut->SetRampToSQRT();
     hueLut->Build();
+
+    // mapper
+    vtkNew<vtkPolyDataMapper> mapperPoly_scalarCell;
+    mapperPoly_scalarCell->SetInputData(polyData_poly_scalarCell);
+    mapperPoly_scalarCell->SetLookupTable(hueLut);
+    mapperPoly_scalarCell->SetScalarRange(scalar_cell_poly->GetRange());
+
+    vtkNew<vtkPolyDataMapper> mapperLine_scalarCell;
+    mapperLine_scalarCell->SetInputData(polyData_line_scalarCell);
+    mapperLine_scalarCell->SetLookupTable(hueLut);
+    mapperLine_scalarCell->SetScalarRange(scalar_cell_line->GetRange());
+
+    vtkNew<vtkPolyDataMapper> mapperPoly_scalarPoint;
+    mapperPoly_scalarPoint->SetInputData(polyData_poly_scalarPoint);
+    mapperPoly_scalarPoint->SetLookupTable(hueLut);
+    mapperPoly_scalarPoint->SetScalarRange(scalar_points->GetRange());
+
+    vtkNew<vtkPolyDataMapper> mapperLine_scalarPoint;
+    mapperLine_scalarPoint->SetInputData(polyData_line_scalarPoint);
+    mapperLine_scalarPoint->SetLookupTable(hueLut);
+    mapperLine_scalarPoint->SetScalarRange(scalar_points->GetRange());
+
+    vtkNew<vtkActor> actorPolyPoint;
+    vtkNew<vtkActor> actorPolyCell;
+    vtkNew<vtkActor> actorLinePoint;
+    vtkNew<vtkActor> actorLineCell;
+    actorPolyPoint->SetMapper(mapperPoly_scalarPoint);
+    actorPolyCell->SetMapper(mapperPoly_scalarCell);
+    actorLinePoint->SetMapper(mapperLine_scalarPoint);
+    actorLineCell->SetMapper(mapperLine_scalarCell);
+
+    // 以点，线，面方式显示
+    //actor->GetProperty()->SetRepresentationToSurface();
+    //actor->GetProperty()->SetRepresentationToWireframe();
+    //actor->GetProperty()->SetRepresentationToPoints();
+
+    actorPolyCell->GetProperty()->SetRepresentationToWireframe();
+
+    vtkNew<vtkRenderer> topLeftRenderer;
+    vtkNew<vtkRenderer> topRightRenderer;
+    vtkNew<vtkRenderer> bottomLeftRenderer;
+    vtkNew<vtkRenderer> bottomRightRenderer;
+    topLeftRenderer->AddActor(actorPolyPoint);
+    topRightRenderer->AddActor(actorPolyCell);
+    bottomLeftRenderer->AddActor(actorLinePoint);
+    bottomRightRenderer->AddActor(actorLineCell);
+
+    vtkNew<vtkRenderWindow> window;
+    window->AddRenderer(topLeftRenderer);
+    topLeftRenderer->SetViewport(0, 0.5, 0.5, 1);
+    window->AddRenderer(topRightRenderer);
+    topRightRenderer->SetViewport(0.5, 0.5, 1, 1);
+    window->AddRenderer(bottomLeftRenderer);
+    bottomLeftRenderer->SetViewport(0, 0, 0.5, 0.5);
+    window->AddRenderer(bottomRightRenderer);
+    bottomRightRenderer->SetViewport(0.5, 0, 1, 0.5);
+
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(window);
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    window->SetSize(800, 600);
+    window->Render();
+    renderWindowInteractor->Start();
+#else
+
+    std::vector<float> vertices{
+        0.,0.,
+        0.,1.,
+        0.,2.,
+        0.,3.,
+
+        1.,3.,
+        1.,2.,
+        1.,1.,
+        1.,0.,
+
+        2.,0.,
+        2.,1.,
+        2.,2.,
+        2.,3.,
+
+        3.,3.,
+        3.,2.,
+        3.,1.,
+        3.,0.
+    };
+
+    std::vector<int> indicesPoly{
+        0,1,6,7,
+        1,2,5,6,
+        2,3,4,5,
+
+        4,5,10,11,
+        5,6,9,10,
+        6,7,8,9,
+
+        8,9,14,15,
+        9,10,13,14,
+        10,11,12,13,
+    };
+
+    std::vector<float> fields{
+        1.0f,
+        1.0f,
+        1.0f,
+        1.0f,
+
+        2.0f,
+        2.0f,
+        2.0f,
+        2.0f,
+
+        3.0f,
+        3.0f,
+        3.0f,
+        3.0f,
+
+        4.0f,
+        4.0f,
+        4.0f,
+        4.0f,
+    };
+
+    auto GenPolyData = [vertices, indicesPoly, fields]()
+    {
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkPoints> points;
+        vtkNew<vtkCellArray> cellsLine;
+        vtkNew<vtkCellArray> cellsPoly;
+
+        for (size_t i = 0; i < vertices.size(); i += 2)
+        {
+            points->InsertNextPoint(vertices[i], vertices[i + 1], 0.0);
+        }
+
+        for (size_t i = 0; i < indicesPoly.size(); i += 4)
+        {
+            cellsPoly->InsertNextCell({ indicesPoly[i],indicesPoly[i + 1], indicesPoly[i + 2],indicesPoly[i + 3] });
+        }
+        polyData->SetPoints(points);
+        polyData->SetPolys(cellsPoly);
+
+        vtkNew<vtkFloatArray> scalars;
+        for (size_t i = 0; i < 16; ++i)
+        {
+            scalars->InsertNextValue(fields[i]);
+        }
+
+        polyData->GetPointData()->SetScalars(scalars);
+
+        return polyData;
+    };
+
+    //-------------------------------------------------------------------
+
+    // 创建颜色查找表
+    vtkNew<vtkLookupTable> hueLut;
+    std::cout << "------------------------------------------\n";
+    std::cout << "GetNumberOfColors\t" << hueLut->GetNumberOfColors() << '\n';
+    std::cout << "GetNumberOfTableValues\t" << hueLut->GetNumberOfTableValues() << '\n';
+    std::cout << "GetNumberOfColorsMinValue\t" << hueLut->GetNumberOfColorsMinValue() << '\n';
+    std::cout << "GetNumberOfColorsMaxValue\t" << hueLut->GetNumberOfColorsMaxValue() << '\n';
+    std::cout << "GetNumberOfAnnotatedValues\t" << hueLut->GetNumberOfAnnotatedValues() << '\n';
+    std::cout << "GetNumberOfAvailableColors\t" << hueLut->GetNumberOfAvailableColors() << '\n';
+
+    hueLut->SetNumberOfColors(10);          // 指定颜色查找表中有多少种颜色，默认256
+    hueLut->SetHueRange(0.67, 0.0);         // 设定HSV颜色范围，色调H取值范围为0°～360°，从红色开始按逆时针方向计算，红色为0°/0.0，绿色为120°/0.34,蓝色为240°/0.67
+    //hueLut->SetRampToSQRT();
     //hueLut->UseAboveRangeColorOn();
     //hueLut->SetAboveRangeColor(0.0, 1.0, 0.0, 0.0);
     //hueLut->SetBelowRangeColor(1.0, 1.0, 0.0, 0.0);
+    //hueLut->SetNumberOfTableValues(20);
+    //hueLut->SetAlphaRange(1.0, 1.0);
+    //hueLut->SetValueRange(1, 1);
+    //hueLut->SetSaturationRange(1, 1);
+    hueLut->SetRange(GenPolyData()->GetPointData()->GetScalars()->GetRange());
+    hueLut->Build();
 
-    auto num = hueLut->GetNumberOfColors();
+    //---------------------------------------------------------
 
-    vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    mapper->InterpolateScalarsBeforeMappingOn();  //设置颜色映射模式，类似纹理贴图
+    vtkNew<vtkPolyDataMapper> mapper;
+    std::cout << "------------------------------------------\n";
+    std::cout << "GetScalarVisibility : " << mapper->GetScalarVisibility() << '\n';
+    std::cout << "GetColorModeAsString : " << mapper->GetColorModeAsString() << '\n';
+    std::cout << "GetScalarModeAsString" << mapper->GetScalarModeAsString() << '\n';
+
     //mapper->SeamlessUOn();
     //mapper->SeamlessVOn();
-    mapper->SetInputData(poly);
-    mapper->SetScalarRange(0, 36);            // 设置标量值的范围
-    //mapper->ScalarVisibilityOn();
-    //mapper->SetColorModeToMapScalars();        // 无论变量数据是何种类型，该方法都通过查询表对标量数据进行映射
-    //mapper->SetColorModeToDefault();        // 默认的映射器行为，即把unsigned char类型的标量属性数据当作颜色值，不执行隐式。对于其他类型的标量数据，将通过查询表映射。
+    mapper->SetInputData(GenPolyData());
+    mapper->SetScalarRange(mapper->GetInput()->GetPointData()->GetScalars()->GetRange());            // 设置标量值的范围
+    mapper->ScalarVisibilityOn(); // 默认开启标量属性显示
+
     mapper->SetLookupTable(hueLut);
+    //mapper->InterpolateScalarsBeforeMappingOn();  // 设置颜色映射模式为梯度平滑，类似纹理贴图
+    mapper->InterpolateScalarsBeforeMappingOff();   // 颜色平滑过度
+
     //mapper->SetColorMode(1);
-    //auto mode = mapper->GetColorMode();
-    //mapper->SetColorModeToMapScalars();
-    //mapper->PassAlphaToOutputOn();
+    //mapper->SetColorModeToMapScalars();        // 无论变量数据是何种类型，该方法都通过查询表对标量数据进行映射
+    //mapper->SetColorModeToDefault();           // 默认的映射器行为，即把unsigned char类型的标量属性数据当作颜色值，不执行隐式。对于其他类型的标量数据，将通过查询表映射。
+    //mapper->SetColorModeToDirectScalars();
+
     //mapper->SetScalarModeToUseCellData();
     //mapper->SetScalarModeToUseCellFieldData();
     //mapper->SetScalarModeToUsePointFieldData();
     //mapper->SetScalarModeToUseFieldData();
     //mapper->SetScalarModeToUsePointData();
-    //mapper->SetColorModeToDirectScalars();
-    //mapper->SetColorModeToDefault();
 
-
-    vtkSmartPointer<vtkPolyDataMapper> mapper_line = vtkSmartPointer<vtkPolyDataMapper>::New();
-    mapper_line->SetInputData(poly_line);
+    //---------------------------------------------------------
 
     vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
+    std::cout << "------------------------------------------\n";
+    std::cout << "Interpolation\t" << actor->GetProperty()->GetInterpolationAsString() << '\n';
     actor->SetMapper(mapper);
-    //actor->GetProperty()->SetInterpolationToFlat();
-    actor->GetProperty()->SetInterpolation(0);
-    auto ret = actor->GetProperty()->GetInterpolationAsString();
 
-    vtkSmartPointer<vtkActor> actor_line = vtkSmartPointer<vtkActor>::New();
-    actor_line->SetMapper(mapper_line);
-    actor_line->GetProperty()->SetColor(1, 1, 1);
-
-    //！[0]
-    //vtkSmartPointer<vtkScalarBarActor> scalarBar = vtkSmartPointer<vtkScalarBarActor>::New();
-    //scalarBar->SetLookupTable(mapper->GetLookupTable());
-    ////scalarBar->SetLookupTable(colorMap);
-    ////scalarBar->SetTitle("Title");     //颜色映射表标题
-    //scalarBar->SetNumberOfLabels(10);   //标签文本个数
-    //scalarBar->SetTextPad(5);           //设置文本框周围的填充量，就是标签文本距离颜色映射表的距离
-    ////scalarBar->SetPosition(0, 0);     //设置位置
-
-    ////scalarBar->SetUseOpacity(1);      //设置不透明度
-    ////scalarBar->UseOpacityOn();
-    //scalarBar->SetMaximumNumberOfColors(20); //设置映射表中颜色分段个数，默认64
-    ////scalarBar->SetLayerNumber(0);
-    ////scalarBar->SetTextureGridWidth(10);
-    ////scalarBar->SetDrawAnnotations(0);
-    //vtkNew<vtkTextProperty> textProperty;
-    //textProperty->SetColor(1, 0, 0);
-    //scalarBar->SetLabelTextProperty(textProperty);
-    //! [0]
-
-    //! [1]
-    vtkSmartPointer<vtkScalarBarActor> scalarBar =
-        vtkSmartPointer<vtkScalarBarActor>::New();
-    vtkSmartPointer<vtkLookupTable> pColorTable =
-        vtkSmartPointer<vtkLookupTable>::New();
-    pColorTable->SetNumberOfTableValues(20);
-    pColorTable->SetHueRange(0.67, 0);//标量条颜色范围，从蓝到红
-    pColorTable->SetAlphaRange(1.0, 1.0);
-    pColorTable->SetValueRange(1, 1);
-    pColorTable->SetSaturationRange(1, 1);
-    pColorTable->SetRange(scalars->GetRange());
-    pColorTable->Build();
-
-    scalarBar->SetTitle("U (m/s)");
-    scalarBar->GetTitleTextProperty()->SetColor(0, 0, 0);
-    scalarBar->GetTitleTextProperty()->SetFontFamilyToArial();
-    scalarBar->GetTitleTextProperty()->SetFontSize(20);
-    //scalarBar->GetLabelTextProperty()->SetColor(0, 0, 0);
-    scalarBar->SetLabelFormat("%5.3f");
-    //scalarBar->GetLabelTextProperty()->SetFontFamilyToArial();
-    //scalarBar->GetLabelTextProperty()->SetFontFamilyToCourier();
-    //scalarBar->GetLabelTextProperty()->SetFontSize(20);
-    scalarBar->SetNumberOfLabels(7);
-    scalarBar->SetUnconstrainedFontSize(1);
-    scalarBar->SetMaximumWidthInPixels(80);
-    scalarBar->SetMaximumHeightInPixels(900);
-    scalarBar->SetLookupTable(pColorTable);
-    vtkNew<vtkTextProperty> textProperty;
-    textProperty->SetColor(0, 0, 0);
-    textProperty->SetFontFamilyToTimes();
-    scalarBar->SetLabelTextProperty(textProperty);
-    //! [1]
-
-    vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
-    renderer->GradientBackgroundOn();
-    renderer->SetBackground(1, 1, 1);
-    renderer->SetBackground2(0, 0, 0);
-
-    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
-    renderWindow->AddRenderer(renderer);
-    //renderWindow->Render();
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-    vtkSmartPointer<vtkInteractorStyleTrackballCamera> style = vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
-    renderWindowInteractor->SetInteractorStyle(style);
-
-    actor->GetMapper()->GetInputAsDataSet()->GetPointData()->SetScalars(scalars);
-
+    // 设置着色方法
+    //actor->GetProperty()->SetInterpolation(0);
     //actor->GetProperty()->SetInterpolationToFlat();
     //actor->GetProperty()->SetInterpolationToPBR();
     //actor->GetProperty()->SetInterpolationToGouraud();
     actor->GetProperty()->SetInterpolationToPhong();
 
     // 以点，线，面方式显示
-    actor->GetProperty()->SetRepresentationToSurface();
+    //actor->GetProperty()->SetRepresentationToSurface();
     //actor->GetProperty()->SetRepresentationToWireframe();
     //actor->GetProperty()->SetRepresentationToPoints();
-    //scalarBar->VisibilityOff();
-    renderer->AddActor(actor);
-    //renderer->AddActor(actor_line);
-    renderer->AddActor2D(scalarBar);
 
-    renderWindow->SetSize(600, 600);
+    //---------------------------------------------------------
+    vtkNew<vtkScalarBarActor> scalarBar;
+    std::cout << "------------------------------------------\n";
+    std::cout << "GetNumberOfLabels \t" << scalarBar->GetNumberOfLabels() << '\n';
+    std::cout << "GetNumberOfConsumers\t" << scalarBar->GetNumberOfConsumers() << '\n';
+    std::cout << "GetNumberOfLabelsMinValue\t" << scalarBar->GetNumberOfLabelsMinValue() << '\n';
+    std::cout << "GetNumberOfLabelsMaxValue\t" << scalarBar->GetNumberOfLabelsMaxValue() << '\n';
+    std::cout << "GetNumberOfPaths\t" << scalarBar->GetNumberOfPaths() << '\n';
+    std::cout << "GetNumberOfColors\t" << vtkLookupTable::SafeDownCast(mapper->GetLookupTable())->GetNumberOfColors() << '\n';
+    std::cout << "GetPostion\t" << scalarBar->GetPosition()[0] << '\t' << scalarBar->GetPosition()[1] << '\n';
+    std::cout << "GetPostion2\t" << scalarBar->GetPosition2()[0] << '\t' << scalarBar->GetPosition2()[1] << '\n';
+
+    scalarBar->SetLookupTable(mapper->GetLookupTable());
+    scalarBar->SetTextPad(5);           //设置文本框周围的填充量，就是标签文本距离颜色映射表的距离
+    scalarBar->SetPosition(.2, .2);     //设置位置，左下角
+    scalarBar->SetPosition2(.8, .8);    //右上角，是相对最下角的位置，不是实际位置，还包括Title的大小
+    std::cout << "GetPostion\t" << scalarBar->GetPosition()[0] << '\t' << scalarBar->GetPosition()[1] << '\n';
+    std::cout << "GetPostion2\t" << scalarBar->GetPosition2()[0] << '\t' << scalarBar->GetPosition2()[1] << '\n';
+    std::cout << "GetBarRatio\t" << scalarBar->GetBarRatio() << '\n'; // 获取颜色条相对于小部件框架的厚度。
+
+    std::cout << "GetPositionCoordinate\t" << scalarBar->GetPositionCoordinate()->GetValue()[0] << '\t' << scalarBar->GetPositionCoordinate()->GetValue()[1] << '\n';
+    std::cout << "GetPosition2Coordinate\t" << scalarBar->GetPosition2Coordinate()->GetValue()[0] << '\t' << scalarBar->GetPosition2Coordinate()->GetValue()[1] << '\n';
+
+    std::cout << "GetHeight\t" << scalarBar->GetHeight() << '\n';
+    std::cout << "GetWidth\t" << scalarBar->GetWidth() << '\n';
+
+    //scalarBar->SetUseOpacity(1);          //设置不透明度
+    //scalarBar->UseOpacityOn();
+    //scalarBar->SetLayerNumber(0);
+    //scalarBar->SetTextureGridWidth(10);
+    //scalarBar->SetDrawAnnotations(0);
+
+    // 色卡标题
+    scalarBar->SetTitle("U (m/s)");
+    scalarBar->GetTitleTextProperty()->SetColor(0, 0, 0);
+    scalarBar->GetTitleTextProperty()->SetFontFamilyToArial();
+    scalarBar->GetTitleTextProperty()->SetFontSize(20);
+
+    std::cout << "------------------------------------------\n";
+    std::cout << "GetTitleRatio\t" << scalarBar->GetTitleRatio() << '\n';
+    std::cout << "GetTitleRatioMaxValue\t" << scalarBar->GetTitleRatioMaxValue() << '\n';
+    std::cout << "GetTitleRatioMinValue\t" << scalarBar->GetTitleRatioMinValue() << '\n';
+
+    // 色卡标签
+    scalarBar->UnconstrainedFontSizeOn(); // 设置标题和标签的字体大小是否不受限制。默认设置为禁用。
+    scalarBar->SetNumberOfLabels(5);      // 标签个数，和颜色个数没关系，颜色个数由SetLookupTable的NumberOfColors决定
+    scalarBar->SetLabelFormat("%5.3f");
+    //scalarBar->GetLabelTextProperty()->SetColor(0, 0, 0);
+    //scalarBar->GetLabelTextProperty()->SetFontFamilyToArial();
+    //scalarBar->GetLabelTextProperty()->SetFontFamilyToCourier();
+    //scalarBar->GetLabelTextProperty()->SetFontSize(20);
+    std::cout << "------------------------------------------\n";
+
+
+    //设置色卡最大颜色分段个数，如果LookupTable大于该数，也只能显示MaximumNumberOfColors个颜色。太小会导致两头的颜色不显示，默认64
+    scalarBar->SetMaximumNumberOfColors(10);
+
+    scalarBar->SetMaximumWidthInPixels(80);
+    scalarBar->SetMaximumHeightInPixels(900);
+
+
+    vtkNew<vtkTextProperty> textProperty;
+    textProperty->SetColor(0, 0, 0);
+    textProperty->SetFontFamilyToTimes();
+    scalarBar->SetLabelTextProperty(textProperty);
+
+    //scalarBar->VisibilityOff(); // 不显示色卡
+
+
+    //---------------------------------------------------------
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    // 设置回调函数，用来返回色卡的位置
+    auto callback = Callback::New();
+    callback->SetScalarBar(scalarBar);
+    callback->SetRenderer(renderer);
+    renderWindowInteractor->AddObserver(vtkCommand::LeftButtonPressEvent, callback);
+
+    // 添加色卡小部件，可以使用鼠标拖动色卡，缩放色卡
+    vtkNew<vtkScalarBarWidget> scalarBarWidget;
+    scalarBarWidget->SetInteractor(renderWindowInteractor);
+    scalarBarWidget->SetScalarBarActor(scalarBar);
+    scalarBarWidget->On();
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderer->AddActor(actor);
+    //renderer->AddActor2D(scalarBar);
+
+    renderWindow->SetSize(800, 600);
     renderWindow->Render();
     renderWindowInteractor->Start();
 
+#endif
     return 0;
 }
 
@@ -3264,7 +3589,9 @@ int main()
 #endif // TEST26
 
 #ifdef TEST27
+
 // https://kitware.github.io/vtk-examples/site/Cxx/Picking/HighlightSelectedPoints/
+
 #include <vtkActor.h>
 #include <vtkAreaPicker.h>
 #include <vtkDataSetMapper.h>
@@ -3605,7 +3932,6 @@ int main(int argc, char* argv[])
 #ifdef TEST29
 
 #include <vtkActor.h>
-#include <vtkAreaPicker.h>
 #include <vtkCallbackCommand.h>
 #include <vtkCellArray.h>
 #include <vtkInteractorStyleRubberBandPick.h>
@@ -3621,121 +3947,252 @@ int main(int argc, char* argv[])
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
-#include <vtkXMLPolyDataWriter.h>
 #include <vtkSmartPointer.h>
+#include <vtkMinimalStandardRandomSequence.h>
+#include <vtkSphereSource.h>
+
+#include <vtkAreaPicker.h>
+#include <vtkPointPicker.h>
+#include <vtkCellPicker.h>
+#include <vtkPropPicker.h>
+#include <vtkPicker.h>
+#include <vtkWorldPointPicker.h>
+
+#include <vtkAssembly.h>
+
+#include <map>
 
 namespace {
+
+    std::map<vtkSmartPointer<vtkActor>, int> theActors;
+
+    class InteractorStyle : public vtkInteractorStyleRubberBandPick
+    {
+    public:
+        static InteractorStyle* New();
+        vtkTypeMacro(InteractorStyle, vtkInteractorStyleRubberBandPick);
+
+        virtual void OnLeftButtonUp() override
+        {
+            std::cout << "------------------------------------\n";
+#if(1)
+            if (this->Interactor)
+            {
+                auto posX = this->Interactor->GetEventPosition()[0];
+                auto posY = this->Interactor->GetEventPosition()[1];
+
+                std::cout << "X : " << posX << "\tY : " << posY << '\n';
+
+                if (auto areaPicker = dynamic_cast<vtkAreaPicker*>(this->Interactor->GetPicker()))
+                {
+                    // 拾取鼠标弹起位置的+-20矩形区域
+                    double bound = 20;
+                    areaPicker->AreaPick(posX - bound, posY - bound, posX + bound, posY + bound, this->CurrentRenderer);
+
+                    auto pickPosition = areaPicker->GetPickPosition();
+                    auto selectionPoint = areaPicker->GetSelectionPoint();
+
+                    std::cout << "pickPosition\t" << pickPosition[0] << '\t' << pickPosition[1] << '\t' << pickPosition[2] << '\n';
+                    std::cout << "selectionPoint\t" << selectionPoint[0] << '\t' << selectionPoint[1] << '\t' << selectionPoint[2] << '\n';
+                }
+                else
+                {
+                    auto picker = this->Interactor->GetPicker();
+                    picker->Pick(posX, posY, 0, this->CurrentRenderer);
+
+                    
+
+                    auto pickPosition = picker->GetPickPosition();     // 模型坐标，不是世界坐标，如果多个actor叠加，返回前面的actor坐标
+                    auto selectionPoint = picker->GetSelectionPoint(); // 窗口坐标
+
+                    std::cout << "pickPosition\t" << pickPosition[0] << '\t' << pickPosition[1] << '\t' << pickPosition[2] << '\n';
+                    std::cout << "selectionPoint\t" << selectionPoint[0] << '\t' << selectionPoint[1] << '\t' << selectionPoint[2] << '\n';
+                }
+
+            }
+#endif
+            this->CurrentRenderer->RemoveAllViewProps();
+
+            if (!this->Interactor)
+            {
+                auto posX = this->Interactor->GetEventPosition()[0];
+                auto posY = this->Interactor->GetEventPosition()[1];
+
+                std::cout << "X : " << posX << "\tY : " << posY << '\n';
+
+                vtkNew<vtkAreaPicker> areaPicker;
+                this->Interactor->SetPicker(areaPicker);
+                double bound = 20;
+                areaPicker->AreaPick(posX - bound, posY - bound, posX + bound, posY + bound, this->CurrentRenderer);
+                auto props = areaPicker->GetProp3Ds();
+                props->InitTraversal();
+                auto num = props->GetNumberOfItems();
+                std::cout << "actor number : " << num << '\n';
+                if (num == 1)
+                {
+                    auto prop = props->GetNextProp3D();
+                    auto assembly = vtkAssembly::SafeDownCast(prop);
+                    auto parts = assembly->GetParts();
+                    auto num2 = parts->GetNumberOfItems();
+
+                    for (size_t i = 0; i < num2; ++i)
+                    {
+                        auto actor = vtkActor::SafeDownCast(parts->GetNextProp3D());
+
+                        for (auto [actor_, id_] : theActors)
+                        {
+                            if (actor == actor_)
+                            {
+                                std::cout << "pick id : " << id_ << '\t';
+                            }
+                        }
+                    }
+                    std::cout << '\n';
+                }
+
+                vtkNew<vtkPropPicker> picker;
+                this->Interactor->SetPicker(picker);
+
+                if (picker->Pick(posX, posY, 0, this->CurrentRenderer) != 0)
+                {
+                    auto pickPosition = picker->GetPickPosition();
+                    std::cout << "pickPostion : " << pickPosition[0] << '\t' << pickPosition[1] << '\t' << pickPosition[2] << '\n';
+                }
+            }
+
+            Superclass::OnLeftButtonUp();
+        }
+    };
+
+    vtkStandardNewMacro(InteractorStyle);
+
     void PickCallbackFunction(vtkObject* caller, long unsigned int eventId,
         void* clientData, void* callData);
-}
 
-vtkSmartPointer<vtkActor> actor;
-vtkSmartPointer<vtkActor> actor1;
-vtkSmartPointer<vtkActor> actor2;
+}
 
 int main(int, char* [])
 {
-    // Create a set of points
-    vtkNew<vtkPoints> points;
-    vtkNew<vtkCellArray> vertices;
-    vtkIdType pid[1];
-    pid[0] = points->InsertNextPoint(1.0, 0.0, 0.0);
-    vertices->InsertNextCell(1, pid);
-
-    vtkNew<vtkPoints> points1;
-    vtkNew<vtkCellArray> vertices1;
-    pid[0] = points1->InsertNextPoint(0.0, 0.0, 0.0);
-    vertices1->InsertNextCell(1, pid);
-
-    vtkNew<vtkPoints> points2;
-    vtkNew<vtkCellArray> vertices2;
-    pid[0] = points2->InsertNextPoint(0.0, 1.0, 0.0);
-    vertices2->InsertNextCell(1, pid);
-
-    // Create a polydata
-    vtkNew<vtkPolyData> polydata;
-    polydata->SetPoints(points);
-    polydata->SetVerts(vertices);
-
-    // Create a polydata
-    vtkNew<vtkPolyData> polydata1;
-    polydata1->SetPoints(points1);
-    polydata1->SetVerts(vertices1);
-
-    // Create a polydata
-    vtkNew<vtkPolyData> polydata2;
-    polydata2->SetPoints(points2);
-    polydata2->SetVerts(vertices2);
-
-
-    // Visualize
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputData(polydata);
-
-    // Visualize
-    vtkNew<vtkPolyDataMapper> mapper1;
-    mapper1->SetInputData(polydata1);
-
-    // Visualize
-    vtkNew<vtkPolyDataMapper> mapper2;
-    mapper2->SetInputData(polydata2);
-
-    vtkNew<vtkNamedColors> colors;
-
-    actor = vtkSmartPointer<vtkActor>::New();
-    actor->SetMapper(mapper);
-    actor->GetProperty()->SetPointSize(8);
-    actor->GetProperty()->SetColor(colors->GetColor3d("green").GetData());
-
-    actor1 = vtkSmartPointer<vtkActor>::New();
-    actor1->SetMapper(mapper1);
-    actor1->GetProperty()->SetPointSize(8);
-    actor1->GetProperty()->SetColor(colors->GetColor3d("red").GetData());
-
-    actor2 = vtkSmartPointer<vtkActor>::New();
-    actor2->SetMapper(mapper2);
-    actor2->GetProperty()->SetPointSize(8);
-    actor2->GetProperty()->SetColor(colors->GetColor3d("blue").GetData());
-
     vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+#if(1)
+    vtkNew<vtkMinimalStandardRandomSequence> randomSequence;
+    randomSequence->SetSeed(8775070);
+    vtkNew<vtkAssembly> assembly;
+
+    for (int i = 0; i < 10; ++i)
+    {
+        vtkNew<vtkSphereSource> source;
+        double x, y, z, radius;
+        x = randomSequence->GetRangeValue(-5.0, 5.0);
+        randomSequence->Next();
+        y = randomSequence->GetRangeValue(-5.0, 5.0);
+        randomSequence->Next();
+        z = randomSequence->GetRangeValue(-5.0, 5.0);
+        randomSequence->Next();
+        radius = randomSequence->GetRangeValue(0.5, 1.0);
+        randomSequence->Next();
+        source->SetRadius(radius);
+        source->SetCenter(x, y, z);
+        source->SetPhiResolution(11);
+        source->SetThetaResolution(21);
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputConnection(source->GetOutputPort());
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+
+        double r, g, b;
+        r = randomSequence->GetRangeValue(0.4, 1.0);
+        randomSequence->Next();
+        g = randomSequence->GetRangeValue(0.4, 1.0);
+        randomSequence->Next();
+        b = randomSequence->GetRangeValue(0.4, 1.0);
+        randomSequence->Next();
+        actor->GetProperty()->SetDiffuseColor(r, g, b);
+        actor->GetProperty()->SetDiffuse(0.8);
+        actor->GetProperty()->SetSpecular(0.5);
+        actor->GetProperty()->SetSpecularColor(1, 1, 1);
+        actor->GetProperty()->SetSpecularPower(30.0);
+
+        theActors.emplace(actor, i);
+        assembly->AddPart(actor);
+
+        //renderer->AddActor(actor);
+    }
+
+    renderer->AddActor(assembly);
+#else
+    std::array<float, 4 * 3> vertices{
+        10,10,0,
+        20,10,0,
+        20,20,0,
+        10,20,0
+    };
+
+    std::array<long long, 4 * 2> indices{
+        0,1,
+        1,2,
+        2,3,
+        3,0
+    };
+
+    vtkNew<vtkPolyData> polyData;
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cells;
+
+    for (size_t i = 0; i < vertices.size(); i += 3)
+    {
+        points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+    }
+    for (size_t i = 0; i < indices.size(); i += 2)
+    {
+        cells->InsertNextCell({ indices[i],indices[i + 1] });
+    }
+
+    polyData->SetPoints(points);
+    polyData->SetLines(cells);
+
+    //mapper
+    vtkNew<vtkPolyDataMapper> cubeMapper;
+    cubeMapper->SetInputData(polyData);
+
+    //actor
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(cubeMapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+    actor->GetProperty()->SetLineWidth(5);
+
+    //vtkNew<vtkAssembly> assembly;
+    //assembly->AddPart(actor);
+
+    //renderer->AddActor(assembly);
+    renderer->AddActor(actor);
+#endif
+
     vtkNew<vtkRenderWindow> renderWindow;
     renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("AreaPicking");
-
-    vtkNew<vtkAreaPicker> areaPicker;
+    renderWindow->SetSize(800, 600);
 
     vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
     renderWindowInteractor->SetRenderWindow(renderWindow);
-    renderWindowInteractor->SetPicker(areaPicker);
 
-    renderer->AddActor(actor);
-    renderer->AddActor(actor1);
-    renderer->AddActor(actor2);
+    // 将拾取器设置为区域拾取
+    //vtkNew<vtkAreaPicker> areaPicker;
+    //renderWindowInteractor->SetPicker(areaPicker);
 
-    renderer->SetBackground(colors->GetColor3d("DarkSlateGray").GetData());
-
-    renderWindow->Render();
-
-    // For vtkInteractorStyleRubberBandPick - use 'r' and left-mouse to draw a
-    // selection box used to pick
-    vtkNew<vtkInteractorStyleRubberBandPick> style;
-
-    // For vtkInteractorStyleTrackballCamera - use 'p' to pick at the current
-    // mouse position
-    //  vtkNew<vtkInteractorStyleTrackballCamera> style;
-    //    paraview
-    style->SetCurrentRenderer(renderer);
+    vtkNew<InteractorStyle> style;
     renderWindowInteractor->SetInteractorStyle(style);
 
-    vtkNew<vtkCallbackCommand> pickCallback;
-    pickCallback->SetCallback(PickCallbackFunction);
+    // 拾取器回调函数
+    //vtkNew<vtkCallbackCommand> pickCallback;
+    //pickCallback->SetCallback(PickCallbackFunction);
+    //renderWindowInteractor->GetPicker()->AddObserver(vtkCommand::EndPickEvent, pickCallback);
 
-    areaPicker->AddObserver(vtkCommand::EndPickEvent, pickCallback);
-
+    renderWindow->Render();
     renderWindowInteractor->Start();
 
     return EXIT_SUCCESS;
-}
+    }
 
 namespace {
     void PickCallbackFunction(vtkObject* caller,
@@ -3743,29 +4200,29 @@ namespace {
         void* vtkNotUsed(clientData),
         void* vtkNotUsed(callData))
     {
-        std::cout << "Pick." << std::endl;
-        vtkAreaPicker* areaPicker = static_cast<vtkAreaPicker*>(caller);
-        vtkProp3DCollection* props = areaPicker->GetProp3Ds();
-        props->InitTraversal();
-
-        for (vtkIdType i = 0; i < props->GetNumberOfItems(); i++)
+        std::cout << "end pick\n";
+        if (vtkAreaPicker* areaPicker = dynamic_cast<vtkAreaPicker*>(caller))
         {
-            vtkProp3D* prop = props->GetNextProp3D();
-            std::cout << "Picked prop: " << prop << '\t';
+            vtkProp3DCollection* props = areaPicker->GetProp3Ds();
+            props->InitTraversal();
 
-            if (prop == actor)
-                std::cout << "111\n";
-
-            if (prop == actor1)
-                std::cout << "222\n";
-
-            if (prop == actor2)
-                std::cout << "333\n";
-
-            std::cout << prop->GetClassName() << std::endl;
-
+            for (vtkIdType i = 0; i < props->GetNumberOfItems(); i++)
+            {
+                vtkProp3D* prop = props->GetNextProp3D();
+                for (auto [actor, id] : theActors)
+                {
+                    if (actor == prop)
+                    {
+                        //prop->VisibilityOff();
+                        std::cout << "pick id : " << id << '\t';
+                    }
+                }
+                std::cout << '\n';
+                //return;
+            }
         }
     }
+
 } // namespace
 
 
@@ -3773,142 +4230,549 @@ namespace {
 
 #ifdef TEST30
 
-#include <vtkActor.h>
-#include <vtkFloatArray.h>
-#include <vtkLookupTable.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPointData.h>
 #include <vtkPolyData.h>
+#include <vtkPoints.h>
+#include <vtkCellArray.h>
 #include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
+#include <vtkActor.h>
 #include <vtkRenderer.h>
-#include <vtkScalarBarActor.h>
-#include <vtkSphereSource.h>
-#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkRenderWindow.h>
+#include <vtkProperty.h>
+#include <vtkCamera.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkInteractorStyleRubberBandPick.h>
+#include <vtkCoordinate.h>
+#include <vtkAbstractPicker.h>
+#include <vtkCellLocator.h>
+#include <vtkAreaPicker.h>
+#include <vtkProp3DCollection.h>
+#include <vtkRegularPolygonSource.h>
+#include <vtkPropPicker.h>
+#include <vtkPolygon.h>
+#include <vtkCellPicker.h>
+#include <vtkWorldPointPicker.h>
 
-std::string title = "origin";
+#include <vtkMatrix4x4.h>
+#include <vtkMath.h>
 
-vtkNew<vtkScalarBarActor> scalarBar;
+#include <array>
+#include <iostream>
 
-namespace {
-    // Handle mouse events
-    class MouseCallBack : public vtkInteractorStyleTrackballCamera
-    {
-    public:
-        static MouseCallBack* New();
-        vtkTypeMacro(MouseCallBack,
-            vtkInteractorStyleTrackballCamera);
-
-        MouseCallBack()
-        {
-        }
-        virtual ~MouseCallBack()
-        {
-        }
-
-        virtual void OnLeftButtonDown() override
-        {
-
-            title = "left button";
-            std::cout << "good\n";
-
-            scalarBar->SetTitle(title.c_str());
-
-            // Forward events
-            vtkInteractorStyleTrackballCamera::OnLeftButtonDown();
-        }
+// 四条线段组成一个正方形
+namespace
+{
+    std::array<float, 4 * 3> vertices1{
+        10,10,0,
+        20,10,0,
+        20,20,0,
+        10,20,0
     };
 
-    vtkStandardNewMacro(MouseCallBack);
-} // namespace
+    std::array<float, 4 * 3> vertices2{
+        10,10,10,
+        20,10,10,
+        20,20,10,
+        10,20,10
+    };
 
-int main(int, char* [])
-{
-    vtkNew<vtkNamedColors> colors;
+    std::array<long long, 4 * 2> indices{
+        0,1,
+        1,2,
+        2,3,
+        3,0
+    };
 
-    // Create a sphere for some geometry
-    vtkNew<vtkSphereSource> sphere;
-    sphere->SetCenter(0, 0, 0);
-    sphere->SetRadius(1);
-    sphere->Update();
-
-    // Create scalar data to associate with the vertices of the sphere
-    int numPts = sphere->GetOutput()->GetPoints()->GetNumberOfPoints();
-    vtkNew<vtkFloatArray> scalars;
-    scalars->SetNumberOfValues(numPts);
-    for (int i = 0; i < numPts; ++i)
+    class InteractorStyle : public vtkInteractorStyleRubberBandPick
     {
-        scalars->SetValue(i, static_cast<float>(i) / numPts);
-    }
-    vtkNew<vtkPolyData> poly;
-    poly->DeepCopy(sphere->GetOutput());
-    poly->GetPointData()->SetScalars(scalars);
+    public:
+        static InteractorStyle* New();
+        vtkTypeMacro(InteractorStyle, vtkInteractorStyleRubberBandPick);
 
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputData(poly);
-    mapper->ScalarVisibilityOn();
-    mapper->SetScalarModeToUsePointData();
-    mapper->SetColorModeToMapScalars();
+        virtual void OnLeftButtonUp() override
+        {
+            std::cout << "------------------------------------\n";
 
-    vtkNew<vtkActor> actor;
-    actor->SetMapper(mapper);
+            if (!this->Interactor)
+            {
+                auto posX = this->Interactor->GetEventPosition()[0];
+                auto posY = this->Interactor->GetEventPosition()[1];
+
+                vtkNew<vtkAreaPicker> picker;
+                this->Interactor->SetPicker(picker);
+                double bound = 5;
+                picker->AreaPick(posX - bound, posY - bound, posX + bound, posY + bound, this->CurrentRenderer);
+                auto props = picker->GetProp3Ds();
+                props->InitTraversal();
+                std::cout << "pick number: " << props->GetNumberOfItems() << '\n';
+            }
+
+            if (!this->Interactor)
+            {
+                auto posX = this->Interactor->GetEventPosition()[0];
+                auto posY = this->Interactor->GetEventPosition()[1];
+
+                vtkNew<vtkAreaPicker> picker;
+                this->Interactor->SetPicker(picker);
+                double bound = 5;
+                picker->AreaPick(posX - bound, posY - bound, posX + bound, posY + bound, this->CurrentRenderer);
+                auto props = picker->GetProp3Ds();
+                props->InitTraversal();
+                auto numPicked = props->GetNumberOfItems();
+                std::cout << "pick number: " << numPicked << '\n';
+
+                if (numPicked > 0)
+                {
+                    vtkNew<vtkCoordinate> coord;
+                    coord->SetCoordinateSystemToDisplay();
+                    coord->SetValue(posX, posY, 0.);
+                    auto worldValue = coord->GetComputedWorldValue(this->CurrentRenderer);
+                    std::cout << "world value\t" << worldValue[0] << '\t' << worldValue[1] << '\t' << worldValue[2] << '\n';
+
+                    // 查找最近的点
+                    auto cellLocator = vtkSmartPointer<vtkCellLocator>::New();
+                    cellLocator->SetDataSet(m_polyData);
+                    cellLocator->BuildLocator();
+
+                    auto assistCell = vtkSmartPointer<vtkGenericCell>::New();
+                    double closestPoint[3];   //the coordinates of the closest point will be returned here
+                    double closestPointDist2; //the squared distance to the closest point will be returned here
+                    vtkIdType cellId;         //the cell id of the cell containing the closest point will be returned here
+                    int subId;
+
+                    cellLocator->FindClosestPoint(worldValue, closestPoint, assistCell, cellId, subId, closestPointDist2);
+                    std::cout << "closest point: " << closestPoint[0] << " " << closestPoint[1] << " " << closestPoint[2] << std::endl;
+                    std::cout << "CellId: " << cellId << std::endl;
+
+                    vtkNew<vtkRegularPolygonSource> polygonSource;
+                    polygonSource->GeneratePolygonOn();
+                    polygonSource->SetNumberOfSides(30);
+                    polygonSource->SetRadius(0.5);
+                    polygonSource->SetCenter(worldValue);
+
+                    vtkNew<vtkPolyDataMapper> mapper;
+                    mapper->SetInputConnection(polygonSource->GetOutputPort());
+
+                    vtkNew<vtkActor> actor;
+                    actor->SetMapper(mapper);
+                    actor->GetProperty()->SetColor(1, 0, 0);
+
+                    this->CurrentRenderer->AddActor(actor);
+                }
+            }
+
+            if (!this->Interactor)
+            {
+                auto posX = this->Interactor->GetEventPosition()[0];
+                auto posY = this->Interactor->GetEventPosition()[1];
+
+                vtkNew<vtkPropPicker> picker;
+                this->Interactor->SetPicker(picker);
+
+                if (picker->Pick(posX, posY, 0, this->CurrentRenderer) != 0)
+                {
+                    auto pickPosition = picker->GetPickPosition();
+                    std::cout << "pickPostion : " << pickPosition[0] << '\t' << pickPosition[1] << '\t' << pickPosition[2] << '\n';
+
+                    // 查找最近的点
+                    auto cellLocator = vtkSmartPointer<vtkCellLocator>::New();
+                    cellLocator->SetDataSet(m_polyData);
+                    cellLocator->BuildLocator();
+
+                    auto assistCell = vtkSmartPointer<vtkGenericCell>::New();
+                    double closestPoint[3];   //the coordinates of the closest point will be returned here
+                    double closestPointDist2; //the squared distance to the closest point will be returned here
+                    vtkIdType cellId;         //the cell id of the cell containing the closest point will be returned here
+                    int subId;
+
+                    cellLocator->FindClosestPoint(pickPosition, closestPoint, assistCell, cellId, subId, closestPointDist2);
+                    std::cout << "closest point: " << closestPoint[0] << " " << closestPoint[1] << " " << closestPoint[2] << std::endl;
+                    std::cout << "CellId: " << cellId << std::endl;
+
+                    vtkNew<vtkRegularPolygonSource> polygonSource;
+                    polygonSource->GeneratePolygonOn();
+                    polygonSource->SetNumberOfSides(30);
+                    polygonSource->SetRadius(0.5);
+                    polygonSource->SetCenter(closestPoint);
+
+                    vtkNew<vtkPolyDataMapper> mapper;
+                    mapper->SetInputConnection(polygonSource->GetOutputPort());
+
+                    vtkNew<vtkActor> actor;
+                    actor->SetMapper(mapper);
+                    actor->GetProperty()->SetColor(1, 0, 0);
+
+                    this->CurrentRenderer->AddActor(actor);
+
+                    vtkNew<vtkPolygon> polygon;
+                }
+            }
+
+            if (!this->Interactor)
+            {
+                auto posX = this->Interactor->GetEventPosition()[0];
+                auto posY = this->Interactor->GetEventPosition()[1];
+
+                std::cout << "X : " << posX << "\tY : " << posY << '\n';
+                std::cout << "parallelScale: " << this->CurrentRenderer->GetActiveCamera()->GetParallelScale() << '\n';
+
+                vtkNew<vtkCoordinate> coord;
+                coord->SetCoordinateSystemToDisplay();
+                //coord->SetCoordinateSystemToNormalizedDisplay();
+                //coord->SetCoordinateSystemToView();
+                coord->SetValue(posX, posY, 0.);
+                auto displayValue = coord->GetComputedDisplayValue(this->CurrentRenderer);
+                auto worldValue = coord->GetComputedWorldValue(this->CurrentRenderer);
+                std::cout << "world value\t" << worldValue[0] << '\t' << worldValue[1] << '\t' << worldValue[2] << '\n';
+                std::cout << "display  value\t" << displayValue[0] << '\t' << displayValue[1] << '\t' << displayValue[2] << '\n';
+
+                //auto picker = this->Interactor->GetPicker();
+                //picker->Pick(posX, posY, 0, this->CurrentRenderer);
+
+                vtkNew<vtkAreaPicker> picker;
+                this->Interactor->SetPicker(picker);
+                double bound = 5;
+                picker->AreaPick(posX - bound, posY - bound, posX + bound, posY + bound, this->CurrentRenderer);
+                auto props = picker->GetProp3Ds();
+                props->InitTraversal();
+                std::cout << "pick number: " << props->GetNumberOfItems() << '\n';
+
+                auto pickPosition = picker->GetPickPosition();     // 模型坐标系，返回的是拾取点在模型坐标系中的值
+                auto selectionPoint = picker->GetSelectionPoint(); // 窗口坐标
+
+                std::cout << "pickPosition\t" << pickPosition[0] << '\t' << pickPosition[1] << '\t' << pickPosition[2] << '\n';
+                std::cout << "selectionPoint\t" << selectionPoint[0] << '\t' << selectionPoint[1] << '\t' << selectionPoint[2] << '\n';
+
+                auto cellLocator = vtkSmartPointer<vtkCellLocator>::New();
+                cellLocator->SetDataSet(m_polyData);
+                cellLocator->BuildLocator();
+
+                //Find the closest points to TestPoint
+                auto assistCell = vtkSmartPointer<vtkGenericCell>::New();
+                double closestPoint[3];   //the coordinates of the closest point will be returned here
+                double closestPointDist2; //the squared distance to the closest point will be returned here
+                vtkIdType cellId;         //the cell id of the cell containing the closest point will be returned here
+                int subId;
+
+                cellLocator->FindClosestPoint(worldValue, closestPoint, assistCell, cellId, subId, closestPointDist2);
+                std::cout << "closest point: " << closestPoint[0] << " " << closestPoint[1] << " " << closestPoint[2] << std::endl;
+                std::cout << "Squared distance: " << closestPointDist2 << std::endl; // 计算输入点到查找到的点之间的距离平方 worldValue <-> closestPoint
+                std::cout << "CellId: " << cellId << std::endl;
+                std::cout << "SubId: " << subId << '\n';
+
+                {
+                    std::cout << "***********************\n";
+                    // 模型坐标转世界坐标
+                    auto modelMat = this->CurrentRenderer->GetActiveCamera()->GetModelTransformMatrix();
+                    double modelPos[4]{ closestPoint[0],closestPoint[1], closestPoint[2], 0.0 };
+                    auto worldValue = modelMat->MultiplyPoint(modelPos);
+
+                    vtkNew<vtkMatrix4x4> matInvert;
+                    vtkMatrix4x4::Invert(modelMat, matInvert);
+
+                    vtkNew<vtkMatrix4x4> matTranspose;
+                    vtkMatrix4x4::Transpose(modelMat, matTranspose);
+
+                    auto modelPos1 = matInvert->MultiplyPoint(worldValue);
+                    auto modelPos2 = matTranspose->MultiplyPoint(worldValue);
+
+                    std::cout << modelPos[0] << ',' << modelPos[1] << ',' << modelPos[2] << '\n';
+                    std::cout << modelPos1[0] << ',' << modelPos1[1] << ',' << modelPos1[2] << '\n';
+                    std::cout << modelPos2[0] << ',' << modelPos2[1] << ',' << modelPos2[2] << '\n';
+                    std::cout << "******************\n";
+                }
+
+                // 模型坐标转世界坐标
+                //double ssss[4]{ closestPoint[0],closestPoint[1],closestPoint[2],0.0 };
+                double ssss[4]{ 10,10,0.0,0.0 };
+                auto mat = this->CurrentRenderer->GetActiveCamera()->GetModelTransformMatrix();
+                auto xxxx = mat->MultiplyPoint(ssss);
+
+                // 世界坐标转屏幕坐标
+                vtkNew<vtkCoordinate> coord1;
+                coord1->SetCoordinateSystemToWorld();
+                coord1->SetValue(xxxx);
+                auto displayValue1 = coord1->GetComputedDisplayValue(this->CurrentRenderer);
+                std::cout << "display  value\t" << displayValue1[0] << '\t' << displayValue1[1] << '\t' << displayValue1[2] << '\n';
+                std::cout << std::hypot(displayValue1[0] - posX, displayValue1[1] - posY) << '\n'; // 鼠标点击的位置与获取到的距离最近的点之间的距离（屏幕坐标）
+
+                vtkNew<vtkRegularPolygonSource> polygonSource;
+                polygonSource->GeneratePolygonOff();
+                polygonSource->SetNumberOfSides(30);
+                polygonSource->SetRadius(0.5);
+                polygonSource->SetCenter(closestPoint);
+
+                vtkNew<vtkPolyDataMapper> mapper;
+                mapper->SetInputConnection(polygonSource->GetOutputPort());
+
+                vtkNew<vtkActor> actor;
+                actor->SetMapper(mapper);
+                actor->GetProperty()->SetColor(1, 0, 0);
+
+                this->CurrentRenderer->AddActor(actor);
+            }
+
+            // vtkPropPicker
+            if (!this->Interactor)
+            {
+                auto posX = this->Interactor->GetEventPosition()[0];
+                auto posY = this->Interactor->GetEventPosition()[1];
+
+                vtkNew<vtkPropPicker> picker;
+                this->Interactor->SetPicker(picker);
+
+                if (picker->Pick(posX, posY, 0, this->CurrentRenderer) != 0)
+                {
+                    auto pickPosition = picker->GetPickPosition();
+                    auto actor = picker->GetActor();
+                    
+                    std::cout << actor << '\n';
+                    std::cout << "pickPostion : " << pickPosition[0] << '\t' << pickPosition[1] << '\t' << pickPosition[2] << '\n';
+
+                    vtkNew<vtkRegularPolygonSource> polygonSource;
+                    polygonSource->GeneratePolygonOff();
+                    polygonSource->SetNumberOfSides(30);
+                    polygonSource->SetRadius(0.5);
+                    polygonSource->SetCenter(pickPosition);
+
+                    vtkNew<vtkPolyDataMapper> mapper;
+                    mapper->SetInputConnection(polygonSource->GetOutputPort());
+
+                    //vtkNew<vtkActor> actor;
+                    //actor->SetMapper(mapper);
+                    //actor->GetProperty()->SetColor(1, 0, 0);
+
+                    //this->CurrentRenderer->AddActor2D(actor);
+                }
+
+            }
+
+            if (!this->Interactor)
+            {
+                auto posX = this->Interactor->GetEventPosition()[0];
+                auto posY = this->Interactor->GetEventPosition()[1];
+
+                //std::cout << "X : " << posX << "\tY : " << posY << '\n';
+
+                vtkNew<vtkCoordinate> coord;
+                coord->SetCoordinateSystemToDisplay();
+                coord->SetValue(posX, posY, 0.);
+                auto worldValue = coord->GetComputedWorldValue(this->CurrentRenderer);
+                //std::cout << "world value\t" << worldValue[0] << '\t' << worldValue[1] << '\t' << worldValue[2] << '\n';
+
+                auto cellLocator = vtkSmartPointer<vtkCellLocator>::New();
+                cellLocator->SetDataSet(m_polyData);
+                cellLocator->BuildLocator();
+
+                //Find the closest points to TestPoint
+                auto assistCell = vtkSmartPointer<vtkGenericCell>::New();
+                double closestPoint[3];   //the coordinates of the closest point will be returned here
+                double closestPointDist2; //the squared distance to the closest point will be returned here
+                vtkIdType cellId;         //the cell id of the cell containing the closest point will be returned here
+                int subId;
+
+                cellLocator->FindClosestPoint(worldValue, closestPoint, assistCell, cellId, subId, closestPointDist2);
+                //std::cout << "closest point: " << closestPoint[0] << " " << closestPoint[1] << " " << closestPoint[2] << std::endl;
+
+                auto modelMat = this->CurrentRenderer->GetActiveCamera()->GetModelTransformMatrix();
+                auto modelViewMat = this->CurrentRenderer->GetActiveCamera()->GetModelViewTransformMatrix();
+                auto viewTransMat = this->CurrentRenderer->GetActiveCamera()->GetViewTransformMatrix();
+                auto eyeTransMat = this->CurrentRenderer->GetActiveCamera()->GetEyeTransformMatrix();
+
+                auto cameraPos = this->CurrentRenderer->GetActiveCamera()->GetPosition();
+                std::cout << "camera\t" << cameraPos[0] << ',' << cameraPos[1] << ',' << cameraPos[2] << '\n';
+
+                //std::cout << "model mat: ";
+                //for (size_t i = 0; i < 16; ++i)
+                //{
+                //    std::cout << modelMat->GetData()[i] << ',';
+                //}
+                //std::cout << "\nmodel view mat: ";
+                //for (size_t i = 0; i < 16; ++i)
+                //{
+                //    std::cout << modelViewMat->GetData()[i] << ',';
+                //}
+                //std::cout << "\nview trans mat: ";
+                //for (size_t i = 0; i < 16; ++i)
+                //{
+                //    std::cout << viewTransMat->GetData()[i] << ',';
+                //}
+                //std::cout << "\neye trans mat: ";
+                //for (size_t i = 0; i < 16; ++i)
+                //{
+                //    std::cout << eyeTransMat->GetData()[i] << ',';
+                //}
+                //std::cout << '\n';
+
+                double modelPos[4]{ closestPoint[0],closestPoint[1], closestPoint[2], 0.0 };
+                auto worldValue1 = modelMat->MultiplyPoint(modelPos);
+
+                vtkNew<vtkMatrix4x4> matInvert;
+                vtkMatrix4x4::Invert(modelMat, matInvert);
+
+                vtkNew<vtkMatrix4x4> matTranspose;
+                vtkMatrix4x4::Transpose(modelMat, matTranspose);
+
+                auto modelPos1 = matInvert->MultiplyPoint(worldValue1);
+                auto modelPos2 = matTranspose->MultiplyPoint(worldValue1);
+
+                //std::cout << modelPos[0] << ',' << modelPos[1] << ',' << modelPos[2] << '\n';
+                //std::cout << modelPos1[0] << ',' << modelPos1[1] << ',' << modelPos1[2] << '\n';
+                //std::cout << modelPos2[0] << ',' << modelPos2[1] << ',' << modelPos2[2] << '\n';
+            }
 
 
-    scalarBar->SetLookupTable(mapper->GetLookupTable());
-    scalarBar->SetTitle(title.c_str());
-    scalarBar->SetNumberOfLabels(2);
-    scalarBar->SetMaximumNumberOfColors(5);
-    scalarBar->SetOrientationToHorizontal();
-    scalarBar->SetPosition(0.1, 0.1);
-    scalarBar->SetPosition2(0.9, 0.9);
-    scalarBar->SetHeight(0.1);
-    //scalarBar->SetWidth(1);
+            // 在鼠标点击处绘制一个直径始终为10个像素的圆
+            if (!this->Interactor)
+            {
+                auto posX = this->Interactor->GetEventPosition()[0];
+                auto posY = this->Interactor->GetEventPosition()[1];
+                    
+                vtkNew<vtkCoordinate> coord;
+                coord->SetCoordinateSystemToDisplay();
+                coord->SetValue(posX, posY, 0.);
+                auto worldCoord = coord->GetComputedWorldValue(this->CurrentRenderer);
 
-    // Create a lookup table to share between the mapper and the scalarbar
-    vtkNew<vtkLookupTable> hueLut;
-    hueLut->SetTableRange(0, 1);
-    hueLut->SetHueRange(0.34, 1.0);
-    hueLut->SetSaturationRange(1, 1);
-    hueLut->SetValueRange(1, 1);
-    hueLut->Build();
+                auto cameraPos = this->CurrentRenderer->GetActiveCamera()->GetPosition();
+                std::cout << "camera\t" << cameraPos[0] << ',' << cameraPos[1] << ',' << cameraPos[2] << '\n';
 
+                std::cout << "ParallelScale switch\t" << this->CurrentRenderer->GetActiveCamera()->GetParallelProjection() << '\n';
+                std::cout << "ParallelScale\t" << this->CurrentRenderer->GetActiveCamera()->GetParallelScale() << '\n';
 
-    mapper->SetLookupTable(hueLut);
-    scalarBar->SetLookupTable(hueLut);
+                vtkNew<vtkCoordinate> coord1;
+                coord1->SetCoordinateSystemToDisplay();
+                coord1->SetValue(0., 0., 0.);
+                auto worldCoord1 = coord1->GetComputedWorldValue(this->CurrentRenderer);
 
-    // Create a renderer and render window
+                vtkNew<vtkCoordinate> coord2;
+                coord2->SetCoordinateSystemToDisplay();
+                coord2->SetValue(10., 0., 0.);
+                auto worldCoord2 = coord2->GetComputedWorldValue(this->CurrentRenderer);
+
+                auto distance = std::hypot(worldCoord1[0] - worldCoord2[0], worldCoord1[1] - worldCoord2[1], worldCoord1[2] - worldCoord2[2]);
+
+                std::cout << "world 1: " << worldCoord1[0] << ',' << worldCoord1[1] << ',' << worldCoord1[2] << '\n';
+                std::cout << "world 2: " << worldCoord2[0] << ',' << worldCoord2[1] << ',' << worldCoord2[2] << '\n';
+                std::cout << "distance: " << distance << '\n';
+
+                vtkNew<vtkRegularPolygonSource> polygonSource;
+                polygonSource->GeneratePolygonOff();
+                polygonSource->SetNumberOfSides(30);
+                polygonSource->SetRadius(distance);
+                polygonSource->SetCenter(worldCoord);
+
+                vtkNew<vtkPolyDataMapper> mapper;
+                mapper->SetInputConnection(polygonSource->GetOutputPort());
+
+                vtkNew<vtkActor> actor;
+                actor->SetMapper(mapper);
+                actor->GetProperty()->SetColor(1, 0, 0);
+
+                this->CurrentRenderer->AddActor(actor);
+            }
+
+            Superclass::OnLeftButtonUp();
+        }
+        void SetPolyData(vtkSmartPointer<vtkPolyData> polyData)
+        {
+            m_polyData = polyData;
+        }
+    private:
+        vtkSmartPointer<vtkPolyData> m_polyData{ nullptr };
+    };
+
+    vtkStandardNewMacro(InteractorStyle);
+}
+
+int main()
+{
     vtkNew<vtkRenderer> renderer;
 
+    {
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkPoints> points;
+        vtkNew<vtkCellArray> cells;
 
+        for (size_t i = 0; i < vertices1.size(); i += 3)
+        {
+            points->InsertNextPoint(vertices1[i], vertices1[i + 1], vertices1[i + 2]);
+        }
+        cells->InsertNextCell({ 0,1,2,3 });
 
-    renderer->GradientBackgroundOn();
-    renderer->SetBackground(colors->GetColor3d("Indigo").GetData());
-    renderer->SetBackground2(colors->GetColor3d("LightBlue").GetData());
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
 
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName(title.c_str());
+        //mapper
+        vtkNew<vtkPolyDataMapper> cubeMapper;
+        cubeMapper->SetInputData(polyData);
 
-    // Create an interactor
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
+        //actor
+        vtkNew<vtkActor> cubeActor;
+        cubeActor->SetMapper(cubeMapper);
+        cubeActor->GetProperty()->SetColor(0, 1, 0);
 
-    vtkNew<MouseCallBack> style;
+        renderer->AddActor(cubeActor);
+    }
 
-    renderWindowInteractor->SetInteractorStyle(style);
+    {
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkPoints> points;
+        vtkNew<vtkCellArray> cells;
 
-    // Add the actors to the scene
-    renderer->AddActor(actor);
-    renderer->AddActor2D(scalarBar);
+        for (size_t i = 0; i < vertices2.size(); i += 3)
+        {
+            points->InsertNextPoint(vertices2[i], vertices2[i + 1], vertices2[i + 2]);
+        }
 
-    // Render the scene (lights and cameras are created automatically)
-    renderWindow->Render();
-    renderWindowInteractor->Start();
+        cells->InsertNextCell({ 0,1,2,3 });
 
-    return EXIT_SUCCESS;
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+
+        //mapper
+        vtkNew<vtkPolyDataMapper> cubeMapper;
+        cubeMapper->SetInputData(polyData);
+
+        //actor
+        vtkNew<vtkActor> cubeActor;
+        cubeActor->SetMapper(cubeMapper);
+        cubeActor->GetProperty()->SetColor(1, 1, 0);
+
+        renderer->AddActor(cubeActor);
+    }
+
+    // 从actor获取顶点数据
+    //auto dataset = cubeActor->GetMapper()->GetInput();
+    //vtkNew<vtkIdList> pts;
+    //dataset->GetCellPoints(1, pts);
+    //auto num = pts->GetNumberOfIds();
+    //auto id1 = pts->GetId(0);
+    //auto id2 = pts->GetId(1);
+    //double pt[3]{ 0. };
+    //dataset->GetPoint(id1, pt);
+    //dataset->GetPoint(id2, pt);
+
+    //renderer
+    renderer->GetActiveCamera()->ParallelProjectionOff();
+    renderer->ResetCamera();
+
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(600, 600);
+
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<InteractorStyle> style;
+    //style->SetPolyData(polyData);
+    iren->SetInteractorStyle(style);
+
+    //数据交互
+    renWin->Render();
+    iren->Start();
+
+    return 0;
 }
 
 #endif // TEST30
@@ -4008,107 +4872,1062 @@ int main(int, char* [])
 
 #ifdef TEST32
 
-#include <vtkAxis.h>
-#include <vtkBrush.h>
-#include <vtkChartHistogram2D.h>
-#include <vtkColor.h>
-#include <vtkColorLegend.h>
+#include <vtkActor.h>
+#include <vtkArrowSource.h>
+#include <vtkBandedPolyDataContourFilter.h>
+#include <vtkCamera.h>
+#include <vtkCleanPolyData.h>
+#include <vtkColorSeries.h>
 #include <vtkColorTransferFunction.h>
-#include <vtkContextScene.h>
-#include <vtkContextView.h>
+#include <vtkDelaunay2D.h>
 #include <vtkDoubleArray.h>
-#include <vtkImageData.h>
-#include <vtkMath.h>
+#include <vtkElevationFilter.h>
+#include <vtkFloatArray.h>
+#include <vtkGlyph3D.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLookupTable.h>
+#include <vtkMaskPoints.h>
 #include <vtkNamedColors.h>
 #include <vtkNew.h>
+#include <vtkParametricFunctionSource.h>
+#include <vtkParametricRandomHills.h>
+#include <vtkParametricTorus.h>
+#include <vtkPlaneSource.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkPolyDataNormals.h>
+#include <vtkProperty.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
-#include <vtkTable.h>
+#include <vtkReverseSense.h>
+#include <vtkScalarBarActor.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+#include <vtkSuperquadricSource.h>
 #include <vtkTextProperty.h>
-#include <vtkVector.h>
+#include <vtkTransform.h>
+#include <vtkTransformPolyDataFilter.h>
+#include <vtkTriangleFilter.h>
+#include <vtkVariant.h>
+#include <vtkVariantArray.h>
+#include <vtkVersion.h>
 
-//----------------------------------------------------------------------------
+#if VTK_VERSION_NUMBER >= 90020210809ULL
+#define HAS_COW
+#include <vtkCameraOrientationWidget.h>
+#endif
+
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <functional>
+#include <iomanip>
+#include <iostream>
+#include <iterator>
+#include <numeric>
+#include <set>
+#include <sstream>
+#include <string>
+#include <vector>
+
+namespace {
+    //! Generate elevations over the surface.
+    /*!
+    @param src - the vtkPolyData source.
+    @return elev - the elevations.
+    */
+    vtkSmartPointer<vtkPolyData> GetElevations(vtkPolyData* src);
+
+    vtkSmartPointer<vtkPolyData> GetHills();
+    vtkSmartPointer<vtkPolyData> GetParametricHills();
+    vtkSmartPointer<vtkPolyData> GetParametricTorus();
+    vtkSmartPointer<vtkPolyData> GetPlane();
+    vtkSmartPointer<vtkPolyData> GetSphere();
+    vtkSmartPointer<vtkPolyData> GetTorus();
+    vtkSmartPointer<vtkPolyData> GetSource(std::string const& source);
+
+    vtkSmartPointer<vtkColorSeries> GetColorSeries();
+
+    vtkSmartPointer<vtkLookupTable> GetCategoricalLUT();
+
+    vtkSmartPointer<vtkLookupTable> GetOrdinaLUT();
+
+    vtkSmartPointer<vtkLookupTable> GetDivergingLUT();
+
+    vtkSmartPointer<vtkLookupTable> ReverseLUT(vtkLookupTable* lut);
+
+    //!  Glyph the normals on the surface.
+    /*!
+    @param src - the vtkPolyData source.
+    #param scaleFactor - the scale factor for the glyphs.
+    @param reverseNormals - if True the normals on the surface are reversed.
+    @return The glyphs.
+    */
+    vtkNew<vtkGlyph3D> GetGlyphs(vtkPolyData* src, double const& scaleFactor = 1.0,
+        bool const& reverseNormals = false);
+
+    std::map<int, std::vector<double>> GetBands(double const dR[2],
+        int const& numberOfBands,
+        int const& precision = 2,
+        bool const& nearestInteger = false);
+
+    //! Divide a range into custom bands
+    /*!
+    You need to specify each band as an array [r1, r2] where r1 < r2 and
+    append these to a vector.
+    The vector should ultimately look
+    like this: [[r1, r2], [r2, r3], [r3, r4]...]
+
+    @param dR - [min, max] the range that is to be covered by the bands.
+    @param numberOfBands - the number of bands, a positive integer.
+    @param myBands - the bands.
+    @return  A map consisting of the band inxex and [min, midpoint, max] for each
+    band.
+    */
+    std::map<int, std::vector<double>>
+        GetCustomBands(double const dR[2], int const& numberOfBands,
+            std::vector<std::array<double, 2>> const& myBands);
+
+    //! Divide a range into integral bands
+    /*!
+    Divide a range into bands
+    @param dR - [min, max] the range that is to be covered by the bands.
+    @returnA map consisting of the band inxex and [min, midpoint, max] for each
+    band.
+    */
+    std::map<int, std::vector<double>> GetIntegralBands(double const dR[2]);
+
+    //! Count the number of scalars in each band.
+    /*
+     * The scalars used are the active scalars in the polydata.
+     *
+     * @param bands - the bands.
+     * @param src - the vtkPolyData source.
+     * @return The frequencies of the scalars in each band.
+     */
+    std::map<int, int> GetFrequencies(std::map<int, std::vector<double>>& bands,
+        vtkPolyData* src);
+    //!
+    /*
+     * The bands and frequencies are adjusted so that the first and last
+     *  frequencies in the range are non-zero.
+     * @param bands: The bands.
+     * @param freq: The frequencies.
+     */
+    void AdjustFrequencyRanges(std::map<int, std::vector<double>>& bands,
+        std::map<int, int>& freq);
+
+    void PrintBandsFrequencies(std::map<int, std::vector<double>> const& bands,
+        std::map<int, int>& freq, int const& precision = 2);
+
+} // namespace
+
 int main(int, char* [])
 {
-    // Define colors
-    vtkNew<vtkNamedColors> colors;
-    vtkColor3d backgroundColor = colors->GetColor3d("SlateGray");
-    vtkColor3d titleColor = colors->GetColor3d("Orange");
-    vtkColor3d axisTitleColor = colors->GetColor3d("Orange");
-    vtkColor3d axisLabelColor = colors->GetColor3d("Beige");
-    vtkColor4ub legendBackgroundColor = colors->GetColor4ub("Tomato");
+    // Get the surface
+    std::string desiredSurface{ "RandomHills" };
+    // desiredSurface = "Hills";
+    // desiredSurface = "ParametricTorus";
+    // desiredSurface = "Plane";
+    // desiredSurface = "RandomHills";
+    // desiredSurface = "Sphere";
+    // desiredSurface = "Torus";
+    auto source = GetSource(desiredSurface);
 
-
-    // Set up a 2D scene, add an XY chart to it
-    int size = 400;
-    vtkNew<vtkContextView> view;
-    view->GetRenderWindow()->SetSize(512, 512);
-    view->GetRenderWindow()->SetWindowName("Histogram2D");
-
-    view->GetRenderer()->SetBackground(backgroundColor.GetData());
-
-    // Define a chart
-    vtkNew<vtkChartHistogram2D> chart;
-
-    // Chart Title
-    chart->SetTitle("2D Histogram");
-    chart->GetTitleProperties()->SetFontSize(36);
-    chart->GetTitleProperties()->SetColor(titleColor.GetData());
-
-    // Chart Axes
-    chart->GetAxis(0)->GetTitleProperties()->SetFontSize(24);
-    chart->GetAxis(0)->GetTitleProperties()->SetColor(axisTitleColor.GetData());
-    chart->GetAxis(0)->GetLabelProperties()->SetColor(axisLabelColor.GetData());
-    chart->GetAxis(0)->GetLabelProperties()->SetFontSize(18);
-
-    chart->GetAxis(1)->GetTitleProperties()->SetFontSize(24);
-    chart->GetAxis(1)->GetTitleProperties()->SetColor(
-        colors->GetColor3d("orange").GetData());
-    chart->GetAxis(1)->GetLabelProperties()->SetColor(
-        colors->GetColor3d("beige").GetData());
-    chart->GetAxis(1)->GetLabelProperties()->SetFontSize(18);
-
-    // Chart Legend
-    dynamic_cast<vtkColorLegend*>(chart->GetLegend())->DrawBorderOn();
-    chart->GetLegend()->GetBrush()->SetColor(legendBackgroundColor);
-
-    // Add the chart to the view
-    view->GetScene()->AddItem(chart);
-
-    vtkNew<vtkImageData> data;
-    data->SetExtent(0, size - 1, 0, size - 1, 0, 0);
-    data->AllocateScalars(VTK_DOUBLE, 1);
-
-    data->SetOrigin(100.0, -100.0, 0.0);
-    data->SetSpacing(2.0, 1.0, 1.0);
-
-    double* dPtr = static_cast<double*>(data->GetScalarPointer(0, 0, 0));
-    for (int i = 0; i < size; ++i)
+    // The length of the normal arrow glyphs.
+    auto scaleFactor = 1.0;
+    if (desiredSurface == "Hills")
     {
-        for (int j = 0; j < size; ++j)
-        {
-            dPtr[i * size + j] =
-                std::sin(vtkMath::RadiansFromDegrees(double(2 * i))) *
-                std::cos(vtkMath::RadiansFromDegrees(double(j)));
-        }
+        scaleFactor = 0.5;
     }
-    chart->SetInputData(data);
+    if (desiredSurface == "Sphere")
+    {
+        scaleFactor = 2.0;
+    }
+    std::cout << desiredSurface << std::endl;
 
-    vtkNew<vtkColorTransferFunction> transferFunction;
-    transferFunction->AddHSVSegment(0.0, 0.0, 1.0, 1.0, 0.3333, 0.3333, 1.0, 1.0);
-    transferFunction->AddHSVSegment(0.3333, 0.3333, 1.0, 1.0, 0.6666, 0.6666, 1.0,
-        1.0);
-    transferFunction->AddHSVSegment(0.6666, 0.6666, 1.0, 1.0, 1.0, 0.2, 1.0, 0.3);
-    transferFunction->Build();
-    chart->SetTransferFunction(transferFunction);
+    source->GetPointData()->SetActiveScalars("Elevation");
+    auto scalarRange =
+        source->GetPointData()->GetScalars("Elevation")->GetRange();
 
-    view->GetRenderWindow()->Render();
-    view->GetInteractor()->Start();
+    auto lut = GetCategoricalLUT();
+    auto lut1 = GetOrdinaLUT();
+    lut->SetTableRange(scalarRange);
+    lut1->SetTableRange(scalarRange);
+    vtkIdType numberOfBands = lut->GetNumberOfTableValues();
+    auto precision = 10;
+    auto bands = GetBands(scalarRange, numberOfBands, precision, false);
+
+    if (desiredSurface == "RandomHills")
+    {
+        // These are my custom bands.
+        // Generated by first running:
+        // bands = GetBands(scalarRange, numberOfBands, precision, false);
+        // then:
+        //  std::vector<int> freq = Frequencies(bands, source);
+        //  PrintBandsFrequencies(bands, freq);
+        // Finally using the output to create this table:
+        std::vector<std::array<double, 2>> myBands = {
+            {0, 1.0},   {1.0, 2.0}, {2.0, 3.0}, {3.0, 4.0},
+            {4.0, 5.0}, {5.0, 6.0}, {6.0, 7.0}, {7.0, 8.0} };
+        // Comment this out if you want to see how allocating
+        // equally spaced bands works.
+        bands = GetCustomBands(scalarRange, numberOfBands, myBands);
+        // bands = GetBands(scalarRange, numberOfBands, precision, false);
+        // Adjust the number of table values
+    }
+    lut->SetNumberOfTableValues(static_cast<vtkIdType>(bands.size()));
+    lut1->SetNumberOfTableValues(static_cast<vtkIdType>(bands.size()));
+
+    // Let's do a frequency table.
+    auto freq = GetFrequencies(bands, source);
+    AdjustFrequencyRanges(bands, freq);
+    PrintBandsFrequencies(bands, freq);
+
+    scalarRange[0] = bands.begin()->second[0];
+    scalarRange[1] = std::prev(bands.end())->second[2];
+    lut->SetTableRange(scalarRange);
+    lut->SetNumberOfTableValues(bands.size());
+
+    // We will use the midpoint of the band as the label.
+    std::vector<std::string> labels;
+    for (std::map<int, std::vector<double>>::const_iterator p = bands.begin();
+        p != bands.end(); ++p)
+    {
+        std::ostringstream os;
+        os << std::fixed << std::setw(6) << std::setprecision(2) << p->second[1];
+        labels.push_back(os.str());
+    }
+
+    // Annotate
+    vtkNew<vtkVariantArray> values;
+    for (size_t i = 0; i < labels.size(); ++i)
+    {
+        values->InsertNextValue(vtkVariant(labels[i]));
+    }
+    for (vtkIdType i = 0; i < values->GetNumberOfTuples(); ++i)
+    {
+        lut->SetAnnotation(i, values->GetValue(i).ToString());
+    }
+
+    // Create a lookup table with the colors reversed.
+    auto lutr = ReverseLUT(lut);
+
+    // Create the contour bands.
+    vtkNew<vtkBandedPolyDataContourFilter> bcf;
+    bcf->SetInputData(source);
+    // Use either the minimum or maximum value for each band.
+    int i = 0;
+    for (std::map<int, std::vector<double>>::const_iterator p = bands.begin();
+        p != bands.end(); ++p)
+    {
+        bcf->SetValue(i, p->second[2]);
+        ++i;
+    }
+    // We will use an indexed lookup table.
+    bcf->SetScalarModeToIndex();
+    bcf->GenerateContourEdgesOn();
+
+    // Generate the glyphs on the original surface.
+    auto glyph = GetGlyphs(source, scaleFactor, false);
+
+    // ------------------------------------------------------------
+    // Create the mappers and actors
+    // ------------------------------------------------------------
+    vtkNew<vtkNamedColors> colors;
+
+    // Set the background color.
+    colors->SetColor("BkgColor",
+        std::array<unsigned char, 4>{179, 204, 255, 255}.data());
+    colors->SetColor("ParaViewBkg",
+        std::array<unsigned char, 4>{82, 87, 110, 255}.data());
+
+    vtkNew<vtkPolyDataMapper> srcMapper;
+    srcMapper->SetInputConnection(bcf->GetOutputPort());
+    srcMapper->SetScalarRange(scalarRange);
+    srcMapper->SetLookupTable(lut);
+    srcMapper->SetScalarModeToUseCellData();
+
+    vtkNew<vtkActor> srcActor;
+    srcActor->SetMapper(srcMapper);
+
+    // Create contour edges
+    vtkNew<vtkPolyDataMapper> edgeMapper;
+    edgeMapper->SetInputData(bcf->GetContourEdgesOutput());
+    edgeMapper->SetResolveCoincidentTopologyToPolygonOffset();
+
+    vtkNew<vtkActor> edgeActor;
+    edgeActor->SetMapper(edgeMapper);
+    edgeActor->GetProperty()->SetColor(colors->GetColor3d("Black").GetData());
+
+    vtkNew<vtkPolyDataMapper> glyphMapper;
+    glyphMapper->SetInputConnection(glyph->GetOutputPort());
+    glyphMapper->SetScalarModeToUsePointFieldData();
+    glyphMapper->SetColorModeToMapScalars();
+    glyphMapper->ScalarVisibilityOn();
+    glyphMapper->SelectColorArray("Elevation");
+    // Colour by scalars.
+    glyphMapper->SetLookupTable(lut1);
+    glyphMapper->SetScalarRange(scalarRange);
+
+    vtkNew<vtkActor> glyphActor;
+    glyphActor->SetMapper(glyphMapper);
+
+    auto windowWidth = 800;
+    auto windowHeight = 800;
+
+    // Add scalar bars.
+    vtkNew<vtkScalarBarActor> scalarBar;
+    // This LUT puts the lowest value at the top of the scalar bar.
+    // scalarBar->SetLookupTable(lut);
+    // Use this LUT if you want the highest value at the top.
+    scalarBar->SetLookupTable(lutr);
+    scalarBar->SetTitle("Elevation");
+    scalarBar->GetTitleTextProperty()->SetColor(
+        colors->GetColor3d("AliceBlue").GetData());
+    scalarBar->GetLabelTextProperty()->SetColor(
+        colors->GetColor3d("AliceBlue").GetData());
+    scalarBar->GetAnnotationTextProperty()->SetColor(
+        colors->GetColor3d("AliceBlue").GetData());
+    scalarBar->UnconstrainedFontSizeOn();
+    scalarBar->SetMaximumWidthInPixels(windowWidth / 8);
+    scalarBar->SetMaximumHeightInPixels(windowHeight / 3);
+    scalarBar->SetPosition(0.85, 0.05);
+
+    // ------------------------------------------------------------
+    // Create the RenderWindow, Renderer and Interactor
+    // ------------------------------------------------------------
+    vtkNew<vtkRenderer> ren;
+    vtkNew<vtkRenderWindow> renWin;
+    vtkNew<vtkRenderWindowInteractor> iren;
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->AddRenderer(ren);
+    // Important: The interactor must be set prior to enabling the widget.
+    iren->SetRenderWindow(renWin);
+#ifdef HAS_COW
+    vtkNew<vtkCameraOrientationWidget> camOrientManipulator;
+    camOrientManipulator->SetParentRenderer(ren);
+    // Enable the widget.
+    camOrientManipulator->On();
+#endif
+
+    // add actors
+    ren->AddViewProp(srcActor);
+    ren->AddViewProp(edgeActor);
+    ren->AddViewProp(glyphActor);
+    ren->AddActor2D(scalarBar);
+
+    ren->SetBackground(colors->GetColor3d("ParaViewBkg").GetData());
+    renWin->SetSize(windowWidth, windowHeight);
+    renWin->SetWindowName("ElevationBandsWithGlyphs");
+
+    if (desiredSurface == "RandomHills")
+    {
+        auto camera = ren->GetActiveCamera();
+        camera->SetPosition(10.9299, 59.1505, 24.9823);
+        camera->SetFocalPoint(2.21692, 7.97545, 7.75135);
+        camera->SetViewUp(-0.230136, 0.345504, -0.909761);
+        camera->SetDistance(54.6966);
+        camera->SetClippingRange(36.3006, 77.9852);
+        renWin->Render();
+    }
+
+    iren->Start();
 
     return EXIT_SUCCESS;
 }
 
+namespace {
+    vtkSmartPointer<vtkPolyData> GetElevations(vtkPolyData* src)
+    {
+        double bounds[6] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+        src->GetBounds(bounds);
+        if (std::abs(bounds[2]) < 1.0e-8 && std::abs(bounds[3]) < 1.0e-8)
+        {
+            bounds[3] = bounds[2] + 1;
+        }
+        vtkNew<vtkElevationFilter> elevFilter;
+        elevFilter->SetInputData(src);
+        elevFilter->SetLowPoint(0, bounds[2], 0);
+        elevFilter->SetHighPoint(0, bounds[3], 0);
+        elevFilter->SetScalarRange(bounds[2], bounds[3]);
+        elevFilter->Update();
+
+        return elevFilter->GetPolyDataOutput();
+    }
+
+    vtkSmartPointer<vtkPolyData> GetHills()
+    {
+        // Create four hills on a plane.
+        // This will have regions of negative, zero and positive Gsaussian curvatures.
+
+        auto xRes = 50;
+        auto yRes = 50;
+        auto xMin = -5.0;
+        auto xMax = 5.0;
+        auto dx = (xMax - xMin) / (xRes - 1.0);
+        auto yMin = -5.0;
+        auto yMax = 5.0;
+        auto dy = (yMax - yMin) / (xRes - 1.0);
+
+        // Make a grid.
+        vtkNew<vtkPoints> points;
+        for (auto i = 0; i < xRes; ++i)
+        {
+            auto x = xMin + i * dx;
+            for (auto j = 0; j < yRes; ++j)
+            {
+                auto y = yMin + j * dy;
+                points->InsertNextPoint(x, y, 0);
+            }
+        }
+
+        // Add the grid points to a polydata object.
+        vtkNew<vtkPolyData> plane;
+        plane->SetPoints(points);
+
+        // Triangulate the grid.
+        vtkNew<vtkDelaunay2D> delaunay;
+        delaunay->SetInputData(plane);
+        delaunay->Update();
+
+        auto polydata = delaunay->GetOutput();
+
+        vtkNew<vtkDoubleArray> elevation;
+        elevation->SetNumberOfTuples(points->GetNumberOfPoints());
+
+        //  We define the parameters for the hills here.
+        // [[0: x0, 1: y0, 2: x variance, 3: y variance, 4: amplitude]...]
+        std::vector<std::array<double, 5>> hd{ {-2.5, -2.5, 2.5, 6.5, 3.5},
+                                              {2.5, 2.5, 2.5, 2.5, 2},
+                                              {5.0, -2.5, 1.5, 1.5, 2.5},
+                                              {-5.0, 5, 2.5, 3.0, 3} };
+        std::array<double, 2> xx{ 0.0, 0.0 };
+        for (auto i = 0; i < points->GetNumberOfPoints(); ++i)
+        {
+            auto x = polydata->GetPoint(i);
+            for (size_t j = 0; j < hd.size(); ++j)
+            {
+                xx[0] = std::pow(x[0] - hd[j][0] / hd[j][2], 2.0);
+                xx[1] = std::pow(x[1] - hd[j][1] / hd[j][3], 2.0);
+                x[2] += hd[j][4] * std::exp(-(xx[0] + xx[1]) / 2.0);
+            }
+            polydata->GetPoints()->SetPoint(i, x);
+            elevation->SetValue(i, x[2]);
+        }
+
+        vtkNew<vtkFloatArray> textures;
+        textures->SetNumberOfComponents(2);
+        textures->SetNumberOfTuples(2 * polydata->GetNumberOfPoints());
+        textures->SetName("Textures");
+
+        for (auto i = 0; i < xRes; ++i)
+        {
+            float tc[2];
+            tc[0] = i / (xRes - 1.0);
+            for (auto j = 0; j < yRes; ++j)
+            {
+                // tc[1] = 1.0 - j / (yRes - 1.0);
+                tc[1] = j / (yRes - 1.0);
+                textures->SetTuple(static_cast<vtkIdType>(i) * yRes + j, tc);
+            }
+        }
+
+        polydata->GetPointData()->SetScalars(elevation);
+        polydata->GetPointData()->GetScalars()->SetName("Elevation");
+        polydata->GetPointData()->SetTCoords(textures);
+
+        vtkNew<vtkPolyDataNormals> normals;
+        normals->SetInputData(polydata);
+        normals->SetInputData(polydata);
+        normals->SetFeatureAngle(30);
+        normals->SplittingOff();
+
+        vtkNew<vtkTransform> tr1;
+        tr1->RotateX(-90);
+
+        vtkNew<vtkTransformPolyDataFilter> tf1;
+        tf1->SetInputConnection(normals->GetOutputPort());
+        tf1->SetTransform(tr1);
+        tf1->Update();
+
+        return tf1->GetOutput();
+    }
+
+    vtkSmartPointer<vtkPolyData> GetParametricHills()
+    {
+        vtkNew<vtkParametricRandomHills> fn;
+        fn->AllowRandomGenerationOn();
+        fn->SetRandomSeed(1);
+        fn->SetNumberOfHills(30);
+
+        vtkNew<vtkParametricFunctionSource> source;
+        source->SetParametricFunction(fn);
+        source->SetUResolution(50);
+        source->SetVResolution(50);
+        source->SetScalarModeToZ();
+        source->Update();
+
+        // Name the arrays (not needed in VTK 6.2+ for vtkParametricFunctionSource).
+        // source->GetOutput()->GetPointData()->GetNormals()->SetName("Normals");
+        // source->GetOutput()->GetPointData()->GetScalars()->SetName("Scalars");
+        // Rename the scalars to "Elevation" since we are using the Z-scalars as
+        // elevations.
+        source->GetOutput()->GetPointData()->GetScalars()->SetName("Elevation");
+
+        vtkNew<vtkTransform> transform;
+        transform->Translate(0.0, 5.0, 15.0);
+        transform->RotateX(-90.0);
+        vtkNew<vtkTransformPolyDataFilter> transformFilter;
+        transformFilter->SetInputConnection(source->GetOutputPort());
+        transformFilter->SetTransform(transform);
+        transformFilter->Update();
+
+        return transformFilter->GetOutput();
+    }
+
+    vtkSmartPointer<vtkPolyData> GetParametricTorus()
+    {
+        vtkNew<vtkParametricTorus> fn;
+        fn->SetRingRadius(5);
+        fn->SetCrossSectionRadius(2);
+
+        vtkNew<vtkParametricFunctionSource> source;
+        source->SetParametricFunction(fn);
+        source->SetUResolution(50);
+        source->SetVResolution(50);
+        source->SetScalarModeToZ();
+        source->Update();
+
+        // Name the arrays (not needed in VTK 6.2+ for vtkParametricFunctionSource).
+        // source->GetOutput()->GetPointData()->GetNormals()->SetName("Normals");
+        // source->GetOutput()->GetPointData()->GetScalars()->SetName("Scalars");
+        // Rename the scalars to "Elevation" since we are using the Z-scalars as
+        // elevations.
+        source->GetOutput()->GetPointData()->GetScalars()->SetName("Elevation");
+
+        vtkNew<vtkTransform> transform;
+        transform->RotateX(-90.0);
+        vtkNew<vtkTransformPolyDataFilter> transformFilter;
+        transformFilter->SetInputConnection(source->GetOutputPort());
+        transformFilter->SetTransform(transform);
+        transformFilter->Update();
+
+        return transformFilter->GetOutput();
+    }
+
+    vtkSmartPointer<vtkPolyData> GetPlane()
+    {
+        vtkNew<vtkPlaneSource> source;
+        source->SetOrigin(-10.0, -10.0, 0.0);
+        source->SetPoint2(-10.0, 10.0, 0.0);
+        source->SetPoint1(10.0, -10.0, 0.0);
+        source->SetXResolution(20);
+        source->SetYResolution(20);
+        source->Update();
+
+        vtkNew<vtkTransform> transform;
+        transform->Translate(0.0, 0.0, 0.0);
+        transform->RotateX(-90.0);
+        vtkNew<vtkTransformPolyDataFilter> transformFilter;
+        transformFilter->SetInputConnection(source->GetOutputPort());
+        transformFilter->SetTransform(transform);
+        transformFilter->Update();
+
+        // We have a m x n array of quadrilaterals arranged as a regular tiling in a
+        // plane. So pass it through a triangle filter since the curvature filter only
+        // operates on polys.
+        vtkNew<vtkTriangleFilter> tri;
+        tri->SetInputConnection(transformFilter->GetOutputPort());
+
+        // Pass it though a CleanPolyDataFilter and merge any points which
+        // are coincident, or very close
+        vtkNew<vtkCleanPolyData> cleaner;
+        cleaner->SetInputConnection(tri->GetOutputPort());
+        cleaner->SetTolerance(0.005);
+        cleaner->Update();
+
+        return cleaner->GetOutput();
+    }
+
+    vtkSmartPointer<vtkPolyData> GetSphere()
+    {
+        vtkNew<vtkSphereSource> source;
+        source->SetCenter(0.0, 0.0, 0.0);
+        source->SetRadius(10.0);
+        source->SetThetaResolution(32);
+        source->SetPhiResolution(32);
+        source->Update();
+
+        return source->GetOutput();
+    }
+
+    vtkSmartPointer<vtkPolyData> GetTorus()
+    {
+        vtkNew<vtkSuperquadricSource> source;
+        source->SetCenter(0.0, 0.0, 0.0);
+        source->SetCenter(1.0, 1.0, 1.0);
+        source->SetPhiResolution(64);
+        source->SetThetaResolution(64);
+        source->SetThetaRoundness(1);
+        source->SetThickness(0.5);
+        source->SetSize(10);
+        source->SetToroidal(1);
+        source->Update();
+
+        // The quadric is made of strips, so pass it through a triangle filter as
+        // the curvature filter only operates on polys
+        vtkNew<vtkTriangleFilter> tri;
+        tri->SetInputConnection(source->GetOutputPort());
+
+        // The quadric has nasty discontinuities from the way the edges are generated
+        // so let's pass it though a CleanPolyDataFilter and merge any points which
+        // are coincident, or very close
+        vtkNew<vtkCleanPolyData> cleaner;
+        cleaner->SetInputConnection(tri->GetOutputPort());
+        cleaner->SetTolerance(0.005);
+        cleaner->Update();
+
+        return cleaner->GetOutput();
+    }
+
+    vtkSmartPointer<vtkPolyData> GetSource(std::string const& source)
+    {
+        std::string surface = source;
+        std::transform(surface.begin(), surface.end(), surface.begin(),
+            [](unsigned char c) { return std::tolower(c); });
+        std::map<std::string, int> available_surfaces = {
+            {"hills", 0},       {"parametrictorus", 1}, {"plane", 2},
+            {"randomhills", 3}, {"sphere", 4},          {"torus", 5} };
+        if (available_surfaces.find(surface) == available_surfaces.end())
+        {
+            std::cout << "The surface is not available." << std::endl;
+            std::cout << "Using RandomHills instead." << std::endl;
+            surface = "randomhills";
+        }
+        switch (available_surfaces[surface])
+        {
+        case 0:
+            return GetHills();
+            break;
+        case 1:
+            return GetParametricTorus();
+            break;
+        case 2:
+            return GetElevations(GetPlane());
+            break;
+        case 3:
+            return GetParametricHills();
+            break;
+        case 4:
+            return GetElevations(GetSphere());
+            break;
+        case 5:
+            return GetElevations(GetTorus());
+            break;
+        }
+        return GetParametricHills();
+    }
+
+    vtkSmartPointer<vtkColorSeries> GetColorSeries()
+    {
+
+        vtkNew<vtkColorSeries> colorSeries;
+        // Select a color scheme.
+        int colorSeriesEnum;
+        // colorSeriesEnum = colorSeries->BREWER_DIVERGING_BROWN_BLUE_GREEN_9;
+        // colorSeriesEnum = colorSeries->BREWER_DIVERGING_SPECTRAL_10;
+        // colorSeriesEnum = colorSeries->BREWER_DIVERGING_SPECTRAL_3;
+        // colorSeriesEnum = colorSeries->BREWER_DIVERGING_PURPLE_ORANGE_9;
+        // colorSeriesEnum = colorSeries->BREWER_SEQUENTIAL_BLUE_PURPLE_9;
+        // colorSeriesEnum = colorSeries->BREWER_SEQUENTIAL_BLUE_GREEN_9;
+        colorSeriesEnum = colorSeries->BREWER_QUALITATIVE_SET3;
+        // colorSeriesEnum = colorSeries->CITRUS;
+        colorSeries->SetColorScheme(colorSeriesEnum);
+        return colorSeries;
+    }
+
+    vtkSmartPointer<vtkLookupTable> GetCategoricalLUT()
+    {
+        vtkSmartPointer<vtkColorSeries> colorSeries = GetColorSeries();
+        // Make the lookup table.
+        vtkNew<vtkLookupTable> lut;
+        colorSeries->BuildLookupTable(lut, vtkColorSeries::CATEGORICAL);
+        lut->SetNanColor(0, 0, 0, 1);
+
+        return lut;
+    }
+
+    vtkSmartPointer<vtkLookupTable> GetOrdinaLUT()
+    {
+        vtkSmartPointer<vtkColorSeries> colorSeries = GetColorSeries();
+        // Make the lookup table.
+        vtkNew<vtkLookupTable> lut;
+        colorSeries->BuildLookupTable(lut, vtkColorSeries::ORDINAL);
+        lut->SetNanColor(0, 0, 0, 1);
+
+        return lut;
+    }
+
+    // clang-format off
+    /**
+     * See: [Diverging Color Maps for Scientific Visualization](https://www.kennethmoreland.com/color-maps/)
+     *
+     *                   start point         midPoint            end point
+     * cool to warm:     0.230, 0.299, 0.754 0.865, 0.865, 0.865 0.706, 0.016, 0.150
+     * purple to orange: 0.436, 0.308, 0.631 0.865, 0.865, 0.865 0.759, 0.334, 0.046
+     * green to purple:  0.085, 0.532, 0.201 0.865, 0.865, 0.865 0.436, 0.308, 0.631
+     * blue to brown:    0.217, 0.525, 0.910 0.865, 0.865, 0.865 0.677, 0.492, 0.093
+     * green to red:     0.085, 0.532, 0.201 0.865, 0.865, 0.865 0.758, 0.214, 0.233
+     *
+     */
+     // clang-format on
+    vtkSmartPointer<vtkLookupTable> GetDivergingLUT()
+    {
+
+        vtkNew<vtkColorTransferFunction> ctf;
+        ctf->SetColorSpaceToDiverging();
+        ctf->AddRGBPoint(0.0, 0.085, 0.532, 0.201);
+        ctf->AddRGBPoint(0.5, 0.865, 0.865, 0.865);
+        ctf->AddRGBPoint(1.0, 0.758, 0.214, 0.233);
+
+        auto tableSize = 256;
+        vtkNew<vtkLookupTable> lut;
+        lut->SetNumberOfTableValues(tableSize);
+        lut->Build();
+
+        for (auto i = 0; i < lut->GetNumberOfColors(); ++i)
+        {
+            std::array<double, 3> rgb;
+            ctf->GetColor(static_cast<double>(i) / lut->GetNumberOfColors(),
+                rgb.data());
+            std::array<double, 4> rgba{ 0.0, 0.0, 0.0, 1.0 };
+            std::copy(std::begin(rgb), std::end(rgb), std::begin(rgba));
+            lut->SetTableValue(static_cast<vtkIdType>(i), rgba.data());
+        }
+
+        return lut;
+    }
+
+    vtkSmartPointer<vtkLookupTable> ReverseLUT(vtkLookupTable* lut)
+    {
+        // First do a deep copy just to get the whole structure
+        // and then reverse the colors and annotations.
+        vtkNew<vtkLookupTable> lutr;
+        lutr->DeepCopy(lut);
+        vtkIdType t = lut->GetNumberOfTableValues() - 1;
+        for (vtkIdType i = t; i >= 0; --i)
+        {
+            std::array<double, 3> rgb{ 0.0, 0.0, 0.0 };
+            std::array<double, 4> rgba{ 0.0, 0.0, 0.0, 1.0 };
+            lut->GetColor(i, rgb.data());
+            std::copy(std::begin(rgb), std::end(rgb), std::begin(rgba));
+            rgba[3] = lut->GetOpacity(i);
+            lutr->SetTableValue(t - i, rgba.data());
+        }
+        t = lut->GetNumberOfAnnotatedValues() - 1;
+        for (vtkIdType i = t; i >= 0; --i)
+        {
+            lutr->SetAnnotation(t - i, lut->GetAnnotation(i));
+        }
+
+        return lutr;
+    }
+
+    vtkNew<vtkGlyph3D> GetGlyphs(vtkPolyData* src, double const& scaleFactor,
+        bool const& reverseNormals)
+    {
+        // Sometimes the contouring algorithm can create a volume whose gradient
+        // vector and ordering of polygon(using the right hand rule) are
+        // inconsistent. vtkReverseSense cures this problem.
+        vtkNew<vtkReverseSense> reverse;
+        vtkNew<vtkMaskPoints> maskPts;
+        maskPts->SetOnRatio(5);
+        maskPts->RandomModeOn();
+        if (reverseNormals)
+        {
+            reverse->SetInputData(src);
+            reverse->ReverseCellsOn();
+            reverse->ReverseNormalsOn();
+            maskPts->SetInputConnection(reverse->GetOutputPort());
+        }
+        else
+        {
+            maskPts->SetInputData(src);
+        }
+
+        // Source for the glyph filter
+        vtkNew<vtkArrowSource> arrow;
+        arrow->SetTipResolution(16);
+        arrow->SetTipLength(0.3);
+        arrow->SetTipRadius(0.1);
+
+        vtkNew<vtkGlyph3D> glyph;
+        glyph->SetSourceConnection(arrow->GetOutputPort());
+        glyph->SetInputConnection(maskPts->GetOutputPort());
+        glyph->SetVectorModeToUseNormal();
+        glyph->SetScaleFactor(scaleFactor);
+        glyph->SetColorModeToColorByVector();
+        glyph->SetScaleModeToScaleByVector();
+        glyph->OrientOn();
+        glyph->Update();
+
+        return glyph;
+    }
+
+    std::map<int, std::vector<double>> GetBands(double const dR[2],
+        int const& numberOfBands,
+        int const& precision,
+        bool const& nearestInteger)
+    {
+        auto prec = abs(precision);
+        prec = (prec > 14) ? 14 : prec;
+
+        auto RoundOff = [&prec](const double& x) {
+            auto pow_10 = std::pow(10.0, prec);
+            return std::round(x * pow_10) / pow_10;
+        };
+
+        std::map<int, std::vector<double>> bands;
+        if ((dR[1] < dR[0]) || (numberOfBands <= 0))
+        {
+            return bands;
+        }
+        double x[2];
+        for (int i = 0; i < 2; ++i)
+        {
+            x[i] = dR[i];
+        }
+        if (nearestInteger)
+        {
+            x[0] = std::floor(x[0]);
+            x[1] = std::ceil(x[1]);
+        }
+        double dx = (x[1] - x[0]) / static_cast<double>(numberOfBands);
+        std::vector<double> b;
+        b.push_back(x[0]);
+        b.push_back(x[0] + dx / 2.0);
+        b.push_back(x[0] + dx);
+        for (int i = 0; i < numberOfBands; ++i)
+        {
+            if (i == 0)
+            {
+                for (std::vector<double>::iterator p = b.begin(); p != b.end(); ++p)
+                {
+                    *p = RoundOff(*p);
+                }
+                b[0] = x[0];
+            }
+            bands[i] = b;
+            for (std::vector<double>::iterator p = b.begin(); p != b.end(); ++p)
+            {
+                *p = RoundOff(*p + dx);
+            }
+        }
+        return bands;
+    }
+
+    std::map<int, std::vector<double>>
+        GetCustomBands(double const dR[2], int const& numberOfBands,
+            std::vector<std::array<double, 2>> const& myBands)
+    {
+        std::map<int, std::vector<double>> bands;
+        if ((dR[1] < dR[0]) || (numberOfBands <= 0))
+        {
+            return bands;
+        }
+
+        std::vector<std::array<double, 2>> x;
+        std::copy(myBands.begin(), myBands.end(), std::back_inserter(x));
+
+        // Determine the index of the range minimum and range maximum.
+        int idxMin = 0;
+        for (auto idx = 0; idx < static_cast<int>(myBands.size()); ++idx)
+        {
+            if (dR[0] < myBands[idx][1] && dR[0] >= myBands[idx][0])
+            {
+                idxMin = idx;
+                break;
+            }
+        }
+        int idxMax = static_cast<int>(myBands.size()) - 1;
+        for (int idx = static_cast<int>(myBands.size()) - 1; idx >= 0; --idx)
+        {
+            if (dR[1] < myBands[idx][1] && dR[1] >= myBands[idx][0])
+            {
+                idxMax = static_cast<int>(idx);
+                break;
+            }
+        }
+
+        // Set the minimum to match the range minimum.
+        x[idxMin][0] = dR[0];
+        x[idxMax][1] = dR[1];
+        for (int i = idxMin; i < idxMax + 1; ++i)
+        {
+            std::vector<double> b(3);
+            b[0] = x[i][0];
+            b[1] = x[i][0] + (x[i][1] - x[i][0]) / 2.0;
+            b[2] = x[i][1];
+            bands[i] = b;
+        }
+        return bands;
+    }
+
+    std::map<int, std::vector<double>> GetIntegralBands(double const dR[2])
+    {
+        std::map<int, std::vector<double>> bands;
+        if (dR[1] < dR[0])
+        {
+            return bands;
+        }
+        double x[2];
+        for (int i = 0; i < 2; ++i)
+        {
+            x[i] = dR[i];
+        }
+        x[0] = std::floor(x[0]);
+        x[1] = std::ceil(x[1]);
+        int numberOfBands = static_cast<int>(std::abs(x[1]) + std::abs(x[0]));
+        return GetBands(x, numberOfBands, false);
+    }
+
+    std::map<int, int> GetFrequencies(std::map<int, std::vector<double>>& bands,
+        vtkPolyData* src)
+    {
+        std::map<int, int> freq;
+        for (auto i = 0; i < static_cast<int>(bands.size()); ++i)
+        {
+            freq[i] = 0;
+        }
+        vtkIdType tuples = src->GetPointData()->GetScalars()->GetNumberOfTuples();
+        for (int i = 0; i < tuples; ++i)
+        {
+            double* x = src->GetPointData()->GetScalars()->GetTuple(i);
+            for (auto j = 0; j < static_cast<int>(bands.size()); ++j)
+            {
+                if (*x <= bands[j][2])
+                {
+                    freq[j] = freq[j] + 1;
+                    break;
+                }
+            }
+        }
+        return freq;
+    }
+
+    void AdjustFrequencyRanges(std::map<int, std::vector<double>>& bands,
+        std::map<int, int>& freq)
+    {
+        // Get the indices of the first and last non-zero elements.
+        auto first = 0;
+        for (auto i = 0; i < static_cast<int>(freq.size()); ++i)
+        {
+            if (freq[i] != 0)
+            {
+                first = i;
+                break;
+            }
+        }
+        std::vector<int> keys;
+        for (std::map<int, int>::iterator it = freq.begin(); it != freq.end(); ++it)
+        {
+            keys.push_back(it->first);
+        }
+        std::reverse(keys.begin(), keys.end());
+        auto last = keys[0];
+        for (size_t i = 0; i < keys.size(); ++i)
+        {
+            if (freq[keys[i]] != 0)
+            {
+                last = keys[i];
+                break;
+            }
+        }
+        // Now adjust the ranges.
+        std::map<int, int>::iterator freqItr;
+        freqItr = freq.find(first);
+        freq.erase(freq.begin(), freqItr);
+        freqItr = ++freq.find(last);
+        freq.erase(freqItr, freq.end());
+        std::map<int, std::vector<double>>::iterator bandItr;
+        bandItr = bands.find(first);
+        bands.erase(bands.begin(), bandItr);
+        bandItr = ++bands.find(last);
+        bands.erase(bandItr, bands.end());
+        // Reindex freq and bands.
+        std::map<int, int> adjFreq;
+        int idx = 0;
+        for (auto p : freq)
+        {
+            adjFreq[idx] = p.second;
+            ++idx;
+        }
+        std::map<int, std::vector<double>> adjBands;
+        idx = 0;
+        for (auto p : bands)
+        {
+            adjBands[idx] = p.second;
+            ++idx;
+        }
+        bands = adjBands;
+        freq = adjFreq;
+    }
+
+    void PrintBandsFrequencies(std::map<int, std::vector<double>> const& bands,
+        std::map<int, int>& freq, int const& precision)
+    {
+        auto prec = abs(precision);
+        prec = (prec > 14) ? 14 : prec;
+
+        if (bands.size() != freq.size())
+        {
+            std::cout << "Bands and frequencies must be the same size." << std::endl;
+            return;
+        }
+        std::ostringstream os;
+        os << "Bands & Frequencies:\n";
+        size_t idx = 0;
+        auto total = 0;
+        auto width = prec + 6;
+        for (std::map<int, std::vector<double>>::const_iterator p = bands.begin();
+            p != bands.end(); ++p)
+        {
+            total += freq[p->first];
+            for (std::vector<double>::const_iterator q = p->second.begin();
+                q != p->second.end(); ++q)
+            {
+                if (q == p->second.begin())
+                {
+                    os << std::setw(4) << idx << " [";
+                }
+                if (q == std::prev(p->second.end()))
+                {
+                    os << std::fixed << std::setw(width) << std::setprecision(prec) << *q
+                        << "]: " << std::setw(8) << freq[p->first] << "\n";
+                }
+                else
+                {
+                    os << std::fixed << std::setw(width) << std::setprecision(prec) << *q
+                        << ", ";
+                }
+            }
+            ++idx;
+        }
+        width = 3 * width + 13;
+        os << std::left << std::setw(width) << "Total" << std::right << std::setw(8)
+            << total << std::endl;
+        std::cout << os.str() << endl;
+}
+
+} // namespace
 
 #endif // TEST32
 
@@ -4388,7 +6207,10 @@ int main(int argc, char* argv[])
 #endif // TEST34
 
 #ifdef TEST35
+
 //https://blog.csdn.net/muye2356/article/details/115144581
+
+
 #include <vtkOpenFOAMReader.h>
 #include <vtkSmartPointer.h>
 #include <vtkAppendPolyData.h>
@@ -4410,8 +6232,6 @@ int main(int argc, char* argv[])
 #include <vtkStreamTracer.h>
 #include <vtkPolyData.h>
 #include <vtkArrayCalculator.h>
-
-#include <vtkAutoInit.h>
 
 int main()
 {
@@ -4459,9 +6279,12 @@ int main()
     streamlinedata->GetPointData()->SetActiveScalars("u_mag");
 
     //计算速度范围
-    double scalarRange[2];
-    scalarRange[0] = streamlinedata->GetPointData()->GetScalars()->GetRange()[0];
-    scalarRange[1] = streamlinedata->GetPointData()->GetScalars()->GetRange()[1];
+    double scalarRange[2]{ 0.0,1.0 };
+    if (auto sxalars_ = streamlinedata->GetPointData()->GetScalars())
+    {
+        scalarRange[0] = sxalars_->GetRange()[0];
+        scalarRange[1] = sxalars_->GetRange()[1];
+    }
 
     vtkSmartPointer<vtkScalarBarActor> scalarBar =
         vtkSmartPointer<vtkScalarBarActor>::New();
@@ -4523,8 +6346,9 @@ int main()
     iren->Initialize();
     iren->Start();
 
-
+    return 0;
 }
+
 #endif // TEST35
 
 #ifdef TEST36
@@ -4986,7 +6810,6 @@ int main(int, char* [])
 #include <vtkSTLReader.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkCellData.h>
-#include <vtkScalarBarActor.h>
 #include <vtkProperty.h>
 #include <vtkTextProperty.h>
 #include <vtkProbeFilter.h>
@@ -5096,7 +6919,6 @@ int main(int, char* [])
 #include <vtkSTLReader.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkCellData.h>
-#include <vtkScalarBarActor.h>
 #include <vtkProperty.h>
 #include <vtkCellDataToPointData.h>
 #include <vtkDataSetMapper.h>
@@ -5199,7 +7021,6 @@ int main(int, char* [])
 #include <vtkSTLReader.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkCellData.h>
-#include <vtkScalarBarActor.h>
 #include <vtkProperty.h>
 #include <vtkPointDataToCellData.h>
 #include <vtkDataSetMapper.h>
@@ -5645,7 +7466,6 @@ namespace {
 #include <vtkSTLReader.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkCellData.h>
-#include <vtkScalarBarActor.h>
 #include <vtkProperty.h>
 #include <vtkTextProperty.h>
 #include <vtkImageMapToColors.h>
@@ -5778,6 +7598,7 @@ int main(int, char* [])
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkProperty.h>
+#include <vtkCoordinate.h>
 
 int main(int, char* [])
 {
@@ -9195,90 +11016,3 @@ int main(int vtkNotUsed(argc), char* vtkNotUsed(argv)[])
 
 #endif // TEST67
 
-#ifdef TEST68
-
-#include <vtkActor.h>
-#include <vtkBalloonRepresentation.h>
-#include <vtkBalloonWidget.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRegularPolygonSource.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSphereSource.h>
-
-int main(int, char* [])
-{
-    vtkNew<vtkNamedColors> colors;
-
-    // Sphere.
-    vtkNew<vtkSphereSource> sphereSource;
-    sphereSource->SetCenter(-4.0, 0.0, 0.0);
-    sphereSource->SetRadius(4.0);
-    sphereSource->Update();
-
-    vtkNew<vtkPolyDataMapper> sphereMapper;
-    sphereMapper->SetInputConnection(sphereSource->GetOutputPort());
-
-    vtkNew<vtkActor> sphereActor;
-    sphereActor->SetMapper(sphereMapper);
-    sphereActor->GetProperty()->SetColor(
-        colors->GetColor3d("MistyRose").GetData());
-
-    // Regular Polygon.
-    vtkNew<vtkRegularPolygonSource> regularPolygonSource;
-    regularPolygonSource->SetCenter(4.0, 0.0, 0.0);
-    regularPolygonSource->SetRadius(4.0);
-    regularPolygonSource->Update();
-
-    vtkNew<vtkPolyDataMapper> regularPolygonMapper;
-    regularPolygonMapper->SetInputConnection(
-        regularPolygonSource->GetOutputPort());
-
-    vtkNew<vtkActor> regularPolygonActor;
-    regularPolygonActor->SetMapper(regularPolygonMapper);
-    regularPolygonActor->GetProperty()->SetColor(
-        colors->GetColor3d("Cornsilk").GetData());
-
-    // A renderer and render window.
-    vtkNew<vtkRenderer> ren;
-    vtkNew<vtkRenderWindow> renWin;
-    renWin->AddRenderer(ren);
-    renWin->SetWindowName("BalloonWidget");
-
-    // An interactor.
-    vtkNew<vtkRenderWindowInteractor> iRen;
-    iRen->SetRenderWindow(renWin);
-
-    // Create the widget.
-    vtkNew<vtkBalloonRepresentation> balloonRep;
-    balloonRep->SetBalloonLayoutToImageRight();
-
-    vtkNew<vtkBalloonWidget> balloonWidget;
-    balloonWidget->SetInteractor(iRen);
-    balloonWidget->SetRepresentation(balloonRep);
-    balloonWidget->AddBalloon(sphereActor, "This is a sphere", nullptr);
-    balloonWidget->AddBalloon(regularPolygonActor, "This is a regular polygon",
-        nullptr);
-
-    // Add the actors to the scene.
-    ren->AddActor(sphereActor);
-    ren->AddActor(regularPolygonActor);
-    ren->SetBackground(colors->GetColor3d("SlateGray").GetData());
-
-    // Render
-    renWin->Render();
-
-    balloonWidget->EnabledOn();
-
-    // Begin mouse interaction.
-    iRen->Initialize();
-    iRen->Start();
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST68

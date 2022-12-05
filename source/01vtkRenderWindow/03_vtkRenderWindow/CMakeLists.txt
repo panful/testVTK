@@ -5,7 +5,7 @@ set(target_name "01_03_vtkRenderWindow")
 
 find_package(VTK REQUIRED)
 
-add_executable(${target_name} "main.cpp")
+add_executable(${target_name} "main.cpp" "magic_enum.hpp")
 
 target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES} )
 

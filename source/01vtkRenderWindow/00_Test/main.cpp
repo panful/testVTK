@@ -2,6 +2,7 @@
 /*
 * 1. 引用计数
 * 2. 主动释放vtk对象
+* 3. 调试vtk源码
 */
 
 #define TEST3
@@ -171,7 +172,20 @@ int main()
 
 #include <array>
 
-// bool vtkOpenGLBufferObject::UploadInternal()
+// 加载顶点拓扑数据等
+// vtkOpenGLBufferObject.cxx bool vtkOpenGLBufferObject::UploadInternal()
+
+// 设置状态，点的大小，线的粗细，深度测试等等
+// vtkOpenGLState.cxx
+
+// 设置uniform等
+// vtkShaderProgram.cxx 
+
+// 编译shader
+// vtkShader.cxx
+
+// FBO
+// vtkOpenGLFrameBufferObject.cxx
 
 int main()
 {

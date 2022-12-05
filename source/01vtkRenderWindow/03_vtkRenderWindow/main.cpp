@@ -17,7 +17,7 @@
 16.网格模型的特征边与封闭性检测 https://www.cnblogs.com/ybqjymy/p/14241831.html
 17.按键盘p键显示物体的包围盒，边框
 18.vtkLODActor 加载大型网格  vtkSelectPolyData 多边形剪切
-19.拾取 cellpick
+19.单元拾取 cellpick
 20.按钮 vtkButtonWidget
 21.vtkFeatureEdges 封闭性检测 TEST16 标注边界的类型  https://kitware.github.io/vtk-examples/site/Cxx/Meshes/BoundaryEdges/
 22.给一个没有封闭的图元加一个盖子，让它封闭 https://kitware.github.io/vtk-examples/site/Cxx/Meshes/CapClip/
@@ -28,21 +28,26 @@
 27 vtkContourTriangulator https://kitware.github.io/vtk-examples/site/Cxx/Modelling/ContourTriangulator/
 28 vtkStripper https://kitware.github.io/vtk-examples/site/Cxx/Visualization/LabelContours/
 29.自定义方法填充线框生成面，闭合线框生成三角面(一个三角面只能由三条线构成，即生成最小的所有三角面）
-30.三角剖分 https://zhuanlan.zhihu.com/p/459884570
-31.
-32.
-33.vtkCaptionWidget
+30.vtkDelaunay2D 三角剖分 TEST42 表面重建 https://zhuanlan.zhihu.com/p/459884570
+31.vtkCellType 获取actor的单元类型
+32.照相机矩阵变换
+33.vtkCaptionWidget 标注某一个点，标注类：vtkTextWidget,vtkScalarBarWidget,vtkOrientationMarkerWidget,vtkBalloonWidget
 34.vtkElevationFilter 沿指定方向生成Scalars https://kitware.github.io/vtk-examples/site/Cxx/Visualization/ProjectSphere/
 35 拾取并标记
 36.矢量图箭头大小
 37.异步创建actor std::future 多线程
-38.vtkMultiThreader
+38.vtkMultiThreader 和 std::thread
 39 MPI
 40 vtkDataSet 和 vtkPolyData
 41.vtk序列化反序列化 https://vtk.org/doc/nightly/html/classvtkDataWriter.html
+42.表面重建 vtkSurfaceReconstructionFilter TEST30 三角剖分
+43 直线与图元的交点 vtkOBBTree  线与线的交点 IntersectWithLine
+44 部分图元大小不变，位置变化
+45.图层设置，让某个mapper始终在最上层或最下层，或中间某一层
+46.
 */
 
-#define TEST40
+#define TEST32
 
 #ifdef TEST1
 
@@ -1852,7 +1857,133 @@ int main(int, char* [])
 
 #endif // TEST12
 
+#ifdef TEST13
 
+#include <vtkPolyData.h>
+#include <vtkPoints.h>
+#include <vtkCellArray.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkProperty.h>
+#include <vtkCamera.h>
+#include <vtkRenderWindowInteractor.h>
+
+#include <vtkCellCenters.h>
+#include <vtkGlyph3D.h>
+#include <vtkArrowSource.h>
+#include <vtkFloatArray.h>
+#include <vtkPointData.h>
+
+#include <array>
+#include <iostream>
+
+namespace
+{
+    std::array<float, 4 * 2> vertices{
+        0,0,
+        1,0,
+        1,1,
+        0,1
+    };
+
+    std::array<long long, 4 * 2> indices{
+        0,1,
+        2,1, // 1,2,
+        2,3,
+        3,0
+    };
+}
+
+int main()
+{
+    vtkNew<vtkPolyData> polyData;
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cells;
+
+    for (size_t i = 0; i < vertices.size(); i += 2)
+    {
+        points->InsertNextPoint(vertices[i], vertices[i + 1], 0.0f);
+    }
+    for (size_t i = 0; i < indices.size(); i += 2)
+    {
+        cells->InsertNextCell({ indices[i],indices[i + 1] });
+    }
+
+    polyData->SetPoints(points);
+    polyData->SetLines(cells);
+
+    // 取单元的中心
+    vtkNew<vtkCellCenters> cellCenters;
+    cellCenters->SetInputData(polyData);
+    cellCenters->Update();
+
+    // 设置单元的法向量
+    vtkNew<vtkFloatArray> centerVectors;
+    centerVectors->SetNumberOfComponents(3);
+    for (size_t i = 0; i < polyData->GetNumberOfCells(); ++i)
+    {
+        vtkNew<vtkIdList> pts;
+        polyData->GetCellPoints(i, pts);
+
+        auto x0 = vertices[pts->GetId(0) * 2 + 0];
+        auto y0 = vertices[pts->GetId(0) * 2 + 1];
+        auto x1 = vertices[pts->GetId(1) * 2 + 0];
+        auto y1 = vertices[pts->GetId(1) * 2 + 1];
+
+        // 逆时针多边形的外法线
+        centerVectors->InsertNextTuple3(y1 - y0, x0 - x1, .0);
+    }
+    cellCenters->GetOutput()->GetPointData()->SetVectors(centerVectors);
+
+    vtkNew<vtkArrowSource> arrow;
+    vtkNew<vtkGlyph3D> glyph;
+    glyph->SetInputData(cellCenters->GetOutput());
+    glyph->SetSourceConnection(arrow->GetOutputPort());
+    glyph->SetScaleModeToDataScalingOff();
+    glyph->SetVectorModeToUseVector();
+    glyph->Update();
+
+    //mapper
+    vtkNew<vtkPolyDataMapper> glyphMapper;
+    glyphMapper->SetInputConnection(glyph->GetOutputPort());
+
+    vtkNew<vtkPolyDataMapper> polyDataMapper;
+    polyDataMapper->SetInputData(polyData);
+
+    //actor
+    vtkNew<vtkActor> glyphActor;
+    glyphActor->SetMapper(glyphMapper);
+    glyphActor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkActor> polyDataActor;
+    polyDataActor->SetMapper(polyDataMapper);
+    polyDataActor->GetProperty()->SetColor(1, 0, 0);
+
+    //renderer
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(polyDataActor);
+    renderer->AddActor(glyphActor);
+    renderer->ResetCamera();
+
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(600, 600);
+
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    //数据交互
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST13
 
 #ifdef TEST14
 
@@ -2998,7 +3129,7 @@ int main(int, char* [])
     diskMapper->SetInputData(polyData);
     vtkNew<vtkActor> diskActor;
     diskActor->SetMapper(diskMapper);
-    diskActor->GetProperty()->SetColor(0.,1.,0.);
+    diskActor->GetProperty()->SetColor(0., 1., 0.);
 
     // Create a renderer, render window, and interactor
     vtkNew<vtkRenderer> renderer;
@@ -3011,7 +3142,7 @@ int main(int, char* [])
 
     renderer->AddActor(edgeActor);  // 边界，红色
     renderer->AddActor(diskActor); // 原始的环状图元
-    renderer->SetBackground(.1,.2,.3);
+    renderer->SetBackground(.1, .2, .3);
 
     renderWindow->Render();
     renderWindowInteractor->Start();
@@ -3503,9 +3634,9 @@ namespace
         {
             cellsLine->InsertNextCell({ indicesLine[i], indicesLine[i + 1] });
         }
-        for (size_t i = 0; i < indicesPoly.size(); i+=4)
+        for (size_t i = 0; i < indicesPoly.size(); i += 4)
         {
-            cellsPoly->InsertNextCell({indicesPoly[i],indicesPoly[i + 1], indicesPoly[i + 2],indicesPoly[i+3]});
+            cellsPoly->InsertNextCell({ indicesPoly[i],indicesPoly[i + 1], indicesPoly[i + 2],indicesPoly[i + 3] });
         }
         polyData->SetPoints(points);
         //polyData->SetLines(cellsLine);
@@ -3535,7 +3666,7 @@ int main(int argc, char* argv[])
 
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
-    actor->GetProperty()->SetColor(1,0,0);
+    actor->GetProperty()->SetColor(1, 0, 0);
 
     vtkNew<vtkRenderer> renderer;
     vtkNew<vtkRenderWindow> renderWindow;
@@ -4354,7 +4485,7 @@ namespace
             pointWithCell.emplace(i, theCells);
         }
 
-        std::map<int,std::vector<int>> otherPoints;
+        std::map<int, std::vector<int>> otherPoints;
 
         // 找到第i个点可以和那些点组成线段
         for (size_t i = 0; i < pointWithCell.size(); ++i)
@@ -4384,7 +4515,7 @@ namespace
         }
 
         // 保存所有的三角形，可能含有直线，三角面的法线可能朝内也可能朝外
-        std::vector<std::array<int,3>> triangles;
+        std::vector<std::array<int, 3>> triangles;
         for (size_t i = 0; i < otherPoints.size(); ++i)
         {
             if (otherPoints[i].size() > 2)
@@ -4411,7 +4542,7 @@ namespace
             std::cout << triangles[i][0] << '\t' << triangles[i][1] << '\t' << triangles[i][2] << std::endl;
             triangleCells->InsertNextCell({ triangles[i][0],triangles[i][1],triangles[i][2] });
         }
-        
+
         vtkNew<vtkPolyData> trianglePoly;
         trianglePoly->SetPoints(points);
         trianglePoly->SetPolys(triangleCells);
@@ -4463,7 +4594,7 @@ int main(int argc, char* argv[])
 
     renderer->AddActor(polyActor);
 
-    renderer->SetBackground(.1,.2,.3);
+    renderer->SetBackground(.1, .2, .3);
     renWin->SetSize(800, 600);
 
     renWin->Render();
@@ -4621,313 +4752,778 @@ int main(int, char* [])
 
 #ifdef TEST31
 
-#include <vtkActor.h>
-#include <vtkCellArray.h>
-#include <vtkDelaunay2D.h>
-#include <vtkMath.h>
-#include <vtkMinimalStandardRandomSequence.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPoints.h>
 #include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkPolygon.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkFloatArray.h>
-#include <vtkPointData.h>
-#include <vtkLookupTable.h>
+#include <vtkPoints.h>
 #include <vtkCellArray.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkProperty.h>
+#include <vtkCamera.h>
+#include <vtkRenderWindowInteractor.h>
+
+#include <vtkCellTypes.h>
+
+#include <array>
+#include <iostream>
+#include "magic_enum.hpp"
+
+#if(0)
+typedef enum
+{
+    // Linear cells
+    VTK_EMPTY_CELL = 0,
+    VTK_VERTEX = 1,
+    VTK_POLY_VERTEX = 2,
+    VTK_LINE = 3,
+    VTK_POLY_LINE = 4,
+    VTK_TRIANGLE = 5,
+    VTK_TRIANGLE_STRIP = 6,
+    VTK_POLYGON = 7,
+    VTK_PIXEL = 8,
+    VTK_QUAD = 9,
+    VTK_TETRA = 10,
+    VTK_VOXEL = 11,
+    VTK_HEXAHEDRON = 12,
+    VTK_WEDGE = 13,
+    VTK_PYRAMID = 14,
+    VTK_PENTAGONAL_PRISM = 15,
+    VTK_HEXAGONAL_PRISM = 16,
+
+    // Quadratic, isoparametric cells
+    VTK_QUADRATIC_EDGE = 21,
+    VTK_QUADRATIC_TRIANGLE = 22,
+    VTK_QUADRATIC_QUAD = 23,
+    VTK_QUADRATIC_POLYGON = 36,
+    VTK_QUADRATIC_TETRA = 24,
+    VTK_QUADRATIC_HEXAHEDRON = 25,
+    VTK_QUADRATIC_WEDGE = 26,
+    VTK_QUADRATIC_PYRAMID = 27,
+    VTK_BIQUADRATIC_QUAD = 28,
+    VTK_TRIQUADRATIC_HEXAHEDRON = 29,
+    VTK_TRIQUADRATIC_PYRAMID = 37,
+    VTK_QUADRATIC_LINEAR_QUAD = 30,
+    VTK_QUADRATIC_LINEAR_WEDGE = 31,
+    VTK_BIQUADRATIC_QUADRATIC_WEDGE = 32,
+    VTK_BIQUADRATIC_QUADRATIC_HEXAHEDRON = 33,
+    VTK_BIQUADRATIC_TRIANGLE = 34,
+
+    // Cubic, isoparametric cell
+    VTK_CUBIC_LINE = 35,
+
+    // Special class of cells formed by convex group of points
+    VTK_CONVEX_POINT_SET = 41,
+
+    // Polyhedron cell (consisting of polygonal faces)
+    VTK_POLYHEDRON = 42,
+
+    // Higher order cells in parametric form
+    VTK_PARAMETRIC_CURVE = 51,
+    VTK_PARAMETRIC_SURFACE = 52,
+    VTK_PARAMETRIC_TRI_SURFACE = 53,
+    VTK_PARAMETRIC_QUAD_SURFACE = 54,
+    VTK_PARAMETRIC_TETRA_REGION = 55,
+    VTK_PARAMETRIC_HEX_REGION = 56,
+
+    // Higher order cells
+    VTK_HIGHER_ORDER_EDGE = 60,
+    VTK_HIGHER_ORDER_TRIANGLE = 61,
+    VTK_HIGHER_ORDER_QUAD = 62,
+    VTK_HIGHER_ORDER_POLYGON = 63,
+    VTK_HIGHER_ORDER_TETRAHEDRON = 64,
+    VTK_HIGHER_ORDER_WEDGE = 65,
+    VTK_HIGHER_ORDER_PYRAMID = 66,
+    VTK_HIGHER_ORDER_HEXAHEDRON = 67,
+
+    // Arbitrary order Lagrange elements (formulated separated from generic higher order cells)
+    VTK_LAGRANGE_CURVE = 68,
+    VTK_LAGRANGE_TRIANGLE = 69,
+    VTK_LAGRANGE_QUADRILATERAL = 70,
+    VTK_LAGRANGE_TETRAHEDRON = 71,
+    VTK_LAGRANGE_HEXAHEDRON = 72,
+    VTK_LAGRANGE_WEDGE = 73,
+    VTK_LAGRANGE_PYRAMID = 74,
+
+    // Arbitrary order Bezier elements (formulated separated from generic higher order cells)
+    VTK_BEZIER_CURVE = 75,
+    VTK_BEZIER_TRIANGLE = 76,
+    VTK_BEZIER_QUADRILATERAL = 77,
+    VTK_BEZIER_TETRAHEDRON = 78,
+    VTK_BEZIER_HEXAHEDRON = 79,
+    VTK_BEZIER_WEDGE = 80,
+    VTK_BEZIER_PYRAMID = 81,
+
+    VTK_NUMBER_OF_CELL_TYPES
+} VTKCellType;
+#endif
 
 namespace
 {
-    std::vector<float> vertices{
-        0.,0.,
-        0.,1.,
-        0.,2.,
-        0.,3.,
+    std::array<float, 9 * 3> vertices{
+        0,2,0,
+        1,2,0,
+        2,2,0,
 
-        1.,3.,
-        1.,2.,
-        1.,1.,
-        1.,0.,
+        0,1,0,
+        1,1,0,
+        2,1,0,
 
-        2.,0.,
-        2.,1.,
-        2.,2.,
-        2.,3.,
-
-        3.,3.,
-        3.,2.,
-        3.,1.,
-        3.,0.
+        0,0,0,
+        1,0,0,
+        2,0,0
     };
 
-    std::vector<int> triangle{
-        0,1,7,
-        7,1,6,
-        1,2,5,
-        1,5,6,
-        2,3,4,
-        2,4,5,
-
-        5,4,10,
-        10,4,11,
-        6,5,9,
-        9,5,10,
-        7,6,8,
-        8,6,9,
-
-        8,9,14,
-        8,14,15,
-        9,10,13,
-        9,13,14,
-        10,11,13,
-        13,11,12
+    std::array<long long, 3 * 2> topoLine{
+        0,6,
+        1,7,
+        2,8
     };
 
-    std::vector<int> quad{
-        0,1,6,7,
-        1,2,5,6,
-        2,3,4,5,
-
-        5,4,11,10,
-        6,5,10,9,
-        7,6,9,8,
-
-        8,9,14,15,
-        9,10,13,14,
-        10,11,12,13
+    std::array<long long, 4 * 3> topoTriangle{
+        0,3,1,
+        1,5,2,
+        7,8,5,
+        3,6,7
     };
 
-    std::vector<float> fields{
-        4.0f,
-        4.0f,
-        4.0f,
-        4.0f,
-
-        4.0f,
-        1.0f,
-        1.0f,
-        4.0f,
-
-        4.0f,
-        1.0f,
-        1.0f,
-        4.0f,
-
-        4.0f,
-        4.0f,
-        4.0f,
-        4.0f,
+    std::array<long long, 4 * 2> topoQuad{
+        0,3,4,1,
+        4,7,8,5,
     };
 
-    vtkSmartPointer<vtkPolyData> GenPolyData()
-    {
-        vtkNew<vtkPolyData> polyData;
-        vtkNew<vtkPoints> points;
-        vtkNew<vtkCellArray> cellTriangle;
-        vtkNew<vtkCellArray> cellPoly;
-
-        for (size_t i = 0; i < vertices.size(); i += 2)
-        {
-            points->InsertNextPoint(vertices[i], vertices[i + 1], 0.0);
-        }
-        for (size_t i = 0; i < triangle.size(); i += 3)
-        {
-            cellTriangle->InsertNextCell({ triangle[i],triangle[i + 1], triangle[i + 2] });
-        }
-        for (size_t i = 0; i < quad.size(); i += 4)
-        {
-            cellPoly->InsertNextCell({ quad[i],quad[i + 1],quad[i + 2],quad[i + 3] });
-        }
-
-        polyData->SetPoints(points);
-        polyData->SetPolys(cellPoly);
-        //polyData->SetPolys(cellTriangle);
-
-        vtkNew<vtkFloatArray> scalars;
-        for (size_t i = 0; i < 16; ++i)
-        {
-            scalars->InsertNextValue(fields[i]);
-        }
-
-        polyData->GetPointData()->SetScalars(scalars);
-
-        return polyData;
-    }
+    std::array<long long, 6> topoPolygon{
+        1,3,6,7,8,5
+    };
 }
 
-int main(int, char* [])
+// index 可以为0,1,2,3 分别测试不同单元类型
+const int index = 0;
+
+int main()
 {
-    vtkNew<vtkNamedColors> colors;
+    vtkNew<vtkActor> actor;
 
-    auto aPolyData = GenPolyData();
+    vtkNew<vtkPoints> points;
+    for (size_t i = 0; i < vertices.size(); i += 3)
+    {
+        points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+    }
 
-    vtkNew<vtkLookupTable> surfaceLUT;
-    surfaceLUT->SetRange(aPolyData->GetPointData()->GetScalars()->GetRange());
-    surfaceLUT->Build();
+    if (index == 0)
+    {
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkCellArray> cells;
+        for (size_t i = 0; i < topoLine.size(); i += 2)
+        {
+            cells->InsertNextCell({ topoLine[i + 0],topoLine[i + 1] });
+        }
+        polyData->SetPoints(points);
+        polyData->SetLines(cells);
 
-    // Triangulate the grid points
-    //vtkNew<vtkDelaunay2D> delaunay;
-    //delaunay->SetInputData(aPolyData);
-    //delaunay->Update();
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+        actor->SetMapper(mapper);
+    }
 
-    //auto polyData = delaunay->GetOutput();
-    //auto pointsNum = polyData->GetNumberOfPoints();
-    //auto cellNum = polyData->GetNumberOfCells();
+    if (index == 1)
+    {
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkCellArray> cells;
+        for (size_t i = 0; i < topoTriangle.size(); i += 3)
+        {
+            cells->InsertNextCell({ topoTriangle[i + 0], topoTriangle[i + 1], topoTriangle[i + 2] });
+        }
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
 
-    // Visualize
-    vtkNew<vtkPolyDataMapper> meshMapper;
-    meshMapper->InterpolateScalarsBeforeMappingOn();
-    meshMapper->ScalarVisibilityOn();
-    //meshMapper->SetInputConnection(delaunay->GetOutputPort());
-    meshMapper->SetInputData(aPolyData);
-    meshMapper->SetScalarRange(aPolyData->GetPointData()->GetScalars()->GetRange());
-    meshMapper->SetLookupTable(surfaceLUT);
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+        actor->SetMapper(mapper);
+    }
 
-    vtkNew<vtkActor> meshActor;
-    meshActor->SetMapper(meshMapper);
+    if (index == 2)
+    {
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkCellArray> cells;
+        for (size_t i = 0; i < topoQuad.size(); i += 4)
+        {
+            cells->InsertNextCell({ topoQuad[i + 0], topoQuad[i + 1], topoQuad[i + 2], topoQuad[i + 3] });
+        }
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
 
-    // Create a renderer, render window, and interactor
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+        actor->SetMapper(mapper);
+    }
+
+    if (index == 3)
+    {
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkCellArray> cells;
+        for (size_t i = 0; i < topoPolygon.size(); i += 6)
+        {
+            cells->InsertNextCell({ topoPolygon[i + 0], topoPolygon[i + 1], topoPolygon[i + 2],
+                topoPolygon[i + 3],topoPolygon[i + 4], topoPolygon[i + 5] });
+        }
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+        actor->SetMapper(mapper);
+    }
+
+    vtkNew<vtkCellTypes> types;
+    actor->GetMapper()->GetInput()->GetCellTypes(types);
+    auto numCellTypes = types->GetNumberOfTypes();
+    for (size_t i = 0; i < numCellTypes; ++i)
+    {
+        auto id = static_cast<int>(types->GetCellType(i));
+        auto name = magic_enum::enum_name(static_cast<VTKCellType>(id));
+        std::cout << "type id : " << id << "\t name : " << name << '\n';
+    }
+
+    actor->GetProperty()->SetColor(1, 1, 0);
+
     vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
 
-    // Add the actor to the scene
-    renderer->AddActor(meshActor);
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(600, 600);
 
-    renderer->SetBackground(colors->GetColor3d("Mint").GetData());
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
 
-    // Render and interact
-    renderWindow->SetSize(640, 480);
-    renderWindow->SetWindowName("ConstrainedDelaunay2D");
-    renderWindow->Render();
-    renderWindowInteractor->Start();
+    //数据交互
+    renWin->Render();
+    iren->Start();
 
-    return EXIT_SUCCESS;
+    return 0;
 }
 
 #endif // TEST31
 
 #ifdef TEST32
 
-#include <vtkActor.h>
-#include <vtkCellArray.h>
-#include <vtkDelaunay2D.h>
-#include <vtkMath.h>
-#include <vtkMinimalStandardRandomSequence.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPoints.h>
 #include <vtkPolyData.h>
+#include <vtkPoints.h>
+#include <vtkCellArray.h>
 #include <vtkPolyDataMapper.h>
-#include <vtkPolygon.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
+#include <vtkActor.h>
 #include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkProperty.h>
+#include <vtkCamera.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkBillboardTextActor3D.h>
+#include <vtkMatrix4x4.h>
+#include <vtkTextProperty.h>
 
-int main(int, char* [])
+#include <array>
+#include <iostream>
+
+namespace
 {
-    vtkNew<vtkNamedColors> colors;
+    std::array<float, 3 * 3> vertices1{
+        -5,-1,0,
+        -4,1,0,
+        -3,-1,0
+    };
 
-    // Generate a 10 x 10 grid of points
-    vtkNew<vtkPoints> points;
-    unsigned int gridSize = 10;
-    unsigned int seed = 0;
-    vtkNew<vtkMinimalStandardRandomSequence> randomSequence;
-    randomSequence->Initialize(seed);
-    for (unsigned int x = 0; x < gridSize; x++)
+    std::array<float, 3 * 3> vertices2{
+        3,-1,0,
+        4,1,0,
+        5,-1,0
+    };
+
+    std::array<float, 3 * 3> vertices3{
+        -1,-1,0,
+        0,1,0,
+        1,-1,0
+    };
+
+    vtkNew<vtkActor> actor1;
+    vtkNew<vtkActor> actor2;
+    vtkNew<vtkActor> actor3;
+
+    class InteractorStyle : public vtkInteractorStyleTrackballCamera
     {
-        for (unsigned int y = 0; y < gridSize; y++)
+    public:
+        static InteractorStyle* New();
+        vtkTypeMacro(InteractorStyle, vtkInteractorStyleTrackballCamera);
+
+        void OnLeftButtonUp() override
         {
-            auto d1 = randomSequence->GetValue() / 2.0 - 0.25;
-            randomSequence->Next();
-            auto d2 = randomSequence->GetValue() / 2.0 - 0.25;
-            randomSequence->Next();
-            points->InsertNextPoint(x + d1, y + d2, 0);
+            std::cout << "#############################################################\n";
+            if (this->Interactor)
+            {
+                // 打印照相机信息
+                if (0)
+                {
+                    double eyePos[3]{ 0. };
+                    this->CurrentRenderer->GetActiveCamera()->GetEyePosition(eyePos);
+                    auto camPos = this->CurrentRenderer->GetActiveCamera()->GetPosition();
+                    auto focalPos = this->CurrentRenderer->GetActiveCamera()->GetFocalPoint();
+
+                    std::cout << "focal pos: " << focalPos[0] << ',' << focalPos[1] << ',' << focalPos[2] << '\n';
+                    std::cout << "camera pos: " << camPos[0] << ',' << camPos[1] << ',' << camPos[2] << '\n';
+                    std::cout << "eye pos: " << eyePos[0] << ',' << eyePos[1] << ',' << eyePos[2] << '\n';
+                    std::cout << "------------------------------------\n";
+                    auto model = this->CurrentRenderer->GetActiveCamera()->GetModelTransformMatrix();
+                    auto projection = this->CurrentRenderer->GetActiveCamera()->GetProjectionTransformMatrix(this->CurrentRenderer);
+                    auto modelView = this->CurrentRenderer->GetActiveCamera()->GetModelViewTransformMatrix();
+                    auto eye = this->CurrentRenderer->GetActiveCamera()->GetEyeTransformMatrix();
+                    auto view = this->CurrentRenderer->GetActiveCamera()->GetViewTransformMatrix();
+                    //std::cout << "model\n";
+                    //model->Print(std::cout);
+                    //std::cout << "eye\n";
+                    //eye->Print(std::cout);
+                    std::cout << "projection\n";
+                    projection->Print(std::cout);
+                    std::cout << "modelView\n";
+                    modelView->Print(std::cout);
+                    //std::cout << "view\n";
+                    //view->Print(std::cout);
+
+                    // 照相机所有信息
+                    //this->CurrentRenderer->GetActiveCamera()->Print(std::cout);
+                }
+                if (0)
+                {
+                    double eyePos[3]{ 0. };
+                    this->CurrentRenderer->GetActiveCamera()->GetEyePosition(eyePos);
+                    auto camPos = this->CurrentRenderer->GetActiveCamera()->GetPosition();
+                    auto focalPos = this->CurrentRenderer->GetActiveCamera()->GetFocalPoint();
+
+                    std::cout << "focal pos: " << focalPos[0] << ',' << focalPos[1] << ',' << focalPos[2] << '\n';
+                    std::cout << "camera pos: " << camPos[0] << ',' << camPos[1] << ',' << camPos[2] << '\n';
+                    std::cout << "eye pos: " << eyePos[0] << ',' << eyePos[1] << ',' << eyePos[2] << '\n';
+                    std::cout << "------------------------------------\n";
+                    auto model = this->CurrentRenderer->GetActiveCamera()->GetModelTransformMatrix();
+                    auto projection = this->CurrentRenderer->GetActiveCamera()->GetProjectionTransformMatrix(this->CurrentRenderer);
+                    auto modelView = this->CurrentRenderer->GetActiveCamera()->GetModelViewTransformMatrix();
+                    auto eye = this->CurrentRenderer->GetActiveCamera()->GetEyeTransformMatrix();
+                    auto view = this->CurrentRenderer->GetActiveCamera()->GetViewTransformMatrix();
+                    //std::cout << "model\n";
+                    //model->Print(std::cout);
+                    //std::cout << "eye\n";
+                    //eye->Print(std::cout);
+                    std::cout << "projection\n";
+                    projection->Print(std::cout);
+                    std::cout << "modelView\n";
+                    modelView->Print(std::cout);
+                    //std::cout << "view\n";
+                    //view->Print(std::cout);
+
+
+                    vtkNew<vtkMatrix4x4> invertModelViewMat;
+                    vtkMatrix4x4::Invert(modelView, invertModelViewMat);
+                    vtkNew<vtkMatrix4x4> transposeModelViewMat;
+                    vtkMatrix4x4::Transpose(modelView, transposeModelViewMat);
+
+                    // actor1始终都是最开始的状态
+                    actor1->SetUserMatrix(transposeModelViewMat);
+                    actor2->SetUserMatrix(transposeModelViewMat);
+
+                    this->CurrentRenderer->ResetCamera();
+                    this->Interactor->Render();
+
+
+                    // 照相机所有信息
+                    //this->CurrentRenderer->GetActiveCamera()->Print(std::cout);
+                }
+                // 对模型进行变换
+                if (0)
+                {
+                    // 缩放矩阵，xyz都缩放为原来的0.5
+                    double scale[16]{
+                        0.5, 0.0, 0.0, 0.0,
+                        0.0, 0.5, 0.0, 0.0,
+                        0.0, 0.0, 0.5, 0.0,
+                        0.0, 0.0, 0.0, 1.0
+                    };
+                    // 平移矩阵，xy都平移0.5个单位
+                    double translation[16]{
+                        0.5, 0.0, 0.0, 0.5,
+                        0.0, 0.5, 0.0, 0.5,
+                        0.0, 0.0, 0.5, 0.0,
+                        0.0, 0.0, 0.0, 1.0
+                    };
+                    // 旋转矩阵
+                    double rotation[16]{
+                        0.5, 0.0, 0.0, 0.0,
+                        0.0, 0.5, 0.0, 0.0,
+                        0.0, 0.0, 0.5, 0.0,
+                        0.0, 0.0, 0.0, 1.0
+                    };
+
+                    this->CurrentRenderer->GetActiveCamera()->SetModelTransformMatrix(scale);
+
+                    // 设置模型变换矩阵后，模型的顶点坐标并不会改变
+                    auto dataset = actor1->GetMapper()->GetInput();
+                    for (size_t i = 0; i < dataset->GetNumberOfPoints(); ++i)
+                    {
+                        double point[3]{ 0. };
+                        dataset->GetPoint(i, point);
+                        std::cout << "point " << i << " : " << point[0] << ',' << point[1] << ',' << point[2] << '\n';
+                    }
+                }
+                // 对单独的Actor进行旋转缩放
+                if (0)
+                {
+                    // 绕x轴旋转30°
+                    actor1->RotateX(30);
+                    // xyz都缩放为原来的0.5
+                    actor2->SetScale(0.5);
+                }
+
+                if (0)
+                {
+                    auto modelView = this->CurrentRenderer->GetActiveCamera()->GetModelViewTransformMatrix();
+                    vtkNew<vtkMatrix4x4> mat;
+                    vtkMatrix4x4::Invert(modelView, mat);
+                    actor1->SetUserMatrix(mat);
+                }
+                // 通过相机位置，求旋转矩阵
+                if (0)
+                {
+                    static int n = 0;
+                    auto originPos = this->CurrentRenderer->GetActiveCamera()->GetPosition();
+
+                    auto camPos = this->CurrentRenderer->GetActiveCamera()->GetPosition();
+                    double eyePos[3]{ 0.0 };
+                    this->CurrentRenderer->GetActiveCamera()->GetEyePosition(eyePos);
+                    std::cout << "camera pos: " << camPos[0] << ',' << camPos[1] << ',' << camPos[2] << '\n';
+                    std::cout << "eye pos: " << eyePos[0] << ',' << eyePos[1] << ',' << eyePos[2] << '\n';
+                    std::cout << "------------------------------------\n";
+                }
+                // 对单个actor进行模型变换
+                if (0)
+                {
+                    // 缩放矩阵，xyz都缩放为原来的0.5
+                    double scale[4][4]{
+                        0.5, 0.0, 0.0, 0.0,
+                        0.0, 0.5, 0.0, 0.0,
+                        0.0, 0.0, 0.5, 0.0,
+                        0.0, 0.0, 0.0, 1.0
+                    };
+                    // 平移矩阵，xy都平移0.5个单位
+                    double translation[4][4]{
+                        0.5, 0.0, 0.0, 0.5,
+                        0.0, 0.5, 0.0, 0.5,
+                        0.0, 0.0, 0.5, 0.0,
+                        0.0, 0.0, 0.0, 1.0
+                    };
+                    // 旋转矩阵，绕y轴旋转180°
+                    double alpha = 180 / 180.0 * 3.1415926;
+                    double rotation[4][4]{
+                        std::cos(alpha), 0.0, std::sin(alpha), 0.0,
+                        0.0, 1.0, 0.0, 0.0,
+                        -sin(alpha), 0.0, std::cos(alpha), 0.0,
+                        0.0, 0.0, 0.0, 1.0
+                    };
+
+                    vtkNew<vtkMatrix4x4> mat;
+                    for (size_t i = 0; i < 4; i++)
+                    {
+                        for (size_t j = 0; j < 4; j++)
+                        {
+                            mat->SetElement(i, j, rotation[i][j]);
+                        }
+                    }
+
+                    actor1->SetUserMatrix(mat);
+                    actor2->RotateY(180); // 绕y轴旋转180
+
+                    this->Interactor->Render();
+                }
+
+                if (1)
+                {
+                    static std::array<double, 3> lastCameraPos;
+                    static vtkSmartPointer<vtkMatrix4x4> lastMV{ nullptr };
+
+                    double eyePos[3]{ 0. };
+                    this->CurrentRenderer->GetActiveCamera()->GetEyePosition(eyePos);
+                    auto camPos = this->CurrentRenderer->GetActiveCamera()->GetPosition();
+                    auto focalPos = this->CurrentRenderer->GetActiveCamera()->GetFocalPoint();
+
+                    std::cout << "focal pos: " << focalPos[0] << ',' << focalPos[1] << ',' << focalPos[2] << '\n';
+                    std::cout << "camera pos: " << camPos[0] << ',' << camPos[1] << ',' << camPos[2] << '\n';
+                    std::cout << "eye pos: " << eyePos[0] << ',' << eyePos[1] << ',' << eyePos[2] << '\n';
+                    std::cout << "------------------------------------\n";
+                    auto model = this->CurrentRenderer->GetActiveCamera()->GetModelTransformMatrix();
+                    auto projection = this->CurrentRenderer->GetActiveCamera()->GetProjectionTransformMatrix(this->CurrentRenderer);
+                    auto modelView = this->CurrentRenderer->GetActiveCamera()->GetModelViewTransformMatrix();
+                    auto eye = this->CurrentRenderer->GetActiveCamera()->GetEyeTransformMatrix();
+                    auto view = this->CurrentRenderer->GetActiveCamera()->GetViewTransformMatrix();
+                    //std::cout << "model\n";
+                    //model->Print(std::cout);
+                    //std::cout << "eye\n";
+                    //eye->Print(std::cout);
+                    //std::cout << "view\n";
+                    //view->Print(std::cout);
+                    std::cout << "projection\n";
+                    projection->Print(std::cout);
+                    //std::cout << "modelView\n";
+                    //modelView->Print(std::cout);
+
+                    if (lastMV == nullptr)
+                    {
+                        lastMV = modelView;
+                        lastCameraPos = { camPos[0], camPos[1], camPos[2] };
+                    }
+                    else
+                    {
+                        double inMat[4]{ lastCameraPos[0],lastCameraPos[1],lastCameraPos[2],0. };
+                        double outMat[4]{ 0. };
+                        lastMV->MultiplyPoint(inMat, outMat);
+                        std::cout << "compute result: " <<outMat[0] << ',' << outMat[1] << ',' << outMat[2] << '\n';
+
+                        lastMV = modelView;
+                        //lastCameraPos = { camPos[0], camPos[1], camPos[2] };
+                    }
+
+                    //vtkNew<vtkMatrix4x4> modelPro;
+                    //vtkMatrix4x4::Multiply4x4(modelView, projection, modelPro);
+                    //modelPro->Print(std::cout);
+                    // 照相机所有信息
+                    //this->CurrentRenderer->GetActiveCamera()->Print(std::cout);
+                }
+            }
+
+
+            Superclass::OnLeftButtonUp();
         }
+
+        void OnMouseMove()override
+        {
+            Superclass::OnMouseMove();
+
+            if (this->Interactor)
+            {
+                if (this->CurrentRenderer && this->CurrentRenderer->GetActiveCamera())
+                {
+                    // 旋转不影响actor
+                    if (0)
+                    {
+                        double eyePos[3]{ 0. };
+                        this->CurrentRenderer->GetActiveCamera()->GetEyePosition(eyePos);
+                        auto camPos = this->CurrentRenderer->GetActiveCamera()->GetPosition();
+                        auto focalPos = this->CurrentRenderer->GetActiveCamera()->GetFocalPoint();
+
+                        std::cout << "focal pos: " << focalPos[0] << ',' << focalPos[1] << ',' << focalPos[2] << '\n';
+                        std::cout << "camera pos: " << camPos[0] << ',' << camPos[1] << ',' << camPos[2] << '\n';
+                        std::cout << "eye pos: " << eyePos[0] << ',' << eyePos[1] << ',' << eyePos[2] << '\n';
+                        std::cout << "------------------------------------\n";
+                        auto model = this->CurrentRenderer->GetActiveCamera()->GetModelTransformMatrix();
+                        auto projection = this->CurrentRenderer->GetActiveCamera()->GetProjectionTransformMatrix(this->CurrentRenderer);
+                        auto modelView = this->CurrentRenderer->GetActiveCamera()->GetModelViewTransformMatrix();
+                        auto eye = this->CurrentRenderer->GetActiveCamera()->GetEyeTransformMatrix();
+                        auto view = this->CurrentRenderer->GetActiveCamera()->GetViewTransformMatrix();
+                        //std::cout << "model\n";
+                        //model->Print(std::cout);
+                        //std::cout << "eye\n";
+                        //eye->Print(std::cout);
+                        std::cout << "projection\n";
+                        projection->Print(std::cout);
+                        std::cout << "modelView\n";
+                        modelView->Print(std::cout);
+                        //std::cout << "view\n";
+                        //view->Print(std::cout);
+
+
+                        vtkNew<vtkMatrix4x4> invertModelViewMat;
+                        vtkMatrix4x4::Invert(modelView, invertModelViewMat);
+                        vtkNew<vtkMatrix4x4> transposeModelViewMat;
+                        vtkMatrix4x4::Transpose(modelView, transposeModelViewMat);
+
+                        // actor1\actor2始终都是最开始的状态
+                        // 前提条件是照相机的位置为{0,0,Z}
+                        actor1->SetUserMatrix(transposeModelViewMat);
+                        actor2->SetUserMatrix(transposeModelViewMat);
+
+                        //this->CurrentRenderer->ResetCamera();
+                        //this->Interactor->Render();
+
+                    }
+
+                    if (0)
+                    {
+
+                        double eyePos[3]{ 0. };
+                        this->CurrentRenderer->GetActiveCamera()->GetEyePosition(eyePos);
+                        auto camPos = this->CurrentRenderer->GetActiveCamera()->GetPosition();
+                        auto focalPos = this->CurrentRenderer->GetActiveCamera()->GetFocalPoint();
+
+                        std::cout << "focal pos: " << focalPos[0] << ',' << focalPos[1] << ',' << focalPos[2] << '\n';
+                        std::cout << "camera pos: " << camPos[0] << ',' << camPos[1] << ',' << camPos[2] << '\n';
+                        std::cout << "eye pos: " << eyePos[0] << ',' << eyePos[1] << ',' << eyePos[2] << '\n';
+                        std::cout << "------------------------------------\n";
+                        auto model = this->CurrentRenderer->GetActiveCamera()->GetModelTransformMatrix();
+                        auto projection = this->CurrentRenderer->GetActiveCamera()->GetProjectionTransformMatrix(this->CurrentRenderer);
+                        auto modelView = this->CurrentRenderer->GetActiveCamera()->GetModelViewTransformMatrix();
+                        auto eye = this->CurrentRenderer->GetActiveCamera()->GetEyeTransformMatrix();
+                        auto view = this->CurrentRenderer->GetActiveCamera()->GetViewTransformMatrix();
+                        //std::cout << "model\n";
+                        //model->Print(std::cout);
+                        //std::cout << "eye\n";
+                        //eye->Print(std::cout);
+                        std::cout << "projection\n";
+                        projection->Print(std::cout);
+                        std::cout << "modelView\n";
+                        modelView->Print(std::cout);
+                        //std::cout << "view\n";
+                        //view->Print(std::cout);
+
+
+                        vtkNew<vtkMatrix4x4> invertModelViewMat;
+                        vtkMatrix4x4::Invert(modelView, invertModelViewMat);
+                        vtkNew<vtkMatrix4x4> transposeModelViewMat;
+                        vtkMatrix4x4::Transpose(modelView, transposeModelViewMat);
+
+                        transposeModelViewMat->SetElement(0, 3, 0.);
+                        transposeModelViewMat->SetElement(1, 3, 0.);
+                        transposeModelViewMat->SetElement(2, 3, 0.);
+
+                        // actor1\actor2始终都是最开始的状态
+                        // 前提条件是照相机的位置为{0,0,Z}
+                        actor1->SetUserMatrix(transposeModelViewMat);
+                        actor2->SetUserMatrix(transposeModelViewMat);
+
+                        //this->CurrentRenderer->ResetCamera();
+                        //this->Interactor->Render();
+
+                    }
+
+                    if (0)
+                    {
+                        vtkRenderWindowInteractor* rwi = this->Interactor;
+
+                        int dx = rwi->GetEventPosition()[0] - rwi->GetLastEventPosition()[0];
+                        int dy = rwi->GetEventPosition()[1] - rwi->GetLastEventPosition()[1];
+
+                        const int* size = this->CurrentRenderer->GetRenderWindow()->GetSize();
+
+                        double delta_elevation = -20.0 / size[1];
+                        double delta_azimuth = -20.0 / size[0];
+
+                        double rxf = dx * delta_azimuth * this->MotionFactor;
+                        double ryf = dy * delta_elevation * this->MotionFactor;
+                        auto viewUp = this->CurrentRenderer->GetActiveCamera()->GetViewUp();
+
+                        actor1->RotateWXYZ(-rxf, viewUp[0], viewUp[1], viewUp[2]);
+
+                        double axis[3];
+                        auto camera = this->CurrentRenderer->GetActiveCamera();
+                        axis[0] = -camera->GetViewTransformMatrix()->GetElement(0, 0);
+                        axis[1] = -camera->GetViewTransformMatrix()->GetElement(0, 1);
+                        axis[2] = -camera->GetViewTransformMatrix()->GetElement(0, 2);
+
+                        actor1->RotateWXYZ(-ryf, axis[0], axis[1], axis[2]);
+                    }
+                }
+            }
+
+
+        }
+    };
+
+    vtkStandardNewMacro(InteractorStyle);
+}
+
+int main()
+{
+    {
+        vtkNew<vtkPoints> points;
+        for (size_t i = 0; i < vertices1.size(); i += 3)
+        {
+            points->InsertNextPoint(vertices1[i], vertices1[i + 1], vertices1[i + 2]);
+        }
+
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0,1,2 });
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+        actor1->SetMapper(mapper);
     }
 
-    vtkNew<vtkPolyData> aPolyData;
-    aPolyData->SetPoints(points);
+    {
+        vtkNew<vtkPoints> points;
+        for (size_t i = 0; i < vertices2.size(); i += 3)
+        {
+            points->InsertNextPoint(vertices2[i], vertices2[i + 1], vertices2[i + 2]);
+        }
 
-    // Create a cell array to store the polygon in
-    vtkNew<vtkCellArray> aCellArray;
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0,1,2 });
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+        actor2->SetMapper(mapper);
+    }
 
-    // Define a polygonal hole with a clockwise polygon
-    vtkNew<vtkPolygon> aPolygon;
+    {
+        vtkNew<vtkPoints> points;
+        for (size_t i = 0; i < vertices3.size(); i += 3)
+        {
+            points->InsertNextPoint(vertices3[i], vertices3[i + 1], vertices3[i + 2]);
+        }
 
-    aPolygon->GetPointIds()->InsertNextId(22);
-    aPolygon->GetPointIds()->InsertNextId(23);
-    aPolygon->GetPointIds()->InsertNextId(24);
-    aPolygon->GetPointIds()->InsertNextId(25);
-    aPolygon->GetPointIds()->InsertNextId(35);
-    aPolygon->GetPointIds()->InsertNextId(45);
-    aPolygon->GetPointIds()->InsertNextId(44);
-    aPolygon->GetPointIds()->InsertNextId(43);
-    aPolygon->GetPointIds()->InsertNextId(42);
-    aPolygon->GetPointIds()->InsertNextId(32);
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0,1,2 });
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+        actor3->SetMapper(mapper);
+    }
 
-    aCellArray->InsertNextCell(aPolygon);
 
-    // Create a polydata to store the boundary. The points must be the
-    // same as the points we will triangulate.
-    vtkNew<vtkPolyData> boundary;
-    boundary->SetPoints(aPolyData->GetPoints());
-    boundary->SetPolys(aCellArray);
+    actor1->GetProperty()->SetColor(1, 0, 0);
+    actor2->GetProperty()->SetColor(0, 1, 0);
+    actor3->GetProperty()->SetColor(0, 0, 1);
 
-    // Triangulate the grid points
-    vtkNew<vtkDelaunay2D> delaunay;
-    delaunay->SetAlpha(1.0);
-    delaunay->SetInputData(aPolyData);
-    delaunay->SetSourceData(boundary);
-
-    // Visualize
-    vtkNew<vtkPolyDataMapper> meshMapper;
-    meshMapper->SetInputConnection(delaunay->GetOutputPort());
-
-    vtkNew<vtkActor> meshActor;
-    meshActor->SetMapper(meshMapper);
-    //meshActor->GetProperty()->EdgeVisibilityOn();
-    meshActor->GetProperty()->SetEdgeColor(1, 0, 0);
-    //meshActor->GetProperty()->SetInterpolationToFlat();
-
-    vtkNew<vtkPolyDataMapper> boundaryMapper;
-    boundaryMapper->SetInputData(boundary);
-
-    vtkNew<vtkActor> boundaryActor;
-    boundaryActor->SetMapper(boundaryMapper);
-    boundaryActor->GetProperty()->SetColor(0, 1, 0);
-    //boundaryActor->GetProperty()->SetLineWidth(3);
-    //boundaryActor->GetProperty()->EdgeVisibilityOn();
-    //boundaryActor->GetProperty()->SetEdgeColor(1, 1, 0);
-    //boundaryActor->GetProperty()->SetRepresentationToWireframe();
-
-    // Create a renderer, render window, and interactor
     vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderer->AddActor(actor1);
+    renderer->AddActor(actor2);
+    renderer->AddActor(actor3);
 
-    // Add the actor to the scene
-    renderer->AddActor(meshActor);
-    //renderer->AddActor(boundaryActor);
     renderer->SetBackground(.1, .2, .3);
+    renderer->GetActiveCamera()->SetFocalPoint(0, 0, 0);
+    renderer->ResetCamera();
 
-    // Render and interact
-    renderWindow->SetSize(640, 480);
-    renderWindow->SetWindowName("ConstrainedDelaunay2D");
-    renderWindow->Render();
-    renderWindowInteractor->Start();
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 800);
 
-    return EXIT_SUCCESS;
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<InteractorStyle> style;
+    iren->SetInteractorStyle(style);
+
+    //数据交互
+    renWin->Render();
+    iren->Start();
+
+    return 0;
 }
 
 #endif // TEST32
@@ -4951,6 +5547,14 @@ int main(int, char* [])
 #include <vtkSphereSource.h>
 #include <vtkTextActor.h>
 #include <vtkTextProperty.h>
+
+/*
+vtkTextWidget：在渲染场景中生成一串标识文本，可以随意调整该文本在渲染场景中的位置，缩放其大小等。
+vtkScalarBarWidget：根据输入的数据在渲染场景中生成一个标量条，通过设置颜色查找表，可以用标量条上的颜色来指示输入的数据。渲染场景中的标量条可以随意移动、改变大小、设置不同的方向等。
+vtkCaptionWidget:用一个带线框及箭头的文本信息来标注某一对象。
+vtkOrientationMarkerWidget：渲染场景中所渲染数据的方向指示标志。在医学图像领域有广泛的应用，比如，通过CT/MR等扫描的数据，当将其导入可视化应用程序时需要标识其上、下、左、右、前、后等方位。
+vtkBalloonWidget:当鼠标停留在渲染场景中的某个Actor一段时间后，会弹出提示信息。所提示的信息，除了可以用文本表示，也可以用图像表示。
+*/
 
 int main(int, char* [])
 {
@@ -5136,7 +5740,7 @@ int main(int, char* [])
 
 
 
-class DesignInteractorStyle : 
+class DesignInteractorStyle :
     public vtkInteractorStyleTrackballCamera
 {
 public:
@@ -5293,9 +5897,9 @@ private:
     vtkSmartPointer<vtkPolyData> m_polyData{ nullptr };
     vtkSmartPointer<vtkActor> sphereActor{ nullptr };
     vtkSmartPointer<vtkLookupTable> lut;
-    int Press{0};
-    int EditMode{0};
-    int PressFlag{0};
+    int Press{ 0 };
+    int EditMode{ 0 };
+    int PressFlag{ 0 };
     double Radius = 2.5;
 };
 
@@ -5466,7 +6070,7 @@ int main(int, char* [])
     polydata->SetPoints(points);
     auto bounds = polydata->GetBounds(); // 返回polyData在xyz上的范围
     auto length = polydata->GetLength(); // 返回包围盒对角线的长度
-    std::cout << "bounds:\t" <<bounds[0] << '\t' << bounds[1] << '\t' << bounds[2] << '\t' << bounds[3]
+    std::cout << "bounds:\t" << bounds[0] << '\t' << bounds[1] << '\t' << bounds[2] << '\t' << bounds[3]
         << '\t' << bounds[4] << '\t' << bounds[5] << "\tlength:\t" << length << '\n';
 
     vtkNew<vtkFloatArray> scalars;
@@ -5820,8 +6424,8 @@ int main(int, char* [])
                 //vectors->InsertNextTuple3(v[0], v[1], v[2]);
 
                 //std::cout << x[0] << '\n' << x[1] << '\n' << x[2] << '\n';
-                ofs1<< x[0] << '\n' << x[1] << '\n' << x[2] << '\n';
-                ofs4<< v[0] << '\n' << v[1] << '\n' << v[2] << '\n';
+                ofs1 << x[0] << '\n' << x[1] << '\n' << x[2] << '\n';
+                ofs4 << v[0] << '\n' << v[1] << '\n' << v[2] << '\n';
             }
         }
     }
@@ -5899,7 +6503,7 @@ int main(int, char* [])
     {
         auto tuple3 = pointArr->GetTuple3(i);
         //std::cout << tuple3[0] << '\n' << tuple3[1] << '\n' << tuple3[2] << '\n';
-        ofs2<< tuple3[0] << '\n' << tuple3[1] << '\n' << tuple3[2] << '\n';
+        ofs2 << tuple3[0] << '\n' << tuple3[1] << '\n' << tuple3[2] << '\n';
     }
     std::cout << "---------------------\n";
     for (size_t i = 0; i < num1; ++i)
@@ -6096,7 +6700,7 @@ int main(int, char* [])
     geometryFilter->SetInputConnection(reader->GetOutputPort());
     geometryFilter->Update();
     //--------------------------------
-    
+
     // Mapper
     // 读上来的DataSet转为PolyData拓扑结构有些问题
     vtkNew<vtkPolyDataMapper> mapperPolyData;
@@ -6138,5 +6742,1041 @@ int main(int, char* [])
 
 #endif // TEST41
 
+#ifdef TEST42
 
+#include <vtkSmartPointer.h>
+#include <vtkPolyDataReader.h>
+#include <vtkPolyData.h>
+#include <vtkSurfaceReconstructionFilter.h>
+#include <vtkContourFilter.h>
+#include <vtkVertexGlyphFilter.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkRenderer.h>
+#include <vtkCamera.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkProperty.h>
+#include <vtkPointData.h>
+#include <vtkFloatArray.h>
+
+namespace
+{
+    std::vector<float> vertices{
+        0.,0.,
+        0.,1.,
+        0.,2.,
+        0.,3.,
+
+        1.,3.,
+        1.,2.,
+        1.,1.,
+        1.,0.,
+
+        2.,0.,
+        2.,1.,
+        2.,2.,
+        2.,3.,
+
+        3.,3.,
+        3.,2.,
+        3.,1.,
+        3.,0.
+    };
+
+    std::vector<int> indices{
+        // 四条外部线
+        0,1,
+        1,2,
+        2,3,
+
+        12,13,
+        13,14,
+        14,15,
+
+        0,7,
+        7,8,
+        8,15,
+
+        3,4,
+        4,11,
+        11,12,
+
+        // 内部线
+        1,6,
+        6,9,
+        9,14,
+
+        2,5,
+        5,10,
+        10,13,
+
+        4,5,
+        5,6,
+        6,7,
+
+        8,9,
+        9,10,
+        10,11,
+    };
+
+    std::vector<int> indicesPoly{
+        0,1,6,7,
+        1,2,5,6,
+        2,3,4,5,
+
+        4,5,10,11,
+        5,6,9,10,
+        6,7,8,9,
+
+        8,9,14,15,
+        9,10,13,14,
+        10,11,12,13,
+    };
+
+    std::vector<float> fields{
+        1.0f,
+        1.0f,
+        1.0f,
+        1.0f,
+
+        2.0f,
+        2.0f,
+        2.0f,
+        2.0f,
+
+        3.0f,
+        3.0f,
+        3.0f,
+        3.0f,
+
+        4.0f,
+        4.0f,
+        4.0f,
+        4.0f,
+    };
+
+    vtkSmartPointer<vtkPolyData> GenPolyData()
+    {
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkPoints> points;
+        vtkNew<vtkCellArray> cellsLine;
+        vtkNew<vtkCellArray> cellsPoly;
+
+        for (size_t i = 0; i < vertices.size(); i += 2)
+        {
+            points->InsertNextPoint(vertices[i], vertices[i + 1], 0.0);
+        }
+        for (size_t i = 0; i < indices.size(); i += 2)
+        {
+            cellsLine->InsertNextCell({ indices[i], indices[i + 1] });
+        }
+        for (size_t i = 0; i < indicesPoly.size(); i += 4)
+        {
+            cellsPoly->InsertNextCell({ indicesPoly[i],indicesPoly[i + 1], indicesPoly[i + 2],indicesPoly[i + 3] });
+        }
+        polyData->SetPoints(points);
+        polyData->SetLines(cellsLine);
+        //polyData->SetPolys(cellsPoly);
+
+        vtkNew<vtkFloatArray> scalars;
+        for (size_t i = 0; i < 16; ++i)
+        {
+            scalars->InsertNextValue(fields[i]);
+        }
+
+        polyData->GetPointData()->SetScalars(scalars);
+
+        return polyData;
+    }
+}
+
+/*
+* 三角剖分技术也可以实现网格的曲面重建
+*
+* 使用VTKsurfaceReconstructionFilter时，主要涉及两个参数，分别使用函数SetNeighborhoodSize（）和SetSampleSpacing（）进行设置。
+SetNeighborhoodSize：
+    设置邻域点的个数；而这些邻域点则用来估计每个点的局部切平面。
+    邻域点的个数默认为20，能够处理大多数重建问题。个数设置越多，计算消耗时间越长。当点云分布严重不均匀情况下，可以考虑增加该值。
+SetSampleSpacing：
+    用于设置划分网格的网格间距，间距与小，网格月密集，一般采用默认值0.05.
+*/
+
+int main()
+{
+    auto polyData = GenPolyData();
+
+    vtkSmartPointer<vtkPolyData> points =
+        vtkSmartPointer<vtkPolyData>::New();
+    points->SetPoints(polyData->GetPoints()); //获得网格模型中的几何数据：点集
+
+    vtkSmartPointer<vtkSurfaceReconstructionFilter> surf =
+        vtkSmartPointer<vtkSurfaceReconstructionFilter>::New();
+    surf->SetInputData(points);
+    surf->SetNeighborhoodSize(20);
+    surf->SetSampleSpacing(0.005);
+    surf->Update();
+
+    vtkSmartPointer<vtkContourFilter> contour =
+        vtkSmartPointer<vtkContourFilter>::New();
+    contour->SetInputConnection(surf->GetOutputPort());
+    contour->SetValue(0, 0.0);
+    contour->Update();
+    //
+    vtkSmartPointer <vtkVertexGlyphFilter> vertexGlyphFilter =
+        vtkSmartPointer<vtkVertexGlyphFilter>::New();
+    vertexGlyphFilter->AddInputData(points);
+    vertexGlyphFilter->Update();
+    vtkSmartPointer<vtkPolyDataMapper> pointMapper =
+        vtkSmartPointer<vtkPolyDataMapper>::New();
+    pointMapper->SetInputData(vertexGlyphFilter->GetOutput());
+    pointMapper->ScalarVisibilityOff();
+
+    vtkSmartPointer<vtkActor> pointActor =
+        vtkSmartPointer<vtkActor>::New();
+    pointActor->SetMapper(pointMapper);
+    pointActor->GetProperty()->SetColor(1, 0, 0);
+    pointActor->GetProperty()->SetPointSize(4);
+
+    vtkSmartPointer<vtkPolyDataMapper> contourMapper =
+        vtkSmartPointer<vtkPolyDataMapper>::New();
+    contourMapper->SetInputData(contour->GetOutput());
+    vtkSmartPointer<vtkActor> contourActor =
+        vtkSmartPointer<vtkActor>::New();
+    contourActor->SetMapper(contourMapper);
+    ///
+    double pointView[4] = { 0, 0, 0.5, 1 };
+    double contourView[4] = { 0.5, 0, 1, 1 };
+
+    vtkSmartPointer<vtkRenderer> pointRender =
+        vtkSmartPointer<vtkRenderer>::New();
+    pointRender->AddActor(pointActor);
+    pointRender->SetViewport(pointView);
+    pointRender->SetBackground(1, 1, 1);
+
+    vtkSmartPointer<vtkRenderer> contourRender =
+        vtkSmartPointer<vtkRenderer>::New();
+    contourRender->AddActor(contourActor);
+    contourRender->SetViewport(contourView);
+    contourRender->SetBackground(0, 1, 0);
+
+    pointRender->GetActiveCamera()->SetPosition(0, -1, 0);
+    pointRender->GetActiveCamera()->SetFocalPoint(0, 0, 0);
+    pointRender->GetActiveCamera()->SetViewUp(0, 0, 1);
+    pointRender->GetActiveCamera()->Azimuth(30);
+    pointRender->GetActiveCamera()->Elevation(30);
+    pointRender->ResetCamera();
+    contourRender->SetActiveCamera(pointRender->GetActiveCamera());
+
+    vtkSmartPointer<vtkRenderWindow> rw =
+        vtkSmartPointer<vtkRenderWindow>::New();
+    rw->AddRenderer(pointRender);
+    rw->AddRenderer(contourRender);
+    rw->SetSize(640, 320);
+    rw->SetWindowName("3D Surface Reconstruction ");
+    rw->Render();
+
+    vtkSmartPointer<vtkRenderWindowInteractor> rwi =
+        vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    rwi->SetRenderWindow(rw);
+    rwi->Initialize();
+    rwi->Start();
+
+    return 0;
+}
+
+#endif // TEST42
+
+#ifdef TEST43
+
+#define TEST_LINE2LINE // 测试线与线的交点
+#define TEST_LINE2POLY // 测试线与多边形网格的交点
+
+#ifdef TEST_LINE2POLY
+
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+#include <vtkLineSource.h>
+#include <vtkPoints.h>
+#include <vtkIdList.h>
+#include <vtkPointData.h>
+#include <vtkLine.h>
+#include <vtkOBBTree.h>
+#include <vtkExtractCells.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkDataSetMapper.h>
+#include <vtkActor.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkProperty.h>
+#include <vtkNamedColors.h>
+#include <vtkPolyData.h>
+#include <vtkVertexGlyphFilter.h>
+
+#define vsp	vtkSmartPointer
+
+int main(int, char* [])
+{
+    auto colors = vsp<vtkNamedColors>::New();
+
+    auto sphereSource = vsp<vtkSphereSource>::New();
+    sphereSource->Update();
+
+    // 注意 {0,0,100}和{0,0,-100}两个点的连线并不一定和屏幕垂直，它会根据照相机旋转
+    // 这是一个世界坐标
+    double lineP0[3] = { -0.6, -0.8, -0.6 };
+    double lineP1[3] = { .6, .6, .6 };
+    auto lineSource = vsp<vtkLineSource>::New();
+    lineSource->SetPoint1(lineP0);
+    lineSource->SetPoint2(lineP1);
+    lineSource->Update();
+
+    auto intersectionPoints = vsp<vtkPoints>::New();
+    auto intersectioncells = vsp<vtkIdList>::New();
+    double tol = 1e-8;
+    auto obbTree = vsp<vtkOBBTree>::New();
+    obbTree->SetTolerance(tol);
+    obbTree->SetDataSet(sphereSource->GetOutput());
+    obbTree->BuildLocator();
+    obbTree->IntersectWithLine(lineP0, lineP1, intersectionPoints, intersectioncells);
+
+    intersectioncells->GetNumberOfIds();
+    intersectionPoints->GetNumberOfPoints();
+
+    auto pointsPolydata = vsp<vtkPolyData>::New();
+    pointsPolydata->SetPoints(intersectionPoints);
+    auto vertexFilter = vsp<vtkVertexGlyphFilter>::New();
+    vertexFilter->SetInputData(pointsPolydata);
+    vertexFilter->Update();
+    auto polydata = vsp<vtkPolyData>::New();
+    polydata->ShallowCopy(vertexFilter->GetOutput());
+
+    auto cellSource = vsp<vtkExtractCells>::New();
+    cellSource->SetInputConnection(sphereSource->GetOutputPort());
+    cellSource->SetCellList(intersectioncells);
+
+    auto sphereMapper = vsp<vtkPolyDataMapper>::New();
+    sphereMapper->SetInputData(sphereSource->GetOutput());
+    auto sphereActor = vsp<vtkActor>::New();
+    sphereActor->SetMapper(sphereMapper);
+    sphereActor->GetProperty()->SetRepresentationToWireframe();
+
+    auto lineMapper = vsp<vtkPolyDataMapper>::New();
+    lineMapper->SetInputData(lineSource->GetOutput());
+    auto lineActor = vsp<vtkActor>::New();
+    lineActor->SetMapper(lineMapper);
+    lineActor->GetProperty()->SetColor(colors->GetColor3d("red").GetData());
+
+    auto pointMapper = vsp<vtkPolyDataMapper>::New();
+    pointMapper->SetInputData(polydata);
+    auto pointActor = vsp<vtkActor>::New();
+    pointActor->SetMapper(pointMapper);
+    pointActor->GetProperty()->SetColor(colors->GetColor3d("blue").GetData());
+    pointActor->GetProperty()->SetPointSize(8);
+
+    auto cellMapper = vsp<vtkDataSetMapper>::New();
+    cellMapper->SetInputConnection(cellSource->GetOutputPort());
+    auto cellActor = vsp<vtkActor>::New();
+    cellActor->SetMapper(cellMapper);
+    cellActor->GetProperty()->SetColor(colors->GetColor3d("yellow").GetData());
+
+    auto renderer = vsp<vtkRenderer>::New();
+    auto renWinddow = vsp<vtkRenderWindow>::New();
+    auto interactor = vsp<vtkRenderWindowInteractor>::New();
+    renWinddow->SetSize(600, 600);
+    renWinddow->AddRenderer(renderer);
+    interactor->SetRenderWindow(renWinddow);
+    renderer->SetBackground(colors->GetColor3d("DarkOliveGreen").GetData());
+    renderer->AddActor(sphereActor);
+    renderer->AddActor(lineActor);
+    renderer->AddActor(pointActor);
+    renderer->AddActor(cellActor);
+
+    interactor->Initialize();
+    interactor->Start();
+
+    return EXIT_SUCCESS;
+}
+#endif // TEST_LINE2POLY
+
+#ifdef TEST_LINE2LINE
+
+#include "vtkSmartPointer.h"
+#include "vtkProperty.h"
+#include "vtkCamera.h"
+
+#include "vtkCylinderSource.h"
+#include "vtkPolyDataMapper.h"
+#include "vtkActor.h"
+#include "vtkRenderer.h"
+#include "vtkRenderWindow.h"
+#include "vtkRenderWindowInteractor.h"
+
+#include <vtkLine.h>
+#include <vtkPoints.h>
+#include <vtkPolygon.h>
+
+int main(int, char* [])
+{
+
+    // Create a square in the XY plane
+    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+    points->InsertNextPoint(0.0, 0.0, 0.0);
+    points->InsertNextPoint(1.0, 0.0, 0.0);
+    points->InsertNextPoint(1.0, 1.0, 0.0);
+    points->InsertNextPoint(0.0, 1.0, 0.0);
+
+    // Create the polygon
+    vtkSmartPointer<vtkPolygon> polygon = vtkSmartPointer<vtkPolygon>::New();
+    polygon->GetPoints()->DeepCopy(points);
+    polygon->GetPointIds()->SetNumberOfIds(4); // 4 corners of the square
+    polygon->GetPointIds()->SetId(0, 0);
+    polygon->GetPointIds()->SetId(1, 1);
+    polygon->GetPointIds()->SetId(2, 2);
+    polygon->GetPointIds()->SetId(3, 3);
+
+    // Inputs
+    double p1[3] = { 1, 0, -1 };
+    double p2[3] = { 1, 0, 1 };
+    double tolerance = 0.001;   // 公差
+    // Outputs
+    double t; // Parametric coordinate of intersection (0 (corresponding to p1) to 1 (corresponding to p2))
+    double x[3]; // The coordinate of the intersection
+    double pcoords[3];
+    int subId;
+
+    vtkIdType iD = polygon->IntersectWithLine(p1, p2, tolerance, t, x, pcoords, subId);
+
+    std::cout << "t:  " << t << std::endl;
+    std::cout << "pcoords:  " << pcoords[0] << " " << pcoords[1] << " " << pcoords[2] << std::endl;
+    std::cout << "Intersect " << iD << std::endl;
+    std::cout << "subid: " << subId << std::endl;
+    std::cout << "x : " << x[0] << " " << x[1] << " " << x[2] << std::endl;
+
+
+    vtkSmartPointer<vtkLine> line = vtkSmartPointer<vtkLine>::New();
+    double p3[3] = { 1, -1, 0 };
+    double p4[3] = { 1, 1, 0 };
+    double u, v;
+    vtkIdType iD2 = line->Intersection(p1, p2, p3, p4, u, v);
+
+    std::cout << "u :" << u << endl;
+    std::cout << "v :" << v << endl;
+    std::cout << "Intersect :" << iD2 << endl;
+
+    return 0;
+}
+#endif // TEST_LINT2LINE
+
+#endif // TEST43
+
+#ifdef TEST44
+
+#include <vtkActor.h>
+#include <vtkArrowSource.h>
+#include <vtkDistanceToCamera.h>
+#include <vtkGlyph3D.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPointSource.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+#include <vtkCamera.h>
+
+#include <vtkPointSet.h>
+#include <array>
+#include <iostream>
+
+class InteractorStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static InteractorStyle* New();
+    vtkTypeMacro(InteractorStyle, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnLeftButtonUp() override
+    {
+        if (this->Interactor)
+        {
+            auto camera = this->CurrentRenderer->GetActiveCamera();
+            std::cout << camera->GetParallelScale() << '\n';
+        }
+
+
+        Superclass::OnLeftButtonUp();
+    }
+};
+
+vtkStandardNewMacro(InteractorStyle);
+
+int main(int, char* [])
+{
+    vtkNew<vtkPolyData> polyPoint;
+    vtkNew<vtkPolyData> polyLine;
+    vtkNew<vtkPoints> points_;
+
+    {
+        std::array<float, 4 * 3> vertices{
+            10,10,0,
+            20,10,0,
+            20,20,0,
+            10,20,0
+        };
+
+
+        vtkNew<vtkCellArray> cells;
+
+        for (size_t i = 0; i < vertices.size(); i += 3)
+        {
+            points_->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+        }
+        for (long long i = 0; i < vertices.size() / 3; ++i)
+        {
+            cells->InsertNextCell({ i });
+        }
+
+        polyPoint->SetPoints(points_);
+        polyPoint->SetVerts(cells);
+    }
+
+    {
+        std::array<float, 4 * 3> vertices
+        {
+            30,30,0,
+            40,30,0,
+            40,40,0,
+            30,40,0
+        };
+
+        std::array<long long, 4 * 2> indices
+        {
+            0,1,
+            1,2,
+            2,3,
+            3,0
+        };
+
+        vtkNew<vtkPoints> points;
+        vtkNew<vtkCellArray> cells;
+
+        for (size_t i = 0; i < vertices.size(); i += 3)
+        {
+            points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+        }
+        for (size_t i = 0; i < indices.size(); i += 2)
+        {
+            cells->InsertNextCell({ indices[i],indices[i + 1] });
+        }
+
+        polyLine->SetPoints(points);
+        polyLine->SetLines(cells);
+    }
+
+    vtkNew<vtkPolyDataMapper> mapperLine;
+    mapperLine->SetInputData(polyLine);
+
+    vtkNew<vtkActor> actorLine;
+    actorLine->SetMapper(mapperLine);
+    actorLine->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkPointSet> pointSet;
+    pointSet->SetPoints(points_);
+
+    vtkNew<vtkDistanceToCamera> distToCamera;
+    distToCamera->SetInputData(pointSet);
+    distToCamera->SetScreenSize(50);
+
+    vtkNew<vtkSphereSource> sphere;
+    vtkNew<vtkGlyph3D> glyph;
+    glyph->SetInputConnection(distToCamera->GetOutputPort());
+    glyph->SetSourceConnection(sphere->GetOutputPort());
+
+    //glyph->SetScaleModeToScaleByScalar();
+    glyph->SetInputArrayToProcess(
+        0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "DistanceToCamera");
+
+    vtkNew<vtkPolyDataMapper> mapperGlyph;
+    mapperGlyph->SetInputConnection(glyph->GetOutputPort());
+    mapperGlyph->SetScalarVisibility(false); // 不关闭时，鼠标缩放会改变球的颜色
+
+    vtkNew<vtkActor> actorGlyph;
+    actorGlyph->SetMapper(mapperGlyph);
+
+
+
+    //---------------------------------------------------------------------------
+
+    // A renderer and render window.
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+    distToCamera->SetRenderer(renderer);
+    renderer->GetActiveCamera()->ParallelProjectionOn();
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+    renderWindow->SetWindowName("DistanceToCamera");
+
+    // Give DistanceToCamera a pointer to the renderer.
+
+
+    //renderer->ResetCamera();
+    //std::cout << renderer->GetActiveCamera()->GetParallelProjection() << '\n';
+    //renderer->GetActiveCamera()->ParallelProjectionOn();
+
+    // Add the actors to the scene.
+    renderer->AddActor(actorGlyph);
+    renderer->AddActor(actorLine);
+
+    // An interactor.
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    vtkNew<InteractorStyle> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    // Render an image (lights and cameras are created automatically).
+    renderWindow->Render();
+    renderer->ResetCamera();
+    // Begin mouse interaction.
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST44
+
+#ifdef TEST45
+
+#include <iostream>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+#include <vtkActor.h>
+#include <vtkConeSource.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkSphereSource.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkProperty.h>
+#include <vtkCamera.h>
+
+#include <iostream>
+
+#define vtkSPtr vtkSmartPointer
+#define vtkSPtrNew(Var, Type) vtkSPtr<Type> Var = vtkSPtr<Type>::New();
+
+//#define TEST_MAPPER // 使用Mapper设置图层效果
+
+#ifdef TEST_MAPPER
+
+int main()
+{
+    vtkSPtrNew(sphere, vtkSphereSource);
+    sphere->SetCenter(0, 0, 0);
+    sphere->SetRadius(1);
+    sphere->Update();
+
+    // 图层设置
+    vtkSPtrNew(sphereMapper, vtkPolyDataMapper);
+    const double units0 = -1.e6;
+    sphereMapper->SetInputData(sphere->GetOutput());
+    sphereMapper->SetResolveCoincidentTopologyToPolygonOffset();
+    //sphereMapper->SetRelativeCoincidentTopologyLineOffsetParameters(0, units0);
+    sphereMapper->SetRelativeCoincidentTopologyPolygonOffsetParameters(0, units0);
+    //sphereMapper->SetRelativeCoincidentTopologyPointOffsetParameter(units0);
+
+    vtkSPtrNew(sphereActor, vtkActor);
+    sphereActor->SetMapper(sphereMapper);
+    sphereActor->GetProperty()->SetColor(1, 0, 0);
+
+    vtkSPtrNew(cone, vtkConeSource);
+    cone->SetRadius(2);
+    cone->SetHeight(4);
+    cone->Update();
+
+    vtkSPtrNew(coneMapper, vtkPolyDataMapper);
+    coneMapper->SetInputData(cone->GetOutput());
+    vtkSPtrNew(coneActor, vtkActor);
+    coneActor->SetMapper(coneMapper);
+
+    vtkSPtrNew(renderer, vtkRenderer);
+    renderer->AddActor(coneActor);
+    renderer->AddActor(sphereActor);
+    renderer->SetBackground(0, 0, 0);
+
+    vtkSPtrNew(renderWindow, vtkRenderWindow);
+    renderWindow->AddRenderer(renderer);
+
+    vtkSPtrNew(renderWindowInteractor, vtkRenderWindowInteractor);
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderer->ResetCamera();
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#else
+
+int main()
+{
+    // 球
+    vtkSPtrNew(sphere, vtkSphereSource);
+    sphere->SetCenter(0, 0, 0);
+    sphere->SetRadius(1);
+    sphere->Update();
+
+    vtkSPtrNew(sphereMapper, vtkPolyDataMapper);
+    sphereMapper->SetInputData(sphere->GetOutput());
+
+    vtkSPtrNew(sphereActor, vtkActor);
+    sphereActor->SetMapper(sphereMapper);
+    sphereActor->GetProperty()->SetColor(1, 0, 0);
+
+    // 圆锥
+    vtkSPtrNew(cone, vtkConeSource);
+    cone->SetCenter(10, 10, 0);
+    cone->SetRadius(2);
+    cone->SetHeight(4);
+    cone->Update();
+
+    vtkSPtrNew(coneMapper, vtkPolyDataMapper);
+    coneMapper->SetInputData(cone->GetOutput());
+
+    vtkSPtrNew(coneActor, vtkActor);
+    coneActor->SetMapper(coneMapper);
+
+    // renderer
+    vtkSPtrNew(renderer1, vtkRenderer);
+    renderer1->AddActor(coneActor);
+    renderer1->SetBackground(1, 1, 0);
+
+    vtkSPtrNew(renderer2, vtkRenderer);
+    renderer2->AddActor(sphereActor);
+    renderer2->SetBackground(0, 1, 1);
+
+    renderer1->ResetCamera();
+    renderer2->ResetCamera();
+    renderer1->SetLayer(0);
+    renderer2->SetLayer(1);
+
+    //vtkNew<vtkCamera> camera;
+    //camera->DeepCopy(renderer1->GetActiveCamera());
+    //renderer2->SetActiveCamera(camera);
+
+    //renderer1->InteractiveOn();
+    //renderer2->InteractiveOn();
+
+    vtkSPtrNew(renderWindow, vtkRenderWindow);
+    renderWindow->SetSize(600, 600);
+    renderWindow->AddRenderer(renderer2);
+    renderWindow->AddRenderer(renderer1); // 鼠标交互响应的最后添加的renderer
+    renderWindow->SetNumberOfLayers(2);
+
+    // renderWindow可以添加多个vtkRenderer
+    // 每个vtkRenderer可以可以设置图层
+
+    auto pos = renderer2->GetActiveCamera()->GetPosition();
+    auto focal = renderer2->GetActiveCamera()->GetFocalPoint();
+    std::cout << "pos: " << pos[0] << ',' << pos[1] << ',' << pos[2] << '\n';
+    std::cout << "focal: " << focal[0] << ',' << focal[1] << ',' << focal[2] << '\n';
+
+    vtkSPtrNew(renderWindowInteractor, vtkRenderWindowInteractor);
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+#endif // TEST_MAPPER
+
+#endif // TEST45
+
+#ifdef TEST46
+
+#include <vtkActor.h>
+#include <vtkBillboardTextActor3D.h>
+#include <vtkCallbackCommand.h>
+#include <vtkNew.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkCubeSource.h>
+#include <vtkTextProperty.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+
+#include <vtkMatrix4x4.h>
+#include <vtkCamera.h>
+#include <vtkPerspectiveTransform.h>
+
+#include <iostream>
+#include "magic_enum.hpp"
+
+namespace
+{
+    enum class MyState
+    {
+        _VTKIS_ROTATE = 1,
+        _VTKIS_PAN,
+        _VTKIS_SPIN,
+        _VTKIS_DOLLY,
+        _VTKIS_ZOOM,
+        _VTKIS_USCALE,
+        _VTKIS_TIMER,
+        _VTKIS_FORWARDFLY,
+        _VTKIS_REVERSEFLY,
+        _VTKIS_TWO_POINTER,
+        _VTKIS_CLIP,
+        _VTKIS_PICK,
+        _VTKIS_LOAD_CAMERA_POSE,
+        _VTKIS_POSITION_PROP,
+        _VTKIS_EXIT,
+        _VTKIS_TOGGLE_DRAW_CONTROLS,
+        _VTKIS_MENU,
+        _VTKIS_GESTURE,
+        _VTKIS_ENV_ROTATE
+    };
+
+    vtkNew<vtkActor> actor;
+    vtkNew<vtkBillboardTextActor3D> textActor;
+
+    class InteractorStyle : public vtkInteractorStyleTrackballCamera
+    {
+    public:
+        static InteractorStyle* New();
+        vtkTypeMacro(InteractorStyle, vtkInteractorStyleTrackballCamera);
+
+        void OnLeftButtonUp() override
+        {
+            std::cout << "############################################\n";
+            if (this->Interactor)
+            {
+                if (0)
+                {
+                    textActor->Print(std::cout);
+
+                    auto actorPos = actor->GetPosition();
+                    auto textPos = textActor->GetPosition();
+                    std::cout << "cube Pos: " << actorPos[0] << ',' << actorPos[1] << ',' << actorPos[2] << '\n';
+                    std::cout << "text Pos: " << textPos[0] << ',' << textPos[1] << ',' << textPos[2] << '\n';
+
+                    std::cout << "--------------------------------\n";
+                    auto actorMat = actor->GetMatrix();
+                    auto textMat = textActor->GetMatrix();
+                    std::cout << "Cube: ";
+                    actorMat->Print(std::cout);
+                    std::cout << "Text: ";
+                    textMat->Print(std::cout);
+
+                    auto textUserMat = textActor->GetUserMatrix();
+                    if(textUserMat) textUserMat->Print(std::cout);
+                    auto cubeUserMat = actor->GetUserMatrix();
+                    if(cubeUserMat) cubeUserMat->Print(std::cout);
+                }
+                if (1)
+                {
+                    // 缩放矩阵，xyz都缩放为原来的0.5
+                    double scale[4][4]{
+                        0.5, 0.0, 0.0, 0.0,
+                        0.0, 0.5, 0.0, 0.0,
+                        0.0, 0.0, 0.5, 0.0,
+                        0.0, 0.0, 0.0, 1.0
+                    };
+                    // 平移矩阵，xy都平移0.5个单位
+                    double translation[16]{
+                        0.5, 0.0, 0.0, 0.5,
+                        0.0, 0.5, 0.0, 0.5,
+                        0.0, 0.0, 0.5, 0.0,
+                        0.0, 0.0, 0.0, 1.0
+                    };
+                    // 旋转矩阵
+                    double rotation[16]{
+                        0.5, 0.0, 0.0, 0.0,
+                        0.0, 0.5, 0.0, 0.0,
+                        0.0, 0.0, 0.5, 0.0,
+                        0.0, 0.0, 0.0, 1.0
+                    };
+
+                    vtkNew<vtkMatrix4x4> mat;
+                    for (size_t i = 0; i < 4; i++)
+                    {
+                        for (size_t j = 0; j < 4; j++)
+                        {
+                            mat->SetElement(i, j, scale[i][j]);
+                        }
+                    }
+
+                    actor->SetUserMatrix(mat);
+                }
+            }
+            Superclass::OnLeftButtonUp();
+        }
+        void OnMouseMove() override
+        {
+            auto name = magic_enum::enum_name(static_cast<MyState>(this->State));
+            if (name.length() > 0) std::cout << "State: " << name << '\n';
+
+            if (this->State == VTKIS_ROTATE)
+            {
+                auto rwi = this->Interactor;
+                int dx = rwi->GetEventPosition()[0] - rwi->GetLastEventPosition()[0];
+                int dy = rwi->GetEventPosition()[1] - rwi->GetLastEventPosition()[1];
+
+                const int* size = this->CurrentRenderer->GetRenderWindow()->GetSize();
+
+                double delta_elevation = -20.0 / size[1];
+                double delta_azimuth = -20.0 / size[0];
+
+                double rxf = dx * delta_azimuth * this->MotionFactor;
+                double ryf = dy * delta_elevation * this->MotionFactor;
+
+                vtkCamera* camera = this->CurrentRenderer->GetActiveCamera();
+                auto viewUp = camera->GetViewUp();          // 视图向上方向矢量
+                auto focalPoint = camera->GetFocalPoint();  // 焦点
+
+                actor->GetUserTransform();
+
+#if(0)
+                // Azimuth
+                {
+                    double newPosition[3];
+                    double* fp = camera->GetFocalPoint();
+                    camera->Transform->Identity();
+
+                    // translate the focal point to the origin,
+                    // rotate about view up,
+                    // translate back again
+                    camera->Transform->Translate(+fp[0], +fp[1], +fp[2]);
+                    camera->Transform->RotateWXYZ(angle, camera->ViewUp);
+                    camera->Transform->Translate(-fp[0], -fp[1], -fp[2]);
+
+                    // apply the transform to the position
+                    camera->Transform->TransformPoint(camera->Position, newPosition);
+                    camera->SetPosition(newPosition);
+                }
+
+                // Elevation
+                {
+                    double axis[3], newPosition[3], savedViewUp[3];
+                    double* fp = camera->GetFocalPoint();
+                    camera->Transform->Identity();
+
+                    // snatch the axis from the view transform matrix
+                    axis[0] = -camera->ViewTransform->GetMatrix()->GetElement(0, 0);
+                    axis[1] = -camera->ViewTransform->GetMatrix()->GetElement(0, 1);
+                    axis[2] = -camera->ViewTransform->GetMatrix()->GetElement(0, 2);
+
+                    // temporarily set the view up with the transformation applied
+                    // to avoid bad cross product computations during SetPosition call
+                    camera->GetViewUp(savedViewUp);
+                    camera->Transform->RotateWXYZ(angle, axis);
+                    camera->Transform->TransformPoint(camera->ViewUp, camera->ViewUp);
+                    camera->Transform->Identity();
+
+                    // translate the focal point to the origin,
+                    // rotate about axis,
+                    // translate back again
+                    camera->Transform->Translate(+fp[0], +fp[1], +fp[2]);
+                    camera->Transform->RotateWXYZ(angle, axis);
+                    camera->Transform->Translate(-fp[0], -fp[1], -fp[2]);
+
+                    // now transform position
+                    camera->Transform->TransformPoint(camera->Position, newPosition);
+                    camera->SetPosition(newPosition);
+
+                    // restore the previous ViewUp vector
+                    camera->ViewUp[0] = savedViewUp[0];
+                    camera->ViewUp[1] = savedViewUp[1];
+                    camera->ViewUp[2] = savedViewUp[2];
+                    // camera is needed since the last time Modified was called (in SetPosition),
+                    // the ViewUp was not same as savedViewUp. Since we're changing its value
+                    // here, we need to fire Modified event. We don't call `SetViewUp` since we
+                    // don't want the computation of the view transform to happen again.
+                    camera->Modified();
+                }
+#endif
+
+                // 围绕以焦点为中心的视图向上矢量旋转相机。结果是相机水平旋转。绕x轴（焦点为0,0,0)
+                camera->Azimuth(rxf);
+                // 用焦点作为旋转中心，围绕投影方向的负值和视图上方向向量的交叉积旋转相机。结果是场景的垂直旋转。绕y轴（焦点为0,0,0)
+                camera->Elevation(ryf);
+
+                camera->OrthogonalizeViewUp();
+
+                rwi->Render();
+
+                return;
+            }
+
+            Superclass::OnMouseMove();
+        }
+    };
+
+    vtkStandardNewMacro(InteractorStyle);
+}
+
+int main(int, char* [])
+{
+    // Create a renderer
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+    renderer->GetActiveCamera()->SetFocalPoint(0, 0, 0);
+    renderer->GetActiveCamera()->SetPosition(0, 0, 15);
+
+    // Create a render window
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetWindowName("BillboardTextActor3D");
+
+    // Create an interactor
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<InteractorStyle> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    // Create a sphere
+    vtkNew<vtkCubeSource> cubeSource;
+    cubeSource->SetCenter(0.0, 0.0, 0.0);
+    cubeSource->SetXLength(1);
+    cubeSource->SetYLength(2);
+    cubeSource->SetZLength(3);
+
+    // 立方体
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputConnection(cubeSource->GetOutputPort());
+    actor->SetMapper(mapper);
+    actor->SetPosition(0, 0, 0);
+    actor->GetProperty()->SetColor(1, 0, 0);
+
+    // 广告板
+    textActor->SetInput("Test Text");
+    textActor->SetPosition(3, 4, 5);
+    textActor->GetTextProperty()->SetFontSize(12);
+    textActor->GetTextProperty()->SetColor(1, 1, 0);
+    textActor->GetTextProperty()->SetJustificationToCentered();
+
+    renderer->AddActor(actor);
+    renderer->AddActor(textActor);
+
+    renderWindow->Render();
+    renderWindow->SetWindowName("BillboardTextActor3D");
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST46
 
