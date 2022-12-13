@@ -38,8 +38,8 @@
 25.颜色过渡，同一个窗口两个绘制对象，同一数据，不同相机 （viewPort)
 26.纹理，光照
 27.框选拾取 vtk拾取相关的类 https://blog.csdn.net/lovelanjuan/article/details/7301773
-28.actor拾取
-29.框选拾取actor，基于范围拾取
+28.actor拾取 vtkPropPicker 基于硬件拾取
+29.vtk拾取汇总，框选拾取，范围拾取，点拾取，单元拾取
 30.范围拾取 vtkAreaPicker 点到actor的最短距离 vtkCellLocator
 31.比例尺(vtkLegendScaleActor)
 32.vtkColorLegend  https://vtk.org/doc/nightly/html/classvtkColorLegend.html
@@ -81,7 +81,7 @@
 
 */
 
-#define TEST24
+#define TEST29
 
 //在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 //#include <vtkAutoInit.h>
@@ -3975,16 +3975,20 @@ namespace {
         virtual void OnLeftButtonUp() override
         {
             std::cout << "------------------------------------\n";
-#if(1)
+
             if (this->Interactor)
             {
                 auto posX = this->Interactor->GetEventPosition()[0];
                 auto posY = this->Interactor->GetEventPosition()[1];
-
                 std::cout << "X : " << posX << "\tY : " << posY << '\n';
 
-                if (auto areaPicker = dynamic_cast<vtkAreaPicker*>(this->Interactor->GetPicker()))
+                // https://blog.csdn.net/q610098308/article/details/125433189 vtk拾取器汇总
+
+                // vtkAreaPicker
+                if (0)
                 {
+                    vtkNew<vtkAreaPicker> areaPicker;
+                    this->Interactor->SetPicker(areaPicker);
                     // 拾取鼠标弹起位置的+-20矩形区域
                     double bound = 20;
                     areaPicker->AreaPick(posX - bound, posY - bound, posX + bound, posY + bound, this->CurrentRenderer);
@@ -3994,87 +3998,124 @@ namespace {
 
                     std::cout << "pickPosition\t" << pickPosition[0] << '\t' << pickPosition[1] << '\t' << pickPosition[2] << '\n';
                     std::cout << "selectionPoint\t" << selectionPoint[0] << '\t' << selectionPoint[1] << '\t' << selectionPoint[2] << '\n';
+
                 }
-                else
+
+                // vtkAreaPicker + vtkAssembly
+                if (0)
                 {
-                    auto picker = this->Interactor->GetPicker();
-                    picker->Pick(posX, posY, 0, this->CurrentRenderer);
+                    vtkNew<vtkAreaPicker> areaPicker;
+                    this->Interactor->SetPicker(areaPicker);
+                    double bound = 20;
+                    areaPicker->AreaPick(posX - bound, posY - bound, posX + bound, posY + bound, this->CurrentRenderer);
+                    auto props = areaPicker->GetProp3Ds();
+                    props->InitTraversal();
+                    auto num = props->GetNumberOfItems();
+                    std::cout << "actor number : " << num << '\n';
+                    if (num == 1)
+                    {
+                        auto prop = props->GetNextProp3D();
+                        auto assembly = vtkAssembly::SafeDownCast(prop);
+                        auto parts = assembly->GetParts();
+                        auto num2 = parts->GetNumberOfItems();
 
-                    
+                        for (size_t i = 0; i < num2; ++i)
+                        {
+                            auto actor = vtkActor::SafeDownCast(parts->GetNextProp3D());
 
-                    auto pickPosition = picker->GetPickPosition();     // 模型坐标，不是世界坐标，如果多个actor叠加，返回前面的actor坐标
-                    auto selectionPoint = picker->GetSelectionPoint(); // 窗口坐标
+                            for (auto [actor_, id_] : theActors)
+                            {
+                                if (actor == actor_)
+                                {
+                                    std::cout << "pick id : " << id_ << '\t';
+                                }
+                            }
+                        }
+                        std::cout << '\n';
+                    }
+                }
+
+                // vtkPicker vtkAbstractPicker
+                if (0)
+                {
+                    vtkAbstractPicker* abstractPicker = this->Interactor->GetPicker();
+                    abstractPicker->Pick(posX, posY, 0, this->CurrentRenderer);
+
+                    auto pickPosition = abstractPicker->GetPickPosition();     // 模型坐标，不是世界坐标，如果多个actor叠加，返回前面的actor坐标
+                    auto selectionPoint = abstractPicker->GetSelectionPoint(); // 窗口坐标
 
                     std::cout << "pickPosition\t" << pickPosition[0] << '\t' << pickPosition[1] << '\t' << pickPosition[2] << '\n';
                     std::cout << "selectionPoint\t" << selectionPoint[0] << '\t' << selectionPoint[1] << '\t' << selectionPoint[2] << '\n';
                 }
 
-            }
-#endif
-            this->CurrentRenderer->RemoveAllViewProps();
-
-            if (!this->Interactor)
-            {
-                auto posX = this->Interactor->GetEventPosition()[0];
-                auto posY = this->Interactor->GetEventPosition()[1];
-
-                std::cout << "X : " << posX << "\tY : " << posY << '\n';
-
-                vtkNew<vtkAreaPicker> areaPicker;
-                this->Interactor->SetPicker(areaPicker);
-                double bound = 20;
-                areaPicker->AreaPick(posX - bound, posY - bound, posX + bound, posY + bound, this->CurrentRenderer);
-                auto props = areaPicker->GetProp3Ds();
-                props->InitTraversal();
-                auto num = props->GetNumberOfItems();
-                std::cout << "actor number : " << num << '\n';
-                if (num == 1)
+                // vtkPropPicker
+                if (1)
                 {
-                    auto prop = props->GetNextProp3D();
-                    auto assembly = vtkAssembly::SafeDownCast(prop);
-                    auto parts = assembly->GetParts();
-                    auto num2 = parts->GetNumberOfItems();
+                    vtkNew<vtkPropPicker> propPicker;
+                    this->Interactor->SetPicker(propPicker);
+                    vtkObject::GetGlobalWarningDisplay();
 
-                    for (size_t i = 0; i < num2; ++i)
+                    if (propPicker->Pick(posX, posY, 0, this->CurrentRenderer) != 0)
                     {
-                        auto actor = vtkActor::SafeDownCast(parts->GetNextProp3D());
-
-                        for (auto [actor_, id_] : theActors)
-                        {
-                            if (actor == actor_)
-                            {
-                                std::cout << "pick id : " << id_ << '\t';
-                            }
-                        }
+                        auto pickPosition = propPicker->GetPickPosition();
+                        auto pickActor = propPicker->GetActor();
+                        std::cout << "pickPostion : " << pickPosition[0] << '\t' << pickPosition[1] << '\t' << pickPosition[2] << '\n';
                     }
-                    std::cout << '\n';
                 }
 
-                vtkNew<vtkPropPicker> picker;
-                this->Interactor->SetPicker(picker);
-
-                if (picker->Pick(posX, posY, 0, this->CurrentRenderer) != 0)
+                // vtkCellPicker
+                if (1)
                 {
-                    auto pickPosition = picker->GetPickPosition();
-                    std::cout << "pickPostion : " << pickPosition[0] << '\t' << pickPosition[1] << '\t' << pickPosition[2] << '\n';
+                    vtkNew<vtkCellPicker> cellPicker;
+                    this->Interactor->SetPicker(cellPicker);
+
+                    cellPicker->SetTolerance(0.01); // 相当于指定鼠标所在位置的范围
+                    cellPicker->Pick(posX, posY, 0, this->CurrentRenderer);
+                    cellPicker->GetPickPosition();
+                    cellPicker->GetActor();
+                    cellPicker->GetMapper();
+                    auto cellId = cellPicker->GetCellId();
+                    cellPicker->GetCellIJK();
+                    cellPicker->GetDataSet();
+
+                    if (cellId != -1)
+                    {
+                        std::cout << "pick cell id: " << cellId << '\n';
+                    }
+                }
+
+                // vtkPointPicker
+                if (1)
+                {
+                    vtkNew<vtkPointPicker> pointPicker;
+                    this->Interactor->SetPicker(pointPicker);
+
+                    pointPicker->SetTolerance(0.01);
+                    pointPicker->Pick(posX, posY, 0, this->CurrentRenderer);
+                    pointPicker->GetActor();
+                    auto pointId = pointPicker->GetPointId();
+                    pointPicker->GetPickPosition();
+                    pointPicker->GetDataSet();
+
+                    if (pointId != -1)
+                    {
+                        std::cout << "pick point id: " << pointId << '\n';
+                    }
                 }
             }
 
             Superclass::OnLeftButtonUp();
         }
+
     };
-
     vtkStandardNewMacro(InteractorStyle);
-
-    void PickCallbackFunction(vtkObject* caller, long unsigned int eventId,
-        void* clientData, void* callData);
-
 }
 
 int main(int, char* [])
 {
     vtkNew<vtkRenderer> renderer;
     renderer->SetBackground(.1, .2, .3);
+
 #if(1)
     vtkNew<vtkMinimalStandardRandomSequence> randomSequence;
     randomSequence->SetSeed(8775070);
@@ -4176,54 +4217,15 @@ int main(int, char* [])
     vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
-    // 将拾取器设置为区域拾取
-    //vtkNew<vtkAreaPicker> areaPicker;
-    //renderWindowInteractor->SetPicker(areaPicker);
-
     vtkNew<InteractorStyle> style;
     renderWindowInteractor->SetInteractorStyle(style);
 
-    // 拾取器回调函数
-    //vtkNew<vtkCallbackCommand> pickCallback;
-    //pickCallback->SetCallback(PickCallbackFunction);
-    //renderWindowInteractor->GetPicker()->AddObserver(vtkCommand::EndPickEvent, pickCallback);
 
     renderWindow->Render();
     renderWindowInteractor->Start();
 
     return EXIT_SUCCESS;
-    }
-
-namespace {
-    void PickCallbackFunction(vtkObject* caller,
-        long unsigned int vtkNotUsed(eventId),
-        void* vtkNotUsed(clientData),
-        void* vtkNotUsed(callData))
-    {
-        std::cout << "end pick\n";
-        if (vtkAreaPicker* areaPicker = dynamic_cast<vtkAreaPicker*>(caller))
-        {
-            vtkProp3DCollection* props = areaPicker->GetProp3Ds();
-            props->InitTraversal();
-
-            for (vtkIdType i = 0; i < props->GetNumberOfItems(); i++)
-            {
-                vtkProp3D* prop = props->GetNextProp3D();
-                for (auto [actor, id] : theActors)
-                {
-                    if (actor == prop)
-                    {
-                        //prop->VisibilityOff();
-                        std::cout << "pick id : " << id << '\t';
-                    }
-                }
-                std::cout << '\n';
-                //return;
-            }
-        }
-    }
-
-} // namespace
+}
 
 
 #endif // TEST29
@@ -4524,7 +4526,7 @@ namespace
                 {
                     auto pickPosition = picker->GetPickPosition();
                     auto actor = picker->GetActor();
-                    
+
                     std::cout << actor << '\n';
                     std::cout << "pickPostion : " << pickPosition[0] << '\t' << pickPosition[1] << '\t' << pickPosition[2] << '\n';
 
@@ -4626,7 +4628,7 @@ namespace
             {
                 auto posX = this->Interactor->GetEventPosition()[0];
                 auto posY = this->Interactor->GetEventPosition()[1];
-                    
+
                 vtkNew<vtkCoordinate> coord;
                 coord->SetCoordinateSystemToDisplay();
                 coord->SetValue(posX, posY, 0.);
@@ -5925,7 +5927,7 @@ namespace {
         os << std::left << std::setw(width) << "Total" << std::right << std::setw(8)
             << total << std::endl;
         std::cout << os.str() << endl;
-}
+    }
 
 } // namespace
 
@@ -6356,7 +6358,6 @@ int main()
 #include <vtkActor.h>
 #include <vtkCamera.h>
 #include <vtkCellArray.h>
-#include <vtkCellLocator.h>
 #include <vtkDataSetMapper.h>
 #include <vtkDelaunay2D.h>
 #include <vtkDoubleArray.h>
@@ -9845,6 +9846,7 @@ int main(int argc, char* argv[])
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 #include <vtkSphereSource.h>
+#include <vtkCommand.h>
 
 namespace {
 
@@ -9888,6 +9890,8 @@ int main(int, char* [])
 
     vtkNew<vtkInteractorStyleRubberBand2D> style;
     style->AddObserver(vtkCommand::SelectionChangedEvent, selectionChangedCallback);
+    //style->AddObserver(vtkCommand::SelectionChangedEvent, [](vtkObject* caller, unsigned long, void*, void*) {});
+
     renderWindowInteractor->SetInteractorStyle(style);
 
     // Begin mouse interaction
