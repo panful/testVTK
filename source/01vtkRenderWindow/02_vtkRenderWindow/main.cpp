@@ -81,7 +81,7 @@
 
 */
 
-#define TEST29
+#define TEST15
 
 //在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 //#include <vtkAutoInit.h>
@@ -1790,8 +1790,7 @@ int main(int argc, char* argv[])
 #include <vtkMinimalStandardRandomSequence.h>
 
 #include <array>
-
-vtkSmartPointer<vtkDataSetMapper> _arrowMapper = vtkSmartPointer<vtkDataSetMapper>::New();
+#include <iostream>
 
 // 设置箭头位置
 vtkSmartPointer<vtkDataSetMapper> createArrow(double* start, double* end)
@@ -1846,56 +1845,81 @@ vtkSmartPointer<vtkDataSetMapper> createArrow(double* start, double* end)
     transformPD->SetTransform(transform);
     transformPD->SetInputConnection(_arrowSource->GetOutputPort());
 
-    _arrowMapper->SetInputConnection(transformPD->GetOutputPort());
+    vtkNew<vtkDataSetMapper> arrowMapper;
+    arrowMapper->SetInputConnection(transformPD->GetOutputPort());
 
-    return _arrowMapper;
+    return arrowMapper;
 }
 
 int main()
 {
-    vtkSmartPointer<vtkArrowSource> arrowSource = vtkSmartPointer<vtkArrowSource>::New();
-    auto num1 = arrowSource->GetShaftResolution();  //6
-    auto num2 = arrowSource->GetTipResolution();    //6
     /*
     SetShaftRadius        设置轴线半径，轴的粗细
     SetShaftResolution    设置轴线分辨率，轴截面的圆由多少个线段构成
     SetShaftLength        设置轴线长度
-    SetTipRadius        设置端点圆锥体半径，圆锥体底面圆的半径
-    SetTipResolution    设置端点圆锥体分辨率，圆锥体侧面由多少个三角构成，
-    SetTipLength        设置端点圆锥体长度，圆锥体的高度
+    SetTipRadius          设置端点圆锥体半径，圆锥体底面圆的半径
+    SetTipResolution      设置端点圆锥体分辨率，圆锥体侧面由多少个三角构成，
+    SetTipLength          设置端点圆锥体长度，圆锥体的高度
     */
 
-    //vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
-    //vtkSmartPointer<vtkTransformPolyDataFilter> transformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+    {
+        vtkNew<vtkArrowSource> arrowSource;
 
-    //arrowSource->GetOutputPort();
+        auto num1 = arrowSource->GetShaftResolution();  //6
+        auto num2 = arrowSource->GetTipResolution();    //6
 
-    //arrowSource->SetShaftResolution(10);
-    //arrowSource->SetShaftRadius(0.05);
-    //arrowSource->SetTipRadius(0.1);
-    //arrowSource->SetTipLength(0.3);
-    //arrowSource->SetTipResolution(10);
-    //arrowSource->Update();
+        arrowSource->SetShaftRadius(.01);
+        arrowSource->SetTipLength(.2);
+        arrowSource->SetTipRadius(.05);
+        arrowSource->Update();
 
-    //vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    //mapper->SetInputConnection(arrowSource->GetOutputPort());
+        std::cout << num1 << ',' << num2 << '\n';
 
-    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
+        auto polyData = arrowSource->GetOutput();
+        auto numPoints = polyData->GetNumberOfPoints();
+        auto numCells = polyData->GetNumberOfCells();
+        auto numPolys = polyData->GetNumberOfPolys();
 
-    double start[] = { 1,0,10 };
-    double end[] = { 20,-10,10 };
-    actor->SetMapper(createArrow(start, end));
+        std::cout << "numPoints: " << numPoints << '\t' << "numCells: " << numCells << '\t' << "numPolys: " << numPolys << '\n';
+    }
 
-    //actor->SetMapper(mapper);
+
+    vtkNew<vtkActor> actor;
+
+    if (1)
+    {
+        // 默认位置
+        vtkNew<vtkArrowSource> arrowSource;
+
+        arrowSource->SetShaftResolution(10);
+        arrowSource->SetShaftRadius(0.05);
+        arrowSource->SetTipRadius(0.1);
+        arrowSource->SetTipLength(0.3);
+        arrowSource->SetTipResolution(10);
+        arrowSource->Update();
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputConnection(arrowSource->GetOutputPort());
+        actor->SetMapper(mapper);
+    }
+    else
+    {
+        // 自定义位置
+        double start[] = { 1,0,10 };
+        double end[] = { 20,-10,10 };
+        actor->SetMapper(createArrow(start, end));
+    }
 
     vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+
     vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
     renderWindow->AddRenderer(renderer);
+
     vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
-    renderer->AddActor(actor);
-    renderer->SetBackground(.1, .2, .3);
     renderWindow->Render();
     renderWindowInteractor->Start();
 
