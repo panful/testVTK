@@ -44,10 +44,10 @@
 43 直线与图元的交点 vtkOBBTree  线与线的交点 IntersectWithLine
 44 部分图元大小不变，位置变化
 45.图层设置，让某个mapper始终在最上层或最下层，或中间某一层
-46.
+46.vtkBillboardTextActor3D 鼠标旋转，文本始终朝向观察者，广告板
 */
 
-#define TEST32
+#define TEST46
 
 #ifdef TEST1
 

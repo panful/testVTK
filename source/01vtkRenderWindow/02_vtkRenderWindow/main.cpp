@@ -81,7 +81,7 @@
 
 */
 
-#define TEST15
+#define TEST24
 
 //在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 //#include <vtkAutoInit.h>
@@ -2880,10 +2880,15 @@ private:
     vtkSmartPointer<vtkRenderer> m_renderer{ nullptr };
 };
 
+#define line_fill  // 上下左右四视图，格点格心数据，线框面显示模式的区别
+//#define scalar_bar    // 色卡颜色查找表的使用
+
 
 int main(int, char* [])
 {
-#if(0)
+
+#ifdef line_fill
+
     // 顶点，共有40个顶点
     vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
     for (size_t i = 0; i < 10; i++)
@@ -3022,12 +3027,13 @@ int main(int, char* [])
     actorLinePoint->SetMapper(mapperLine_scalarPoint);
     actorLineCell->SetMapper(mapperLine_scalarCell);
 
-    // 以点，线，面方式显示
-    //actor->GetProperty()->SetRepresentationToSurface();
-    //actor->GetProperty()->SetRepresentationToWireframe();
-    //actor->GetProperty()->SetRepresentationToPoints();
-
-    actorPolyCell->GetProperty()->SetRepresentationToWireframe();
+    // 以点，线框，面方式显示
+    actorPolyPoint->GetProperty()->SetRepresentationToWireframe();
+    //actorPolyPoint->GetProperty()->SetRepresentationToSurface();
+    //actorPolyPoint->GetProperty()->SetRepresentationToPoints();
+    //actorPolyCell->GetProperty()->SetRepresentationToWireframe();
+    actorPolyPoint->GetProperty()->EdgeVisibilityOn();
+    actorPolyPoint->GetProperty()->SetEdgeColor(1, 1, 1);
 
     vtkNew<vtkRenderer> topLeftRenderer;
     vtkNew<vtkRenderer> topRightRenderer;
@@ -3057,7 +3063,10 @@ int main(int, char* [])
     window->SetSize(800, 600);
     window->Render();
     renderWindowInteractor->Start();
-#else
+
+#endif // line_fill
+
+#ifdef scalar_bar
 
     std::vector<float> vertices{
         0.,0.,
@@ -3215,11 +3224,6 @@ int main(int, char* [])
     //actor->GetProperty()->SetInterpolationToGouraud();
     actor->GetProperty()->SetInterpolationToPhong();
 
-    // 以点，线，面方式显示
-    //actor->GetProperty()->SetRepresentationToSurface();
-    //actor->GetProperty()->SetRepresentationToWireframe();
-    //actor->GetProperty()->SetRepresentationToPoints();
-
     //---------------------------------------------------------
     vtkNew<vtkScalarBarActor> scalarBar;
     std::cout << "------------------------------------------\n";
@@ -3322,7 +3326,8 @@ int main(int, char* [])
     renderWindow->Render();
     renderWindowInteractor->Start();
 
-#endif
+#endif scalar_bar
+
     return 0;
 }
 
