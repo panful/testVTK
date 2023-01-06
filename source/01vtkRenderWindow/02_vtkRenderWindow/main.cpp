@@ -12,7 +12,7 @@
 
 /*
 1.鼠标左键弹起后修改actor颜色
-2.从文件读取顶点
+2.绘制点，GetCell()函数崩溃的问题
 3.（顶点 + 索引）绘制立方体（和opengl ebo方式类似），每个顶点添加一个颜色值
 4.简单的平面，使用顶点属性数据设置颜色 vtkDataArray
 5.通过定义三个指定x-y-z方向坐标的阵列来创建直线栅格。
@@ -81,7 +81,7 @@
 
 */
 
-#define TEST24
+#define TEST2
 
 //在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 //#include <vtkAutoInit.h>
@@ -204,83 +204,90 @@ int main(int, char* [])
 
 #ifdef TEST2
 
-// VTK includes
-#include "vtkPoints.h"
-#include "vtkPolyData.h"
-#include "vtkActor.h"
-#include "vtkRenderer.h"
-#include "vtkRenderWindow.h"
-#include "vtkPolyDataMapper.h"
-#include "vtkInteractorStyle.h"
-#include "vtkRenderWindowInteractor.h"
-#include "vtkProperty.h"
-#include "vtkCellArray.h"
-#include "vtkInteractorStyleTrackballCamera.h"
+#include <vtkPolyData.h>
+#include <vtkPoints.h>
+#include <vtkCellArray.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkProperty.h>
+#include <vtkCamera.h>
+#include <vtkRenderWindowInteractor.h>
 
-#include <fstream>
+#include <array>
+#include <iostream>
 
-using namespace std;
-
-int main(int argc, char* argv[])
+namespace
 {
-    vtkPoints* points = vtkPoints::New();     //顶点
-    vtkCellArray* cells = vtkCellArray::New();//索引
+    std::array<float, 3> vertices{
+        10,10,10,
+        //1,0,0,
+        //1,1,0,
+        //0,1,0
+    };
 
+    std::array<long long, 1> indices{
+        0,
+        //1,
+        //2,
+        //3,
+    };
+}
 
-    //    ifstream fs(argv[1]);
-    ifstream fs("file\\02_point.txt");
-    vtkIdType idtype;
-    double x, y, z;
-    while (fs >> x >> y >> z) {
-        //插入点坐标，此处可改为其它的xyz
-        idtype = points->InsertNextPoint(x, y, z);
-        cells->InsertNextCell(1, &idtype);
+int main()
+{
+    vtkNew<vtkPolyData> polyData;
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cells;
+
+    for (size_t i = 0; i < vertices.size(); i += 3)
+    {
+        points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+    }
+    for (size_t i = 0; i < indices.size(); i++)
+    {
+        cells->InsertNextCell({ indices[i] });  // 这种插入方式有的时候会有问题，导致 GetCell(0)函数崩溃
+        cells->InsertNextCell(1, 0);
     }
 
-
-
-    // 渲染机制未知，需要同时设置点坐标与点坐标对应的verts
-    // verts中的id必须与点坐标对应
-    vtkPolyData* polyData = vtkPolyData::New();
     polyData->SetPoints(points);
     polyData->SetVerts(cells);
 
-    //下面为正常的可视化流程，可设置的点云颜色、大小等
-    vtkPolyDataMapper* mapper = vtkPolyDataMapper::New();
+    //mapper
+    vtkNew<vtkPolyDataMapper> mapper;
     mapper->SetInputData(polyData);
 
-    vtkActor* actor = vtkActor::New();
+    //actor
+    vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
-    //设置颜色与点大小
-    actor->GetProperty()->SetColor(1.0, 0.0, 0.0);
+    actor->GetProperty()->SetColor(0, 1, 0);
     actor->GetProperty()->SetPointSize(5);
 
+    actor->Print(std::cout);
+    actor->GetMapper()->GetInput()->Print(std::cout);
+    double bounds[6]{ 0 };
+    actor->GetMapper()->GetInput()->GetCellBounds(0, bounds);
+    auto cell = actor->GetMapper()->GetInput()->GetCell(0);
+    cell->GetBounds(bounds);
 
-    vtkRenderer* renderer = vtkRenderer::New();
+    //renderer
+    vtkNew<vtkRenderer> renderer;
     renderer->AddActor(actor);
-    // 设置背景颜色
-    renderer->SetBackground(1, 1, 1);
+    renderer->ResetCamera();
 
-    vtkRenderWindow* renderWindow = vtkRenderWindow::New();
-    renderWindow->AddRenderer(renderer);
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(600, 600);
 
-    vtkRenderWindowInteractor* iren = vtkRenderWindowInteractor::New();
-    iren->SetRenderWindow(renderWindow);
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
 
-    vtkInteractorStyleTrackballCamera* style = vtkInteractorStyleTrackballCamera::New();
-    iren->SetInteractorStyle(style);
-
-    iren->Initialize();
+    //数据交互
+    renWin->Render();
     iren->Start();
-
-    points->Delete();
-    polyData->Delete();
-    mapper->Delete();
-    actor->Delete();
-    renderer->Delete();
-    renderWindow->Delete();
-    iren->Delete();
-    style->Delete();
 
     return 0;
 }
@@ -2858,10 +2865,25 @@ public:
 
         if (m_bar && m_renderer)
         {
+            std::cout << "----------------------\n";
+
             // 色卡的色带部分在渲染窗口中的像素位置
             int rect[4]{ 0 };
             m_bar->GetScalarBarRect(rect, m_renderer);
             std::cout << "ScalarBarRect : " << rect[0] << '\t' << rect[1] << '\t' << rect[2] << '\t' << rect[3] << '\n';
+
+            auto range = m_bar->GetLookupTable()->GetRange();
+            std::cout << "Range: " << range[0] << '\t' << range[1] << '\n';
+            
+            // 获取指定scalar在颜色映射表中的索引
+            if (auto lut = vtkLookupTable::SafeDownCast(m_bar->GetLookupTable()))
+            {
+                double scalar = 10.0;
+                auto index = lut->GetIndex(scalar);
+                auto numColors = lut->GetNumberOfColors();
+                auto indexLu = lut->GetIndexedLookup();
+                std::cout << "indexedLookup: " << indexLu << "\tcolor num: " << numColors << "\tscalar: "<<scalar << "\tindex: " << index << '\n';
+            }
         }
     }
 
@@ -2880,8 +2902,8 @@ private:
     vtkSmartPointer<vtkRenderer> m_renderer{ nullptr };
 };
 
-#define line_fill  // 上下左右四视图，格点格心数据，线框面显示模式的区别
-//#define scalar_bar    // 色卡颜色查找表的使用
+//#define line_fill  // 上下左右四视图，格点格心数据，线框面显示模式的区别
+#define scalar_bar    // 色卡颜色查找表的使用
 
 
 int main(int, char* [])

@@ -3,9 +3,10 @@
 * 1. 引用计数
 * 2. 主动释放vtk对象
 * 3. 调试vtk源码
+* 4. AddObserver使用lambda，将vtk指针指向的数据置为空
 */
 
-#define TEST3
+#define TEST4
 
 #ifdef TEST1
 
@@ -115,43 +116,40 @@ int main(int, char* [])
 
 #ifdef TEST2
 
-#include <iostream>
-#include <vector>
+#include <iostream> 
 #include <vtkObject.h> 
 #include <vtkObjectFactory.h> 
 #include <vtkSmartPointer.h> 
-class vtkMyClass : public vtkObject {
+
+class vtkMyClass : public vtkObject 
+{
 public:
     vtkTypeMacro(vtkMyClass, vtkObject);
     void PrintSelf(ostream& os, vtkIndent indent) {}
     static vtkMyClass* New();
 protected:
-    vtkMyClass();
-    ~vtkMyClass();
+    vtkMyClass()
+    {
+        std::cerr << "constructor called\n";
+    }
+    ~vtkMyClass()
+    {
+        std::cerr << "destructor called\n";
+    }
 };
 vtkStandardNewMacro(vtkMyClass)
-vtkMyClass::vtkMyClass() {
-    std::cerr << "constructor called\n";
-}
-vtkMyClass::~vtkMyClass() {
-    std::cerr << "destructor called\n";
-}
-int main()
-{
-    {
-        //std::vector<vtkSmartPointer<vtkMyClass>> vec;
-        std::cerr << __LINE__ << '\n';
-        vtkSmartPointer<vtkMyClass> myObject;
-        std::cerr << __LINE__ << '\n';
-        myObject = vtkSmartPointer<vtkMyClass>::New();
-        //vec.emplace_back(myObject);
-        std::cerr << __LINE__ << '\n';
-        myObject = NULL; // calls destructor 
-        std::cerr << __LINE__ << '\n';
-    }
 
+int main(int argc, char** argv) {
+    std::cerr << __LINE__ << '\n';
+    vtkSmartPointer<vtkMyClass> myObject;
+    std::cerr << __LINE__ << '\n';
+    myObject = vtkSmartPointer<vtkMyClass>::New();
+    std::cerr << __LINE__ << '\n';
+    myObject = NULL; // calls destructor 
+    std::cerr << __LINE__ << '\n';
     return 0;
 }
+
 #endif // TEST2
 
 #ifdef TEST3
@@ -254,3 +252,154 @@ int main()
 
 
 #endif // TEST3
+
+#ifdef TEST4
+
+#include <vtkCubeSource.h>
+#include <vtkArrowSource.h>
+#include <vtkSmartPointer.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkCallbackCommand.h>
+
+#include <iostream>
+
+class vtkMyClass : public vtkObject
+{
+public:
+    vtkTypeMacro(vtkMyClass, vtkObject);
+    void PrintSelf(ostream& os, vtkIndent indent) {}
+    static vtkMyClass* New();
+protected:
+    vtkMyClass()
+    {
+        std::cerr << "constructor called\n";
+    }
+    ~vtkMyClass()
+    {
+        std::cerr << "destructor called\n";
+    }
+};
+vtkStandardNewMacro(vtkMyClass)
+
+class MyCommand : public vtkCommand
+{
+public:
+    static MyCommand* New();
+
+    virtual void Execute(vtkObject* caller, unsigned long, void*)
+    {
+        std::cout << "cb\n";
+        if (m_actor)
+        {
+            std::cout << "m_actor = nullptr;\n";
+
+            //std::cout << "count\t" << m_actor->GetReferenceCount() << '\n';
+            //printf("pointer:%p\n", m_actor);
+            //m_actor->Delete();
+            //m_actor = nullptr;
+            //std::cout << "count\t" << m_actor->GetReferenceCount() << '\n';
+            //printf("pointer:%p\n", m_actor);
+            //m_actor->Modified();
+            //m_actor.New();
+            //auto x = m_actor.Get();
+            //x = nullptr;
+
+            vtkNew<vtkArrowSource> arrow;
+            //mapper
+            vtkNew<vtkPolyDataMapper> cubeMapper;
+            cubeMapper->SetInputConnection(arrow->GetOutputPort());
+
+            vtkActor* cubeActor = vtkActor::New();
+            printf("pointer:%p\n", cubeActor);
+            cubeActor->SetMapper(cubeMapper);
+            cubeActor->GetProperty()->SetColor(1, 0, 0);
+
+            //m_actor->SetMapper(nullptr);
+            vtkNew<vtkActor> emptyActor;
+            m_actor->ShallowCopy(cubeActor);
+
+            auto r = m_actor->GetPropertyKeys();
+        }
+
+        if (m_myClass)
+        {
+            //std::cout << "m_myClass = nullptr;\n";
+            ////m_myClass = nullptr;
+            ////m_myClass->Delete();
+            //m_myClass->SetReferenceCount(0);
+        }
+    }
+
+    void SetActor(const vtkSmartPointer<vtkActor>& actor)
+    {
+        m_actor = actor;
+    }
+    void SetClass(const vtkSmartPointer<vtkMyClass>& myClass)
+    {
+        m_myClass = myClass;
+    }
+private:
+    vtkActor* m_actor{ nullptr };
+    vtkSmartPointer<vtkMyClass> m_myClass{ nullptr };
+};
+
+vtkStandardNewMacro(MyCommand);
+
+int main(int, char* [])
+{
+    vtkNew<vtkCubeSource> cube;
+
+    //mapper
+    vtkNew<vtkPolyDataMapper> cubeMapper;
+    cubeMapper->SetInputConnection(cube->GetOutputPort());
+    //cubeMapper->SetInputData(cube->GetOutput()); // 不能使用vtkPolyData，只能用管道方式
+
+    //actor
+    vtkActor* cubeActor = vtkActor::New();
+    printf("pointer:%p\n", cubeActor);
+    cubeActor->SetMapper(cubeMapper);
+    cubeActor->GetProperty()->SetColor(0, 1, 0);
+
+    //camera
+    vtkNew<vtkCamera> camera;
+    camera->SetPosition(1, 1, 1);//设置相机位置
+    camera->SetFocalPoint(0, 0, 0);//设置相机焦点
+
+    //renderer
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(cubeActor);
+    renderer->SetActiveCamera(camera);
+    renderer->ResetCamera();
+    
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(600, 600);//设置window大小
+
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+    vtkNew<MyCommand> cb;
+    cb->SetActor(cubeActor);
+    vtkNew<vtkMyClass> myClass;
+    cb->SetClass(myClass);
+    iren->AddObserver(vtkCommand::LeftButtonPressEvent, cb);
+
+    //vtkNew<vtkCallbackCommand> cb;
+    //cb->SetCallback([](vtkObject* caller, unsigned long, void*, void*) {std::cout << "lambda\n"; });
+    //iren->AddObserver(vtkCommand::LeftButtonPressEvent, cb);
+
+    //数据交互
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST4
