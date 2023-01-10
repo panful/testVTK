@@ -4,7 +4,7 @@ set(target_name "02_03_MultiWindow")
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC OFF)
-set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTOUIC OFF)
 
 find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
 
@@ -25,45 +25,7 @@ find_package(VTK
     REQUIRED
 )
 
-function(prepend_for_each_item src_list prepend_content)
-    foreach(_item IN LISTS ${src_list})
-        string(PREPEND _item ${prepend_content})
-        list(APPEND _dest_list ${_item})
-    endforeach()
-    set(${src_list} ${_dest_list} PARENT_SCOPE)
-endfunction()
-
-set(HEADERS
-    mainWindow.h
-    service.h
-    viewer.h
-    window.h
-    scene.h
-    screenCapture.h
-    
-    command.h
-    setColorCommand.h
-)
-
-set(SRCS
-    mainWindow.cpp
-    service.cpp
-    viewer.cpp
-    window.cpp
-    scene.cpp
-    screenCapture.cpp
-    
-)
-
-set(RSCS
-    mainWindow.ui
-)
-
-prepend_for_each_item(HEADERS "include/")
-prepend_for_each_item(SRCS "source/")
-prepend_for_each_item(RSCS "source/")
-
-add_executable(${target_name} "main.cpp" ${HEADERS} ${SRCS} ${RSCS})
+add_executable(${target_name} "main.cpp" "window.h" )
 
 target_include_directories(${target_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 

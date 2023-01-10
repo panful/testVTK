@@ -1,10 +1,10 @@
-﻿#include "mainWindow.h"
+﻿#include "window.h"
 #include <QApplication>
 #include <QSurfaceFormat>
 
 int main(int argc, char** argv)
 {
-    // 从渲染窗口拖出viewer 报错：ERROR: In ...\VTK-9.1.0\Rendering\OpenGL2\vtkOpenGLFramebufferObject.cxx, line 367
+    // 从渲染窗口拖出vtkWindow 报错：ERROR: In ...\VTK-9.1.0\Rendering\OpenGL2\vtkOpenGLFramebufferObject.cxx, line 367
     // vtkOpenGLFramebufferObject(000002445318B250) : failed at glDeleteFramebuffers 16 OpenGL errors detected
     // 需要设置：QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 
@@ -27,7 +27,7 @@ int main(int argc, char** argv)
 
     QApplication app(argc, argv);
 
-    LeoMainWindow window;
+    Window window;
     window.setMinimumSize(800, 600);
     window.show();
 

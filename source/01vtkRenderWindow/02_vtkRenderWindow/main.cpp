@@ -77,11 +77,11 @@
 64.DICOM  MPR 医学ct图四象限
 65.vtkBorderWidget事件
 66.shared actor 多个vtkRenderWindow共享actor
-67.vtkBoxWidget
+67.vtkBoxWidget 一个立方体框线盒子，可以将物体包裹起来
 
 */
 
-#define TEST25
+#define TEST66
 
 //在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 //#include <vtkAutoInit.h>
@@ -2874,7 +2874,7 @@ public:
 
             auto range = m_bar->GetLookupTable()->GetRange();
             std::cout << "Range: " << range[0] << '\t' << range[1] << '\n';
-            
+
             // 获取指定scalar在颜色映射表中的索引
             if (auto lut = vtkLookupTable::SafeDownCast(m_bar->GetLookupTable()))
             {
@@ -2882,7 +2882,7 @@ public:
                 auto index = lut->GetIndex(scalar);
                 auto numColors = lut->GetNumberOfColors();
                 auto indexLu = lut->GetIndexedLookup();
-                std::cout << "indexedLookup: " << indexLu << "\tcolor num: " << numColors << "\tscalar: "<<scalar << "\tindex: " << index << '\n';
+                std::cout << "indexedLookup: " << indexLu << "\tcolor num: " << numColors << "\tscalar: " << scalar << "\tindex: " << index << '\n';
             }
         }
     }
@@ -10909,63 +10909,110 @@ namespace {
 
 #ifdef TEST66
 
-#include <vtkCubeSource.h>
 #include <vtkSmartPointer.h>
+#include <vtkPolyData.h>
+#include <vtkPoints.h>
+#include <vtkCellArray.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkActor.h>
 #include <vtkCamera.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderer.h>
 #include <vtkRenderWindowInteractor.h>
+#include <vtkCommand.h>
+#include <vtkProperty.h>
+
+#include <iostream>
+#include <array>
+
+namespace
+{
+    std::array<float, 4 * 3> vertices{
+        0,0,0,
+        1,0,0,
+        1,1,0,
+        0,1,0
+    };
+
+    class MyCommand : public vtkCommand
+    {
+    public:
+        static MyCommand* New();
+
+        virtual void Execute(vtkObject* caller, unsigned long, void*)
+        {
+            std::cout << "command callback\n";
+
+            if (m_actor)
+            {
+                m_actor->GetProperty()->SetColor(1, 0, 0);
+            }
+        }
+        void SetActor(const vtkSmartPointer<vtkActor>& actor)
+        {
+            m_actor = actor;
+        }
+    private:
+        vtkSmartPointer<vtkActor> m_actor{ nullptr };
+    };
+
+    vtkStandardNewMacro(MyCommand);
+}
 
 int main(int, char* [])
 {
-    vtkNew<vtkCubeSource> cube;
+    vtkNew<vtkPolyData> polyData;
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cells;
+
+    for (size_t i = 0; i < vertices.size(); i += 3)
+    {
+        points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+    }
+
+    cells->InsertNextCell({ 0,1,2,3 });
+
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+
     vtkNew<vtkPolyDataMapper> cubeMapper;
-    cubeMapper->SetInputConnection(cube->GetOutputPort());
+    cubeMapper->SetInputData(polyData);
 
     vtkNew<vtkActor> cubeActor;
     cubeActor->SetMapper(cubeMapper);
 
-    // camera
-    vtkNew<vtkCamera> camera1;
-    vtkNew<vtkCamera> camera2;
-
-    camera1->SetPosition(1, 1, 1);//设置相机位置
-    camera1->SetFocalPoint(0, 0, 0);//设置相机焦点
-
-    camera2->SetPosition(1, 1, 1);//设置相机位置
-    camera2->SetFocalPoint(0, 0, 0);//设置相机焦点
-
     //renderer
     vtkNew<vtkRenderer> renderer1;
-    vtkNew<vtkRenderer> renderer2;
-
     renderer1->AddActor(cubeActor);
-    renderer1->SetActiveCamera(camera1);
     renderer1->ResetCamera();
 
+    vtkNew<vtkRenderer> renderer2;
     renderer2->AddActor(cubeActor);
-    renderer2->SetActiveCamera(camera2);
     renderer2->ResetCamera();
 
     // window
+    //----------------------------------------------------------------
     vtkNew<vtkRenderWindow> renWin1;
-    vtkNew<vtkRenderWindow> renWin2;
-
-    renWin2->SetSharedRenderWindow(renWin1);
-
     renWin1->AddRenderer(renderer1);
-    renWin1->SetSize(600, 600);//设置window大小
+    renWin1->SetSize(600, 600);
 
+    // 可以在不同的window中显示同一个actor，并且可以同步更新
+    // 但是前提是不同window使用不同renderer，不能是同一个renderer
+
+    vtkNew<vtkRenderWindow> renWin2;
+    renWin2->SetSharedRenderWindow(renWin1);
     renWin2->AddRenderer(renderer2);
-    renWin2->SetSize(600, 600);//设置window大小
+    renWin2->SetSize(600, 600);
+    //----------------------------------------------------------------
 
     // interactor
     vtkNew<vtkRenderWindowInteractor> iren1;
-    vtkNew<vtkRenderWindowInteractor> iren2;
-
     iren1->SetRenderWindow(renWin1);
+    vtkNew<MyCommand> cb;
+    cb->SetActor(cubeActor);
+    iren1->AddObserver(vtkCommand::LeftButtonPressEvent, cb);
+
+    vtkNew<vtkRenderWindowInteractor> iren2;
     iren2->SetRenderWindow(renWin2);
 
     // start
