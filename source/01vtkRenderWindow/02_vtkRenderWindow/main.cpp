@@ -35,7 +35,7 @@
 22.将点（向量）投影到平面
 23.鼠标双击事件 DoubleClick
 24.云图，渐变线，点和单元设置流场参数，颜色过渡方式，颜色映射表，色卡
-25.颜色过渡，同一个窗口两个绘制对象，同一数据，不同相机 （viewPort)
+25.多边形三角化，减少三角形的数量，图像和原来保持不变
 26.纹理，光照
 27.框选拾取 vtk拾取相关的类 https://blog.csdn.net/lovelanjuan/article/details/7301773
 28.actor拾取 vtkPropPicker 基于硬件拾取
@@ -81,7 +81,7 @@
 
 */
 
-#define TEST66
+#define TEST25
 
 //在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 //#include <vtkAutoInit.h>
@@ -3358,7 +3358,6 @@ int main(int, char* [])
 #ifdef TEST25
 
 #include <vtkCamera.h>
-#include <vtkNamedColors.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkProperty.h>
@@ -3367,176 +3366,178 @@ int main(int, char* [])
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
-#include <vtkSphereSource.h>
 #include <vtkTriangleFilter.h>
-#include <vtkXMLPolyDataReader.h>
+#include <vtkPolyData.h>
+#include <vtkPoints.h>
+#include <vtkCellArray.h>
 
-#include <vtkFloatArray.h>
-#include <vtkPointData.h>
-#include <vtkLookupTable.h>
+#include <array>
+#include <iostream>
 
-int main(int argc, char* argv[])
+// 四条线段组成一个正方形
+namespace
 {
-    vtkSmartPointer<vtkPolyData> inputPolyData;
-    if (argc > 1)
+    std::array<float, 16 * 3> vertices{
+        0,0,0,
+        0,1,0,
+        0,2,0,
+        0,3,0,
+
+        1,0,0,
+        1,1,0,
+        1,2,0,
+        1,3,0,
+
+        2,0,0,
+        2,1,0,
+        2,2,0,
+        2,3,0,
+
+        3,0,0,
+        3,1,0,
+        3,2,0,
+        3,3,0,
+    };
+
+    std::array<long long, 9 * 4> indices1{
+        0,1,5,4,
+        1,2,6,5,
+        2,3,7,6,
+
+        4,5,9,8,
+        5,6,10,9,
+        6,7,11,10,
+
+        8,9,13,12,
+        9,10,14,13,
+        10,11,15,14
+    };
+
+    std::array<long long, 18 * 3> indices2{
+        0,1,5,
+        0,5,4,
+
+        1,2,6,
+        1,6,5,
+
+        2,3,7,
+        2,7,6,
+
+        4,5,9,
+        4,9,8,
+
+        5,6,10,
+        5,10,9,
+
+        6,7,11,
+        6,11,10,
+
+        8,9,13,
+        8,13,12,
+
+        9,10,14,
+        9,14,13,
+
+        10,11,15,
+        10,15,14
+    };
+}
+
+vtkSmartPointer<vtkPolyData> GenPolyData(int type)
+{
+    vtkNew<vtkPolyData> polyData;
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cells;
+
+    for (size_t i = 0; i < vertices.size(); i += 3)
     {
-        vtkNew<vtkXMLPolyDataReader> reader;
-        reader->SetFileName(argv[1]);
-        vtkNew<vtkTriangleFilter> triangles;
-        triangles->SetInputConnection(reader->GetOutputPort());
-        triangles->Update();
-        inputPolyData = triangles->GetOutput();
+        points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
     }
-    else
+
+    if (type == 3)
     {
-        vtkNew<vtkSphereSource> sphereSource;
-        sphereSource->SetThetaResolution(30);
-        sphereSource->SetPhiResolution(15);
-        sphereSource->Update();
-        inputPolyData = sphereSource->GetOutput();
+        for (size_t i = 0; i < indices2.size(); i += 3)
+        {
+            cells->InsertNextCell({ indices2[i],indices2[i + 1] ,indices2[i + 2] });
+        }
     }
-
-    vtkNew<vtkFloatArray> scalars;
-
-    for (size_t i = 0; i < inputPolyData->GetNumberOfPoints(); i += 10)
+    else if (type == 4)
     {
-        scalars->InsertNextValue(0);
-        scalars->InsertNextValue(1);
-        scalars->InsertNextValue(2);
-        scalars->InsertNextValue(3);
-        scalars->InsertNextValue(4);
-
-        scalars->InsertNextValue(5);
-        scalars->InsertNextValue(6);
-        scalars->InsertNextValue(7);
-        scalars->InsertNextValue(8);
-        scalars->InsertNextValue(9);
+        for (size_t i = 0; i < indices1.size(); i += 4)
+        {
+            cells->InsertNextCell({ indices1[i],indices1[i + 1] ,indices1[i + 2],indices1[i + 3] });
+        }
     }
 
-    inputPolyData->GetPointData()->SetScalars(scalars);
 
-    vtkNew<vtkNamedColors> colors;
-    std::cout << "Before decimation" << std::endl << "------------" << std::endl;
-    std::cout << "There are " << inputPolyData->GetNumberOfPoints() << " points."
-        << std::endl;
-    std::cout << "There are " << inputPolyData->GetNumberOfPolys() << " polygons."
-        << std::endl;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
 
+    return polyData;
+}
+
+int main()
+{
+    auto trianglePoly = GenPolyData(3);
+    auto quad = GenPolyData(4);
+
+    // 将多边形转为三角形
+    vtkNew<vtkTriangleFilter> triangleFilter;
+    triangleFilter->SetInputData(quad);
+    triangleFilter->Update();
+
+    // 减少网格中的三角形
+    // 例如原来网格有十个三角形，经过处理之后只有五个三角形，但是绘制的图像没有变化
+    // 输入必须是三角形，如果不是可以用vtkTriangleFilter进行三角化
     vtkNew<vtkQuadricDecimation> decimate;
-    decimate->SetInputData(inputPolyData);
+    decimate->SetInputData(triangleFilter->GetOutput());
+    //decimate->SetInputData(trianglePoly);
     decimate->AttributeErrorMetricOn();
     decimate->SetTargetReduction(.9);
     decimate->VolumePreservationOn();
-
     decimate->Update();
 
     vtkNew<vtkPolyData> decimated;
     decimated->ShallowCopy(decimate->GetOutput());
 
-    std::cout << "After decimation" << std::endl << "------------" << std::endl;
-    std::cout << "There are " << decimated->GetNumberOfPoints() << " points."
-        << std::endl;
-    std::cout << "There are " << decimated->GetNumberOfPolys() << " polygons."
-        << std::endl;
-    std::cout << "Reduction: "
-        << static_cast<double>((inputPolyData->GetNumberOfPolys() -
-            decimated->GetNumberOfPolys())) /
-        static_cast<double>(inputPolyData->GetNumberOfPolys())
-        << std::endl;
+    std::cout << "after number of cells: " << decimate->GetOutput()->GetNumberOfCells() << '\n';
+    std::cout << "after number of polys: " << decimate->GetOutput()->GetNumberOfPolys() << '\n';
+    std::cout << "after number of points: " << decimate->GetOutput()->GetNumberOfPoints() << '\n';
+    std::cout << "-----------------------------\n";
+    std::cout << "before number of cells: " << trianglePoly->GetNumberOfCells() << '\n';
+    std::cout << "before number of polys: " << trianglePoly->GetNumberOfPolys() << '\n';
+    std::cout << "before number of points: " << trianglePoly->GetNumberOfPoints() << '\n';
 
-    vtkSmartPointer<vtkLookupTable> hueLut = vtkSmartPointer<vtkLookupTable>::New();
-    hueLut->SetNumberOfColors(10);        // 指定颜色查找表中有多少种颜色
-    hueLut->SetHueRange(0.67, 0.0);        // 设定HSV颜色范围，色调H取值范围为0°～360°，从红色开始按逆时针方向计算，红色为0°/0.0，绿色为120°/0.34,蓝色为240°/0.67
-    hueLut->SetNumberOfColors(20);
-    hueLut->Build();
+    //mapper
+    vtkNew<vtkPolyDataMapper> cubeMapper;
+    cubeMapper->SetInputData(decimated);
 
-    vtkNew<vtkPolyDataMapper> inputMapper;
-    inputMapper->SetInputData(inputPolyData);
-    inputMapper->SetLookupTable(hueLut);
-    inputMapper->SetScalarRange(0, 9);
-    //inputMapper->SetColorModeToDefault();
-    //inputMapper->ScalarVisibilityOn();
+    //actor
+    vtkNew<vtkActor> cubeActor;
+    cubeActor->SetMapper(cubeMapper);
+    cubeActor->GetProperty()->SetColor(0, 1, 0);
+    cubeActor->GetProperty()->SetRepresentationToWireframe();
 
-    vtkNew<vtkProperty> backFace;
-    backFace->SetColor(colors->GetColor3d("Gold").GetData());
+    //renderer
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(cubeActor);
+    renderer->ResetCamera();
 
-    vtkNew<vtkActor> inputActor;
-    inputActor->SetMapper(inputMapper);
-    inputActor->GetProperty()->SetInterpolationToFlat();
-    inputActor->GetProperty()->SetColor(
-        colors->GetColor3d("NavajoWhite").GetData());
-    inputActor->SetBackfaceProperty(backFace);
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(600, 600);
 
-    vtkNew<vtkPolyDataMapper> decimatedMapper;
-    decimatedMapper->SetInputData(decimated);
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
 
-    vtkNew<vtkActor> decimatedActor;
-    decimatedActor->SetMapper(decimatedMapper);
-    decimatedActor->GetProperty()->SetColor(
-        colors->GetColor3d("NavajoWhite").GetData());
-    decimatedActor->GetProperty()->SetInterpolationToFlat();
-    decimatedActor->SetBackfaceProperty(backFace);
+    //数据交互
+    renWin->Render();
+    iren->Start();
 
-    // There will be one render window
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->SetSize(600, 300);
-    renderWindow->SetWindowName("QuadricDecimation");
-
-    // And one interactor
-    vtkNew<vtkRenderWindowInteractor> interactor;
-    interactor->SetRenderWindow(renderWindow);
-
-    auto p = decimatedActor->GetProperty();
-
-    // Define viewport ranges
-    // (xmin, ymin, xmax, ymax)
-    double leftViewport[4] = { 0.0, 0.0, 0.5, 1.0 };
-    double rightViewport[4] = { 0.5, 0.0, 1.0, 1.0 };
-
-    // Setup both renderers
-    vtkNew<vtkRenderer> leftRenderer;
-    renderWindow->AddRenderer(leftRenderer);
-    leftRenderer->SetViewport(leftViewport);
-    leftRenderer->SetBackground(colors->GetColor3d("Peru").GetData());
-
-    vtkNew<vtkRenderer> rightRenderer;
-    renderWindow->AddRenderer(rightRenderer);
-    rightRenderer->SetViewport(rightViewport);
-    rightRenderer->SetBackground(colors->GetColor3d("CornflowerBlue").GetData());
-
-    // Add the sphere to the left and the cube to the right
-    leftRenderer->AddActor(inputActor);
-    //rightRenderer->AddActor(decimatedActor);
-    rightRenderer->AddActor(inputActor);
-
-
-    // Shared camera looking down the -y axis
-    vtkNew<vtkCamera> camera;
-    camera->SetPosition(0, -1, 0);
-    camera->SetFocalPoint(0, 0, 0);
-    camera->SetViewUp(0, 0, 1);
-    camera->Elevation(30);
-    camera->Azimuth(30);
-
-    vtkNew<vtkCamera> camera2;
-    camera2->SetPosition(-1, 0, 2);
-    camera2->SetFocalPoint(0, 0, 0);
-    camera2->SetViewUp(0, 0, 1);
-    camera2->Elevation(30);
-    camera2->Azimuth(30);
-
-    leftRenderer->SetActiveCamera(camera);
-    rightRenderer->SetActiveCamera(camera2);
-
-    leftRenderer->ResetCamera();
-    leftRenderer->ResetCameraClippingRange();
-
-    renderWindow->Render();
-    interactor->Start();
-
-    return EXIT_SUCCESS;
+    return 0;
 }
-
 
 #endif // TEST25
 
