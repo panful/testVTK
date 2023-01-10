@@ -45,9 +45,10 @@
 44 部分图元大小不变，位置变化
 45.图层设置，让某个mapper始终在最上层或最下层，或中间某一层
 46.vtkBillboardTextActor3D 鼠标旋转，文本始终朝向观察者，广告板
+47.vtkSmartPointer指向的数据置空
 */
 
-#define TEST46
+#define TEST47
 
 #ifdef TEST1
 
@@ -6216,7 +6217,7 @@ int main(int, char* [])
 #include <thread>
 #include <future>
 
-constexpr size_t MaxNumOfActors = 1000;
+constexpr size_t MaxNumOfActors = 10;
 
 vtkSmartPointer<vtkActor> CreateActor(double x, double y, double z)
 {
@@ -6237,7 +6238,7 @@ vtkSmartPointer<vtkActor> CreateActor(double x, double y, double z)
     return cubeActor;
 }
 
-//#define MultiThread
+#define MultiThread
 
 int main(int argc, char* argv[])
 {
@@ -6280,9 +6281,11 @@ int main(int argc, char* argv[])
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
 
-    //数据交互
-    renWin->Render();
-    iren->Start();
+    std::thread t([&]() {renWin->Render(); iren->Start(); });
+    t.join(); // 此处不能用detach()
+
+    //renWin->Render();
+    //iren->Start();
 
     return 0;
 }
@@ -7921,4 +7924,168 @@ int main(int, char* [])
 }
 
 #endif // TEST46
+
+#ifdef TEST47
+
+#include <vtkSmartPointer.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkCallbackCommand.h>
+#include <vtkCellArray.h>
+#include <vtkPolyData.h>
+#include <vtkPoints.h>
+
+#include <iostream>
+
+namespace
+{
+    std::array<float, 4 * 3> vertices{
+        0,0,0,
+        1,0,0,
+        1,1,0,
+        0,1,0
+    };
+
+    std::array<long long, 4 * 2> indices{
+        0,1,
+        1,2,
+        2,3,
+        3,0
+    };
+
+    class MyCommand : public vtkCommand
+    {
+    public:
+        static MyCommand* New();
+
+        virtual void Execute(vtkObject* caller, unsigned long, void*)
+        {
+            // 将Actor的Mapper的vtkPolyData修改，也会修改Actor
+            if (!m_polyData)
+            {
+                vtkNew<vtkPoints> points;
+                vtkNew<vtkCellArray> cells;
+                vtkNew<vtkCellArray> emptyCells;
+
+                for (size_t i = 0; i < vertices.size(); i += 3)
+                {
+                    points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+                }
+
+                cells->InsertNextCell({ 0,1,2,3 });
+
+                m_polyData->SetPoints(points);
+                m_polyData->SetPolys(cells);
+                m_polyData->SetLines(emptyCells); // 如果不将线段置为空，原来的polydata就包含了线段和多边形
+            }
+
+            // 将Actor置为空
+            if (m_actor && m_mapper && m_polyData)
+            {
+                std::cout << "polyData ref count: " << m_polyData->GetReferenceCount() << '\n';
+                std::cout << "mapper ref count: " << m_mapper->GetReferenceCount() << '\n';
+
+                // 会将mapper的引用计数减一
+                // 不会将polyData的引用计数减一，因为mapper还没析构
+                //vtkNew<vtkPolyDataMapper> mapper;
+                //m_actor->SetMapper(mapper);
+
+                // 会将mapper等全部重新设置的actor属性的引用计数全部减一
+                // 具体可以看ShallowCopy的实现
+                vtkNew<vtkActor> emptyActor;
+                m_actor->ShallowCopy(emptyActor);
+
+                std::cout << "polyData ref count: " << m_polyData->GetReferenceCount() << '\n';
+                std::cout << "mapper ref count: " << m_mapper->GetReferenceCount() << '\n';
+            }
+        }
+
+        void SetPolyData(const vtkSmartPointer<vtkPolyData>& polydata)
+        {
+            m_polyData = polydata;
+        }
+        void SetActor(const vtkSmartPointer<vtkActor>& actor)
+        {
+            m_actor = actor;
+        }
+        void SetMapper(const vtkSmartPointer<vtkPolyDataMapper>& mapper)
+        {
+            m_mapper = mapper;
+        }
+
+    private:
+        vtkSmartPointer<vtkPolyData> m_polyData{ nullptr };
+        vtkSmartPointer<vtkActor> m_actor{ nullptr };
+        vtkSmartPointer<vtkPolyDataMapper> m_mapper{ nullptr };
+    };
+
+    vtkStandardNewMacro(MyCommand);
+}
+
+int main(int, char* [])
+{
+    vtkNew<vtkPolyData> polyData;
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cells;
+
+    for (size_t i = 0; i < vertices.size(); i += 3)
+    {
+        points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+    }
+    for (size_t i = 0; i < indices.size(); i += 2)
+    {
+        cells->InsertNextCell({ indices[i],indices[i + 1] });
+    }
+
+    polyData->SetPoints(points);
+    polyData->SetLines(cells);
+
+    //mapper
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+
+    //actor
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    //camera
+    vtkNew<vtkCamera> camera;
+    camera->SetPosition(1, 1, 1);//设置相机位置
+    camera->SetFocalPoint(0, 0, 0);//设置相机焦点
+
+    //renderer
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetActiveCamera(camera);
+    renderer->ResetCamera();
+
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(600, 600);//设置window大小
+
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<MyCommand> cb;
+    cb->SetPolyData(polyData);
+    cb->SetActor(actor);
+    cb->SetMapper(mapper);
+    iren->AddObserver(vtkCommand::LeftButtonPressEvent, cb);
+
+    //数据交互
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST47
 

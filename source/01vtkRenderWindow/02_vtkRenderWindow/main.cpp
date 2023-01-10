@@ -62,7 +62,7 @@
 49.vtkImageView  https://blog.csdn.net/liushao1031177/article/details/115799500
 50.保存矢量图svg文件
 51.利用vtk橡皮筋交互模式，实现鼠标绘制矩形
-52.左右两个窗口，一个拖动选择框，一个显示框选的内容（官方例子）vtkBorderWidget   坐标转换
+52.左右两个窗口，一个拖动选择框，一个显示框选的内容（官方例子）vtkBorderWidget   坐标转换  截图
 53.vtkImageClip 裁剪图片
 54.vtkImageBlend 合成图片，利用多个图片的z值，将多张图片放在一起
 55.logowidget  vtkImageCanvasSource2D
@@ -81,7 +81,7 @@
 
 */
 
-#define TEST2
+#define TEST66
 
 //在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 //#include <vtkAutoInit.h>
@@ -3558,9 +3558,9 @@ int main()
 {
     // 加载图片
     //vtkSmartPointer<vtkBMPReader>bmpReader = vtkSmartPointer<vtkBMPReader>::New();
-    //bmpReader->SetFileName("C:\\Users\\yangpan\\Pictures\\Saved Pictures\\test.jpg");
+    //bmpReader->SetFileName("test.bmp");
     vtkSmartPointer<vtkJPEGReader>jpgReader = vtkSmartPointer<vtkJPEGReader>::New();
-    jpgReader->SetFileName("C:\\Users\\yangpan\\Pictures\\Saved Pictures\\test.jpg");
+    jpgReader->SetFileName("resource/test1.jpg");
     // 生成纹理
     vtkSmartPointer<vtkTexture>texture = vtkSmartPointer<vtkTexture>::New();
     texture->SetInputConnection(jpgReader->GetOutputPort());
@@ -3583,13 +3583,8 @@ int main()
     // 使用纹理
     cylinderActor->SetTexture(texture);
 
-    // 设置图像颜色方式1
+    // 设置图像颜色
     //cylinderActor->GetProperty()->SetColor(1.0, 0.0, 0.0);
-
-    // 设置图像颜色方式2
-    //vtkSmartPointer<vtkProperty>cylinderProperty = vtkSmartPointer<vtkProperty>::New();
-    //cylinderProperty->SetColor(1.0, 0.0, 0.0);
-    //cylinderActor->SetProperty(cylinderProperty);
 
     // render
     vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
@@ -3618,7 +3613,7 @@ int main()
     myCamera->ComputeViewPlaneNormal();
     myCamera->SetViewUp(-0.2234, 0.9983, 0.0345);
     renderer->SetActiveCamera(myCamera);
-    renderer->ResetCamera();  //图像不显示，鼠标动一下才会显示，调用Render()可以解决
+    renderer->ResetCamera();
 
     // window
     vtkSmartPointer<vtkRenderWindow> window = vtkSmartPointer<vtkRenderWindow>::New();
@@ -3627,12 +3622,9 @@ int main()
     vtkSmartPointer<vtkRenderWindowInteractor> rWinInt = vtkSmartPointer<vtkRenderWindowInteractor>::New();
     rWinInt->SetRenderWindow(window);
 
-    // view port
-    //renderer->SetViewport(0.0, 0.0, 0.5, 0.5);
     window->AddRenderer(renderer);
     window->Render();
     rWinInt->Start();
-
 
     return EXIT_SUCCESS;
 }
@@ -8884,7 +8876,7 @@ int main(int argc, char* argv[])
 {
     vtkNew<vtkNamedColors> color;
 
-    std::string inputFilename = "C:\\Users\\yangpan\\Desktop\\test.jpg";
+    std::string inputFilename = "resource/test1.jpg";
 
     // Read the image
     vtkNew<vtkJPEGReader> jPEGReader;

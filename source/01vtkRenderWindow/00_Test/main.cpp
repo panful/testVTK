@@ -269,24 +269,6 @@ int main()
 
 #include <iostream>
 
-class vtkMyClass : public vtkObject
-{
-public:
-    vtkTypeMacro(vtkMyClass, vtkObject);
-    void PrintSelf(ostream& os, vtkIndent indent) {}
-    static vtkMyClass* New();
-protected:
-    vtkMyClass()
-    {
-        std::cerr << "constructor called\n";
-    }
-    ~vtkMyClass()
-    {
-        std::cerr << "destructor called\n";
-    }
-};
-vtkStandardNewMacro(vtkMyClass)
-
 class MyCommand : public vtkCommand
 {
 public:
@@ -294,62 +276,12 @@ public:
 
     virtual void Execute(vtkObject* caller, unsigned long, void*)
     {
-        std::cout << "cb\n";
-        if (m_actor)
-        {
-            std::cout << "m_actor = nullptr;\n";
-
-            //std::cout << "count\t" << m_actor->GetReferenceCount() << '\n';
-            //printf("pointer:%p\n", m_actor);
-            //m_actor->Delete();
-            //m_actor = nullptr;
-            //std::cout << "count\t" << m_actor->GetReferenceCount() << '\n';
-            //printf("pointer:%p\n", m_actor);
-            //m_actor->Modified();
-            //m_actor.New();
-            //auto x = m_actor.Get();
-            //x = nullptr;
-
-            vtkNew<vtkArrowSource> arrow;
-            //mapper
-            vtkNew<vtkPolyDataMapper> cubeMapper;
-            cubeMapper->SetInputConnection(arrow->GetOutputPort());
-
-            vtkActor* cubeActor = vtkActor::New();
-            printf("pointer:%p\n", cubeActor);
-            cubeActor->SetMapper(cubeMapper);
-            cubeActor->GetProperty()->SetColor(1, 0, 0);
-
-            //m_actor->SetMapper(nullptr);
-            vtkNew<vtkActor> emptyActor;
-            m_actor->ShallowCopy(cubeActor);
-
-            auto r = m_actor->GetPropertyKeys();
-        }
-
-        if (m_myClass)
-        {
-            //std::cout << "m_myClass = nullptr;\n";
-            ////m_myClass = nullptr;
-            ////m_myClass->Delete();
-            //m_myClass->SetReferenceCount(0);
-        }
+        std::cout << "command callback\n";
     }
-
-    void SetActor(const vtkSmartPointer<vtkActor>& actor)
-    {
-        m_actor = actor;
-    }
-    void SetClass(const vtkSmartPointer<vtkMyClass>& myClass)
-    {
-        m_myClass = myClass;
-    }
-private:
-    vtkActor* m_actor{ nullptr };
-    vtkSmartPointer<vtkMyClass> m_myClass{ nullptr };
 };
 
 vtkStandardNewMacro(MyCommand);
+
 
 int main(int, char* [])
 {
@@ -358,11 +290,9 @@ int main(int, char* [])
     //mapper
     vtkNew<vtkPolyDataMapper> cubeMapper;
     cubeMapper->SetInputConnection(cube->GetOutputPort());
-    //cubeMapper->SetInputData(cube->GetOutput()); // 不能使用vtkPolyData，只能用管道方式
 
     //actor
-    vtkActor* cubeActor = vtkActor::New();
-    printf("pointer:%p\n", cubeActor);
+    vtkNew<vtkActor> cubeActor;
     cubeActor->SetMapper(cubeMapper);
     cubeActor->GetProperty()->SetColor(0, 1, 0);
 
@@ -385,15 +315,15 @@ int main(int, char* [])
     //RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
-    vtkNew<MyCommand> cb;
-    cb->SetActor(cubeActor);
-    vtkNew<vtkMyClass> myClass;
-    cb->SetClass(myClass);
-    iren->AddObserver(vtkCommand::LeftButtonPressEvent, cb);
 
-    //vtkNew<vtkCallbackCommand> cb;
-    //cb->SetCallback([](vtkObject* caller, unsigned long, void*, void*) {std::cout << "lambda\n"; });
-    //iren->AddObserver(vtkCommand::LeftButtonPressEvent, cb);
+    // 继承vtkCommand设置回调函数
+    vtkNew<MyCommand> cb1;
+    iren->AddObserver(vtkCommand::RightButtonPressEvent, cb1);
+
+    // 用lambda设置VTK的回调函数
+    vtkNew<vtkCallbackCommand> cb2;
+    cb2->SetCallback([](vtkObject* caller, unsigned long, void*, void*) {std::cout << "lambda\n"; });
+    iren->AddObserver(vtkCommand::LeftButtonPressEvent, cb2);
 
     //数据交互
     renWin->Render();
