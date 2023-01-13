@@ -18,7 +18,7 @@
 5.通过定义三个指定x-y-z方向坐标的阵列来创建直线栅格。
 6.批量生成一大堆线条
 7.点构成线条，使用索引
-8.照相机属性以及交互方式，获取网格的最大最小边界，无限放大缩小  vtkInteractorStyle*** https://blog.csdn.net/liushao1031177/article/details/116903698
+8.修改矢量图箭头颜色 TEST17
 9.绘制点，线，面，类似Opengl 顶点+索引的绘制方式
 10.2D网格绘制
 11.拟合样条曲线生成柱状体
@@ -81,7 +81,7 @@
 
 */
 
-#define TEST66
+#define TEST8
 
 //在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 //#include <vtkAutoInit.h>
@@ -776,53 +776,30 @@ int main(int argc, char* argv[])
 
 #ifdef TEST8
 
-#include <vtkCubeSource.h>
-#include <vtkSmartPointer.h>
-#include <vtkPolyDataMapper.h>
+#include <vtkArrowSource.h>
+
 #include <vtkActor.h>
-#include <vtkCamera.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkLegendScaleActor.h>
+#include <vtkCellArray.h>
+#include <vtkCubeSource.h>
+#include <vtkGlyph3D.h>
+#include <vtkGlyph2D.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
 #include <vtkProperty.h>
-#include <vtkButtonWidget.h>
-#include <vtkObjectFactory.h>
-
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkDoubleArray.h>
+#include <vtkPointData.h>
+#include <vtkFloatArray.h>
+#include <vtkLookupTable.h>
+#include <vtkVector.h>
+#include <vtkCleanPolyData.h>
+#include <vtkAlgorithmOutput.h>
 #include <vtkInteractorStyleRubberBand3D.h>
-
-#include <vector>
-#include <iostream>
-
-namespace
-{
-    // 顶点数据
-    std::vector<double> vertices{
-        -1.,0.,0.,
-        -.5,.5,.5,
-        0.,1.,1.5,
-
-        .5,.5,.5,
-        1.,0.,0.,
-        .5,-.5,.5,
-
-        0.,-1.,-1.5,
-        -.5,-.5,-.5,
-        0.,0.,0.
-    };
-
-    // 拓扑数据
-    std::vector<long long> indices{
-        0,1,8,
-        1,2,3,
-        8,3,4,
-        8,4,5,
-        7,5,6,
-        7,8,5,
-        0,8,7,
-        1,3,8
-    };
-}
 
 class CustomStyle :
     public vtkInteractorStyleRubberBand3D
@@ -832,253 +809,151 @@ public:
     vtkTypeMacro(CustomStyle, vtkInteractorStyleRubberBand3D);
 
 protected:
-    void OnChar() override
+
+    void OnLeftButtonDown() override
     {
-        if (!this->Interactor || !this->CurrentRenderer)
-        {
-            return;
-        }
 
-        switch (this->Interactor->GetKeyCode())
-        {
-        case 'x':
-        case 'X':
-        {
-            std::cout << "--------------------------------------------------\n";
-            auto camera = this->CurrentRenderer->GetActiveCamera();
-            auto cameraPos = this->CurrentRenderer->GetActiveCamera()->GetPosition();
-            auto cameraFocalPos = this->CurrentRenderer->GetActiveCamera()->GetFocalPoint();
-            auto cameraFocalDistance = this->CurrentRenderer->GetActiveCamera()->GetFocalDistance();
-            auto cameraFocalDisk = this->CurrentRenderer->GetActiveCamera()->GetFocalDisk();
-            auto cameraFocalScale = this->CurrentRenderer->GetActiveCamera()->GetFocalPointScale();
-            auto cameraFocalShift = this->CurrentRenderer->GetActiveCamera()->GetFocalPointShift();
-            auto distance = this->CurrentRenderer->GetActiveCamera()->GetDistance();
-            double eyePos[3]{ 0.0 };
-            this->CurrentRenderer->GetActiveCamera()->GetEyePosition(eyePos);
-            auto cameraClippingRange = this->CurrentRenderer->GetActiveCamera()->GetClippingRange();
-            auto cameraParallelScale = this->CurrentRenderer->GetActiveCamera()->GetParallelScale();
-            auto cameraViewAngle = this->CurrentRenderer->GetActiveCamera()->GetViewAngle();
-
-            std::cout << "Camera Pos:\t\t" << cameraPos[0] << '\t' << cameraPos[1] << '\t' << cameraPos[2] << '\n';
-            std::cout << "Camera Focal Pos:\t" << cameraFocalPos[0] << '\t' << cameraFocalPos[1] << '\t' << cameraFocalPos[2] << '\n';
-            //std::cout << "Camera Focal Distance:\t" << cameraFocalDistance << '\n';
-            //std::cout << "Camera Focal Disk:\t" << cameraFocalDisk << '\n';
-            //std::cout << "Camera Focal Scale:\t" << cameraFocalScale << '\n';
-            //std::cout << "Camera Focal Shift:\t" << cameraFocalShift[0] << '\t' << cameraFocalShift[1] << '\t' << cameraFocalShift[2] << '\n';
-            std::cout << "Distance:\t" << distance << '\n';
-            //std::cout << "Camera Eye Pos:\t" << eyePos[0] << '\t' << eyePos[1] << '\t' << eyePos[2] << '\n';
-            //std::cout << "Camera Clipping Range:\t" << cameraClippingRange[0] << '\t' << cameraClippingRange[1] << '\n';
-            std::cout << "Camera Parallel Scale:\t" << cameraParallelScale << '\n';
-            std::cout << "Camera View Angle:\t" << cameraViewAngle << '\n';
-
-            auto cameraClippingRangeEx = this->CurrentRenderer->GetClippingRangeExpansion();
-            auto cameraClippingRangeExMax = this->CurrentRenderer->GetClippingRangeExpansionMaxValue();
-            auto cameraClippingRangeExMin = this->CurrentRenderer->GetClippingRangeExpansionMinValue();
-            //std::cout << "Clipping Range Ex\t" << cameraClippingRangeEx << '\t' << cameraClippingRangeExMax << '\t' << cameraClippingRangeExMin << '\n';
-
-            break;
-        }
-        case 'Z':
-        case 'z':
-        {
-            this->CurrentRenderer->GetActiveCamera()->SetPosition(0, 0, 0.1);
-            this->Interactor->Render();
-            std::cout << "set camera position\n";
-            break;
-        }
-        case 'C':
-        case 'c':
-        {
-            if (this->CurrentRenderer && this->Interactor)
-            {
-                this->CurrentRenderer->ResetCamera();
-                this->Interactor->Render();
-            }
-            break;
-        }
-        default:
-            break;
-        }
-
-        return Superclass::OnChar();
+        Superclass::OnLeftButtonDown();
     }
 
-    void OnMouseWheelForward() override
+    void OnMiddleButtonUp() override
     {
-        if (this->CurrentRenderer && this->CurrentRenderer->GetActiveCamera()->GetParallelScale() < 1e-3)
-            return;
 
-        /*return*/ Superclass::OnMouseWheelForward();
-        //this->CurrentRenderer->ResetCameraClippingRange();
-
-        //std::cout << this->CurrentRenderer->GetActiveCamera()->GetParallelScale() << std::endl;
+        Superclass::OnMiddleButtonUp();
     }
-    void OnMouseWheelBackward() override
-    {
-        if (this->CurrentRenderer && this->CurrentRenderer->GetActiveCamera()->GetParallelScale() > 10)
-            return;
 
-        /*return*/ Superclass::OnMouseWheelBackward();
-        //this->CurrentRenderer->ResetCameraClippingRange();
-
-        //std::cout << this->CurrentRenderer->GetActiveCamera()->GetParallelScale() << std::endl;
-    }
 };
 
 vtkStandardNewMacro(CustomStyle);
 
-class ActiveCameraCB :
-    public vtkCommand
-{
-public:
-    static ActiveCameraCB* New();
-
-    vtkTypeMacro(ActiveCameraCB, vtkCommand);
-protected:
-    virtual void Execute(vtkObject* caller, unsigned long, void* callData)
-    {
-        if (callData)
-        {
-            std::cout << "------------------------\n";
-        }
-        static int index = 0;
-        std::cout << index++ << "\tactive camera CB\n";
-
-        this->SetAbortFlag(2);
-    }
-};
-
-vtkStandardNewMacro(ActiveCameraCB);
-
 int main(int, char* [])
 {
-    // polyData 1
-    vtkNew<vtkPolyData> polyData;
+
     vtkNew<vtkPoints> points;
-    vtkNew<vtkCellArray> cells;
+    points->InsertNextPoint(0.0, 0.0, 0.0);
+    points->InsertNextPoint(1.0, 1.0, 0.0);
+    points->InsertNextPoint(1.0, 0.0, 0.0);
+    points->InsertNextPoint(0.0, 1.0, 0.0);
 
-    for (size_t i = 0; i < vertices.size(); i += 3)
-    {
-        points->InsertNextPoint(vertices[i]/*/100.0*/, vertices[i + 1] /*/ 100.0*/, vertices[i + 2] /*/ 100.0*/);
-    }
+    vtkNew<vtkPolyData> polydata;
+    polydata->SetPoints(points);
 
-    for (size_t i = 0; i < indices.size(); i += 3)
-    {
-        cells->InsertNextCell({ indices[i], indices[i + 1], indices[i + 2] });
-    }
 
-    polyData->SetPoints(points);
-    polyData->SetPolys(cells);
+    // Set point normals
+    vtkNew<vtkDoubleArray> pointNormalsArray;
+    auto numOfComponents = pointNormalsArray->GetNumberOfComponents(); // 默认为1，向量的维度
+    pointNormalsArray->SetNumberOfComponents(3); // 3d normals (ie x,y,z)
+    pointNormalsArray->SetNumberOfTuples(polydata->GetNumberOfPoints());
 
-    // 计算网格三个方向上的范围，即xyz的最大最小值
-    auto bounds1 = polyData->GetBounds();
-    auto bounds2 = points->GetBounds();
+    // 法线只能控制箭头方向
+    double pN1[3] = { 1.0, 0.0, 0.0 };
+    double pN2[3] = { 0.0, 1.0, 0.0 };
+    double pN3[3] = { 1.0, 1.0, 1.0 };
+    double pN4[3] = { 0.0, 0.0, 0.0 };
 
-    // polyData 2
-    vtkNew<vtkPolyData> polyData2;
-    vtkNew<vtkPoints> points2;
-    vtkNew<vtkCellArray> cells2;
+    // Add the data to the normals array
+    pointNormalsArray->SetTuple(0, pN1);  //SetTuple4(id,v0,v1,v2,v3)
+    pointNormalsArray->SetTuple(1, pN2);
+    pointNormalsArray->SetTuple(2, pN3);
+    pointNormalsArray->SetTuple(3, pN4);
 
-    for (size_t i = 0; i < vertices.size(); i += 3)
-    {
-        points2->InsertNextPoint(vertices[i] + 3., vertices[i + 1] + 3., vertices[i + 2] + 3.);
-    }
+    // Add the normals to the points in the polydata
+    //polydata->GetPointData()->SetNormals(pointNormalsArray);
+    polydata->GetPointData()->SetVectors(pointNormalsArray); //用向量控制箭头的颜色，方向，大小
 
-    for (size_t i = 0; i < indices.size(); i += 3)
-    {
-        cells2->InsertNextCell({ indices[i], indices[i + 1], indices[i + 2] });
-    }
+    // add scalar for colors
+    // 标量可以控制箭头的大小以及颜色
+    vtkSmartPointer<vtkFloatArray> scalars = vtkSmartPointer<vtkFloatArray>::New();
+    scalars->InsertTuple1(0, 1);
+    scalars->InsertTuple1(1, 2);
+    scalars->InsertTuple1(2, 3);
+    scalars->InsertTuple1(3, 4);
 
-    polyData2->SetPoints(points2);
-    polyData2->SetPolys(cells2);
+    //polydata->GetPointData()->SetScalars(scalars);
 
-    // 计算网格三个方向上的范围，即xyz的最大最小值
-    auto bounds1_2 = polyData2->GetBounds();
-    auto bounds2_2 = points2->GetBounds();
+    // color map
+    vtkNew<vtkLookupTable> pColorTable;
+    pColorTable->SetNumberOfColors(10);
+    //pColorTable->SetHueRange(.0, .67);
+    pColorTable->Build();
 
-    // actor 1
-    vtkNew<vtkActor> actor;
+    vtkNew<vtkNamedColors> colors;
+
+    // Create anything you want here, we will use a cube/arrow for the demo.
+    vtkNew<vtkCubeSource> cubeSource;
+    vtkNew<vtkArrowSource> arrowSource;
+    arrowSource->SetShaftRadius(0.01);
+    arrowSource->SetTipRadius(0.05);
+    arrowSource->SetTipLength(0.2);
+
+    vtkNew<vtkGlyph3D> glyph3D;
+    //glyph3D->SetSourceConnection(cubeSource->GetOutputPort());
+    glyph3D->SetSourceConnection(arrowSource->GetOutputPort());
+
+    auto mode = glyph3D->GetColorModeAsString();
+    //glyph3D->SetColorModeToColorByScale();    // 颜色使用标量控制（类似云图颜色映射）
+    glyph3D->SetColorModeToColorByVector();    // 使用向量映射颜色（不再需要设置scalerRange）
+    glyph3D->SetScaleModeToDataScalingOff();   // 关闭由于数据（标量或向量）导致的缩放
+    //glyph3D->SetScaleModeToScaleByVectorComponents();
+    //glyph3D->SetInputArrayToProcess()
+
+    glyph3D->SetVectorModeToUseVector();  // 使用向量设置方向
+    //glyph3D->SetVectorModeToUseNormal();// 使用法线设置方向
+    glyph3D->SetInputData(polydata);
+    //glyph3D->SetInputConnection()
+    auto scale = glyph3D->GetScaleFactor();
+    //glyph3D->SetScaleFactor(2.0);  //设置缩放比例，默认为1
+    glyph3D->Update();
+
+    // Visualize
     vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputData(polyData);
+    mapper->SetInputConnection(glyph3D->GetOutputPort());
+    // 使用可视化管线
+    //auto connect = mapper->GetInputConnection(0, 0);
+    //if (glyph3D->GetOutputPort() == connect)
+    //    std::cout << "same";
+
+    //mapper->SetInputData(glyph3D->GetOutput());
+    //mapper->SetScalarRange(1, 4);
+
+    //mapper->SetColorModeToDirectScalars();
+    //mapper->SetColorModeToDefault();
+    mapper->SetLookupTable(pColorTable);
+
+    // 如果添加的是向量，获取的范围就是向量的【模长】最大最小值
+    auto range = mapper->GetInput()->GetScalarRange();
+    mapper->SetScalarRange(range);
+
+
+
+    vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
-    actor->GetProperty()->SetColor(0, 1, 0);
+    mapper->ScalarVisibilityOff();
+    actor->GetProperty()->SetColor(1, 0, 0);
+    mapper->ScalarVisibilityOn();
 
-    auto bounds3 = mapper->GetBounds();
-    auto bounds4 = actor->GetBounds();
+    // 从经过vtkAlgorithm变换后的数据获取源数据（注意使用的是独立数据集还是管道连接方式）
+    vtkSmartPointer<vtkAlgorithm> algorithm = actor->GetMapper()->GetInputConnection(0, 0)->GetProducer();
+    auto reference = dynamic_cast<vtkGlyph2D*>(algorithm.GetPointer()); // 如果没有经过algorithm变换，reference为nullptr
+    //auto originSource = vtkPolyData::SafeDownCast(reference->GetInput());
+    //auto originPointNum = originSource->GetNumberOfPoints(); // 源数据共有四个顶点
 
-    // actor 2
-    vtkNew<vtkActor> actor2;
-    vtkNew<vtkPolyDataMapper> mapper2;
-    mapper2->SetInputData(polyData2);
-    actor2->SetMapper(mapper2);
-    actor2->GetProperty()->SetColor(1, 0, 0);
 
-    auto bounds3_2 = mapper2->GetBounds();
-    auto bounds4_2 = actor2->GetBounds();
-
-    vtkNew<vtkLegendScaleActor> scale;
-    scale->BottomAxisVisibilityOff();//下面的比例尺不显示
-    scale->LeftAxisVisibilityOff();  //左边比例尺不显示
-    scale->RightAxisVisibilityOff();
-    scale->TopAxisVisibilityOff();
-
-    //camera
-    vtkNew<vtkCamera> camera;
-    camera->SetPosition(1, 1, 1);    //设置相机位置
-    camera->SetFocalPoint(0, 0, 0);  //设置相机焦点
-
-    //renderer
     vtkNew<vtkRenderer> renderer;
-    renderer->SetBackground(.1, .2, .3);
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
 
     renderer->AddActor(actor);
-    renderer->AddActor(actor2);
-    renderer->AddActor(scale);
+    renderer->SetBackground(colors->GetColor3d("SlateGray").GetData());
 
-    // vtkRenderer获取的范围是render中所有actor的最大范围
-    auto bounds5 = renderer->ComputeVisiblePropBounds();
+    renderWindow->SetWindowName("Glyph3D");
+    renderWindow->Render();
+    renderWindowInteractor->Start();
 
-    renderer->ResetCamera();
-
-    //renderer->ResetCameraClippingRange(-1e30, 1e30, -1e30, 1e30, -1e30, 1e30);
-    renderer->GetActiveCamera()->SetParallelProjection(true); // 平行投影
-
-    //renderer->GetActiveCamera()->SetParallelScale(.001);
-
-    //renderer->GetActiveCamera()->SetPosition(0, 0, 0.001);
-    //renderer->ResetCameraClippingRange();
-
-    vtkNew<ActiveCameraCB> cameraCB;
-    //renderer->AddObserver(vtkCommand::ResetCameraEvent, cameraCB);
-    //renderer->AddObserver(vtkCommand::ResetCameraClippingRangeEvent, cameraCB);
-
-    //RenderWindow
-    vtkNew<vtkRenderWindow> renWin;
-    renWin->AddRenderer(renderer);
-    renWin->SetSize(800, 600);//设置window大小
-
-    //RenderWindowInteractor
-    vtkNew<vtkRenderWindowInteractor> iren;
-    iren->SetRenderWindow(renWin);
-
-    //iren->AddObserver(vtkCommand::RenderEvent, cameraCB);
-    renderer->GetActiveCamera()->AddObserver(vtkCommand::ModifiedEvent, cameraCB);
-    //renderer->GetActiveCamera()-
-
-    vtkNew< CustomStyle> style;
-    iren->SetInteractorStyle(style);
-
-    //数据交互
-    renWin->Render();
-    iren->Start();
-
-    return 0;
+    return EXIT_SUCCESS;
 }
-
-//vtkInteractorStyleTrackballCamera* style = vtkInteractorStyleTrackballCamera::New();  //左键旋转，滚轮缩放，滚轮拖动，右键缩放
-//vtkInteractorStyleTrackballActor *style = vtkInteractorStyleTrackballActor::New();    //滚轮不能缩放，其他和vtkInteractorStyleTrackballCamera一样
-//vtkInteractorStyleUnicam *style = vtkInteractorStyleUnicam::New();                    //只能左键缩放平移
-//vtkInteractorStyleUser* style = vtkInteractorStyleUser::New();                        //没有鼠标响应 主要用于用户自定义的操作
 
 #endif // TEST8
 
@@ -1955,7 +1830,7 @@ int main(int, char* [])
 {
     // 加载一个STL模型
     vtkSmartPointer<vtkSTLReader> source = vtkSmartPointer<vtkSTLReader>::New();
-    source->SetFileName("C:\\Users\\yangpan\\Desktop\\test1.stl");
+    source->SetFileName("test1.stl");
     source->Update();
 
     int numPts = source->GetOutput()->GetPoints()->GetNumberOfPoints();                    // 获取模型的顶点数量
@@ -2902,8 +2777,8 @@ private:
     vtkSmartPointer<vtkRenderer> m_renderer{ nullptr };
 };
 
-//#define line_fill  // 上下左右四视图，格点格心数据，线框面显示模式的区别
-#define scalar_bar    // 色卡颜色查找表的使用
+#define line_fill  // 上下左右四视图，格点格心数据，线框面显示模式的区别
+//#define scalar_bar    // 色卡颜色查找表的使用
 
 
 int main(int, char* [])
@@ -3056,6 +2931,11 @@ int main(int, char* [])
     //actorPolyCell->GetProperty()->SetRepresentationToWireframe();
     actorPolyPoint->GetProperty()->EdgeVisibilityOn();
     actorPolyPoint->GetProperty()->SetEdgeColor(1, 1, 1);
+
+    // 设置云图的颜色
+    mapperPoly_scalarCell->ScalarVisibilityOff();
+    actorPolyCell->GetProperty()->SetColor(1, 1, 0);
+    mapperPoly_scalarCell->ScalarVisibilityOn();
 
     vtkNew<vtkRenderer> topLeftRenderer;
     vtkNew<vtkRenderer> topRightRenderer;
@@ -7795,54 +7675,54 @@ int main(int, char* [])
     // jpg
     //vtkNew<vtkJPEGWriter> jpg;
     //jpg->SetInputData(img->GetOutput());
-    ////jpg->SetFileName("C:\\Users\\yangpan\\Desktop\\test");  //不会补全.jpg，但是保存的图片名加上.jpg以后也可以显示
-    //jpg->SetFileName("C:\\Users\\yangpan\\Desktop\\test.jpg");
+    ////jpg->SetFileName("test");  //不会补全.jpg，但是保存的图片名加上.jpg以后也可以显示
+    //jpg->SetFileName("test.jpg");
     //jpg->Write();
 
     //jpg->SetInputData(luminance->GetOutput());
-    //jpg->SetFileName("C:\\Users\\yangpan\\Desktop\\test1.jpg");
+    //jpg->SetFileName("test1.jpg");
     //jpg->Write();
 
     //// tiff
     //vtkNew<vtkTIFFWriter> tiff;
     //tiff->SetInputData(img->GetOutput());
-    //tiff->SetFileName("C:\\Users\\yangpan\\Desktop\\test.tiff");
+    //tiff->SetFileName("test.tiff");
     //tiff->Write();
 
     //vtkNew<vtkTIFFWriter> tiff1;
     //tiff1->SetInputData(luminance->GetOutput());
-    //tiff1->SetFileName("C:\\Users\\yangpan\\Desktop\\test1.tiff");
+    //tiff1->SetFileName("test1.tiff");
     //tiff1->Write();
 
     //// png
     //vtkNew<vtkPNGWriter> png;
     //png->SetInputData(img->GetOutput());
-    //png->SetFileName("C:\\Users\\yangpan\\Desktop\\test.png");
+    //png->SetFileName("test.png");
     //png->Write();
 
     //vtkNew<vtkPNGWriter> png1;
     //png1->SetInputData(luminance->GetOutput());
-    //png1->SetFileName("C:\\Users\\yangpan\\Desktop\\test1.png");
+    //png1->SetFileName("test1.png");
     //png1->Write();
 
     //// bmp
     //vtkNew<vtkBMPWriter> bmp;
     //bmp->SetInputData(img->GetOutput());
-    //bmp->SetFileName("C:\\Users\\yangpan\\Desktop\\test.bmp");
+    //bmp->SetFileName("test.bmp");
     //bmp->Write();
 
     //vtkNew<vtkBMPWriter> bmp1;
     //bmp1->SetInputData(luminance->GetOutput());
-    //bmp1->SetFileName("C:\\Users\\yangpan\\Desktop\\test1.bmp");
+    //bmp1->SetFileName("test1.bmp");
     //bmp1->Write();
 
     // *.ps 矢量图
     vtkNew<vtkPostScriptWriter> ps;
     ps->SetInputData(img->GetOutput());
-    ps->SetFileName("C:\\Users\\yangpan\\Desktop\\test.ps");
+    ps->SetFileName("test.ps");
     ps->Write();
 
-    std::string exportFileName = "C:\\Users\\yangpan\\Desktop\\test.wrl";
+    std::string exportFileName = "test.wrl";
     vtkNew<vtkVRMLExporter> exporter;
     exporter->SetFileName(exportFileName.c_str());
     exporter->SetActiveRenderer(renderer);
@@ -7946,7 +7826,7 @@ int main(int, char* [])
     vtkNew<vtkSVGExporter> svg;
     svg->SetRenderWindow(view->GetRenderWindow());
     //svg->SetActiveRenderer(view->GetRenderer());
-    svg->SetFileName("C:\\Users\\yangpan\\Desktop\\contextViewSvg.svg");
+    svg->SetFileName("contextViewSvg.svg");
     svg->Write();
 
     //view->GetInteractor()->Initialize();
@@ -7976,7 +7856,7 @@ int main(int, char* [])
 
 int main(int argc, char* argv[])
 {
-    std::string file = "C:\\Users\\yangpan\\Desktop\\test.jpg";
+    std::string file = "test.jpg";
     vtkNew<vtkJPEGReader> jPEGReader;
     jPEGReader->SetFileName(file.c_str());
     jPEGReader->Update();
@@ -8158,7 +8038,7 @@ int main(int, char* [])
 
     vtkNew<vtkSVGExporter> exp;
     exp->SetRenderWindow(view->GetRenderWindow());
-    exp->SetFileName("C:\\Users\\yangpan\\Desktop\\test111.svg");
+    exp->SetFileName("test111.svg");
     exp->Write();
 
 #if 0
@@ -9074,7 +8954,7 @@ int main(int argc, char* argv[])
 
 #include <string>
 
-std::string file = "C:\\Users\\yangpan\\Desktop\\test.jpg";
+std::string file = "test.jpg";
 
 int main(int argc, char* argv[])
 {
@@ -9256,7 +9136,7 @@ int main(int argc, char* argv[])
     vtkNew<vtkImageActor> actor;
     vtkNew<vtkRenderWindow> window;
 
-    std::string file = "C:\\Users\\yangpan\\Desktop\\test.jpg";
+    std::string file = "test.jpg";
 
     vtkNew<vtkJPEGReader> reader;
     reader->SetFileName(file.c_str());
@@ -10379,8 +10259,8 @@ QImage createQImage(vtkImageData* imageData);
 
 int main()
 {
-    std::string inputFilename = "C:\\Users\\yangpan\\Desktop\\test.jpg";
-    std::string outputFilename = "C:\\Users\\yangpan\\Desktop\\save.jpg";
+    std::string inputFilename = "test.jpg";
+    std::string outputFilename = "save.jpg";
 
     vtkNew<vtkJPEGReader> reader;
     reader->SetFileName(inputFilename.c_str());
