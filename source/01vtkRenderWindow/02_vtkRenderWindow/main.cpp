@@ -31,7 +31,7 @@
 18.带流场参数的立方体
 19.vtkDistancePolyDataFilter 计算两个vtkPolyData的距离
 20.可以随意拖动的坐标轴
-21.官方例子，球面法向量  矢量图
+21.
 22.将点（向量）投影到平面
 23.鼠标双击事件 DoubleClick
 24.
@@ -50,9 +50,9 @@
 37.探针 https://blog.csdn.net/liushao1031177/article/details/122860254
 38.plot https://kitware.github.io/vtk-examples/site/Cxx/Plotting/LinePlot/
 39.以单元形式设置标量数据
-40.vtkCellDataToPointData 单元标量数据转顶点数据，等值线vtkContourFilter
+40.
 41.vtkPointDataToCellData 顶点标量数据转单元数据
-42.vtkCellCenters 获取单元中心即格心，并用球体标注格心(矢量图）
+42.
 43.reverse access ,从经过算法(vtkAlgorithm,vtkPolyDataAlgorithm)变换的数据中获取源数据（vtkPolyData,vtkDataSet）
 44.vtkChart https://kitware.github.io/vtk-examples/site/Cxx/DataStructures/OctreeTimingDemo/
 45.从Actor中获取polyData，并修改polyData的属性会改变原来Actor的状态，深拷贝可以不改变源Actor状态
@@ -1938,134 +1938,7 @@ namespace {
 
 #endif // TEST20
 
-#ifdef TEST21
 
-// https://kitware.github.io/vtk-examples/site/Cxx/Points/NormalEstimation/
-
-#include <vtkArrowSource.h>
-#include <vtkCamera.h>
-#include <vtkGlyph3D.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPCANormalEstimation.h>
-#include <vtkPointSource.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSphereSource.h>
-#include <vtkLineSource.h>
-
-#include <vtkPolyDataNormals.h>
-
-namespace {
-    void MakeGlyphs(vtkPolyData* src, double size, vtkGlyph3D* glyph);
-}
-
-int main(int, char* [])
-{
-    double radius = 1.0;
-    vtkNew<vtkPointSource> points;
-    points->SetNumberOfPoints(1000);
-    points->SetRadius(radius);
-    points->SetCenter(0.0, 0.0, 0.0);
-    points->SetDistributionToShell();
-
-    double p0[3] = { 1.0, 0.0, 0.0 };
-    double p1[3] = { 0.0, 1.0, 0.0 };
-
-    vtkNew<vtkLineSource> lineSource;
-    lineSource->SetPoint1(p0);
-    lineSource->SetPoint2(p1);
-
-    vtkNew<vtkPolyDataNormals> nor;
-
-    int sampleSize = 10;
-    vtkNew<vtkPCANormalEstimation> normals;
-    normals->SetInputConnection(points->GetOutputPort());
-    normals->SetSampleSize(sampleSize);
-    normals->SetNormalOrientationToGraphTraversal();
-    normals->Update();
-
-    vtkNew<vtkNamedColors> colors;
-
-    vtkNew<vtkGlyph3D> glyph3D;
-    MakeGlyphs(normals->GetOutput(), radius * 0.2, glyph3D.GetPointer());
-
-    vtkNew<vtkPolyDataMapper> glyph3DMapper;
-    glyph3DMapper->SetInputConnection(glyph3D->GetOutputPort());
-
-    vtkNew<vtkActor> glyph3DActor;
-    glyph3DActor->SetMapper(glyph3DMapper);
-    glyph3DActor->GetProperty()->SetDiffuseColor(
-        colors->GetColor3d("Banana").GetData());
-
-    vtkNew<vtkSphereSource> sphere;
-    sphere->SetRadius(1.0);
-    sphere->SetThetaResolution(41);
-    sphere->SetPhiResolution(21);
-
-    vtkNew<vtkPolyDataMapper> sphereMapper;
-    sphereMapper->SetInputConnection(sphere->GetOutputPort());
-
-    vtkNew<vtkActor> sphereActor;
-    sphereActor->SetMapper(sphereMapper);
-    sphereActor->GetProperty()->SetDiffuseColor(
-        colors->GetColor3d("Tomato").GetData());
-
-    // Create graphics stuff
-    //
-    vtkNew<vtkRenderer> renderer;
-    renderer->SetBackground(colors->GetColor3d("SlateGray").GetData());
-
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetSize(640, 480);
-    renderWindow->SetWindowName("NormalEstimation");
-
-    vtkNew<vtkRenderWindowInteractor> interactor;
-    interactor->SetRenderWindow(renderWindow);
-
-    // Add the actors to the renderer, set the background and size
-    //
-    renderer->AddActor(glyph3DActor);
-    renderer->AddActor(sphereActor);
-
-    // Generate an interesting view
-    //
-    renderer->ResetCamera();
-    renderer->GetActiveCamera()->Azimuth(0);
-    renderer->GetActiveCamera()->Elevation(30);
-    renderer->GetActiveCamera()->Dolly(1.0);
-    renderer->ResetCameraClippingRange();
-
-    renderWindow->Render();
-    interactor->Initialize();
-    interactor->Start();
-
-    return EXIT_SUCCESS;
-}
-namespace {
-    void MakeGlyphs(vtkPolyData* src, double size, vtkGlyph3D* glyph)
-    {
-        // Source for the glyph filter
-        vtkNew<vtkArrowSource> arrow;
-        arrow->SetTipResolution(16);
-        arrow->SetTipLength(0.3);
-        arrow->SetTipRadius(0.1);
-
-        glyph->SetSourceConnection(arrow->GetOutputPort());
-        glyph->SetInputData(src);
-        glyph->SetVectorModeToUseNormal();
-        glyph->SetScaleModeToScaleByVector();
-        glyph->SetScaleFactor(size);
-        glyph->OrientOn();
-        glyph->Update();
-    }
-} // namespace
-
-#endif // TEST21
 
 #ifdef TEST22
 
@@ -4514,107 +4387,7 @@ int main(int, char* [])
 
 #endif // TEST39
 
-#ifdef TEST40
 
-#include <vtkActor.h>
-#include <vtkFloatArray.h>
-#include <vtkLookupTable.h>
-#include <vtkPointData.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkSmartPointer.h>
-#include <vtkSTLReader.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkCellData.h>
-#include <vtkProperty.h>
-#include <vtkCellDataToPointData.h>
-#include <vtkDataSetMapper.h>
-#include <vtkContourFilter.h>
-
-int main(int, char* [])
-{
-    // 顶点
-    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
-    for (size_t i = 0; i < 10; i++)
-    {
-        points->InsertNextPoint(i, 0, 0);
-        points->InsertNextPoint(i + 1, 1, 0);
-        points->InsertNextPoint(i, 2, 0);
-        points->InsertNextPoint(i + 1, 3, 0);
-    }
-
-    // 拓扑
-    vtkSmartPointer<vtkCellArray> cell_poly = vtkSmartPointer<vtkCellArray>::New();
-    for (long long i = 0; i < 33; i += 4)
-    {
-        cell_poly->InsertNextCell({ i,i + 1,i + 5,i + 4 });
-        cell_poly->InsertNextCell({ i + 1,i + 2,i + 6,i + 5 });
-        cell_poly->InsertNextCell({ i + 2,i + 3,i + 7,i + 6 });
-    }
-
-    // 标量
-    vtkSmartPointer<vtkFloatArray> scalars = vtkSmartPointer<vtkFloatArray>::New();
-    scalars->SetNumberOfValues(27);
-    for (int i = 0; i < 27; i++)
-    {
-        scalars->SetValue(i, i);
-    }
-
-    vtkSmartPointer<vtkPolyData> poly1 = vtkSmartPointer<vtkPolyData>::New();
-    poly1->SetPoints(points);
-    poly1->SetPolys(cell_poly);
-    poly1->GetCellData()->SetScalars(scalars);
-
-    // 单元标量数据转为顶点数据
-    vtkNew<vtkCellDataToPointData> cellToPoint;
-    cellToPoint->SetInputData(poly1);
-    cellToPoint->PassCellDataOff();
-    cellToPoint->Update(); //updata不能少
-
-    vtkNew<vtkContourFilter> contourFilter;
-    contourFilter->SetInputData(cellToPoint->GetOutput());
-    contourFilter->GenerateValues(50, 0, 26);
-    contourFilter->Update();
-
-    // 创建颜色查找表
-    vtkSmartPointer<vtkLookupTable> hueLut = vtkSmartPointer<vtkLookupTable>::New();
-    hueLut->SetHueRange(0.67, 0.0);            // 设定HSV颜色范围，色调H取值范围为0°～360°，从红色开始按逆时针方向计算，红色为0°/0.0，绿色为120°/0.34,蓝色为240°/0.67
-    hueLut->Build();
-
-    vtkSmartPointer<vtkDataSetMapper> mapper1 = vtkSmartPointer<vtkDataSetMapper>::New();
-    mapper1->SetInputData(cellToPoint->GetOutput());
-    mapper1->SetInputData(contourFilter->GetOutput());
-    mapper1->SetScalarRange(0, 26);            // 设置标量值的范围
-    mapper1->SetLookupTable(hueLut);
-
-    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-    actor->SetMapper(mapper1);
-
-    vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
-
-    renderer->SetBackground(.1, .2, .3);
-
-    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
-    renderWindow->AddRenderer(renderer);
-
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-    vtkSmartPointer<vtkInteractorStyleTrackballCamera> style = vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
-    renderWindowInteractor->SetInteractorStyle(style);
-
-    renderer->AddActor(actor);
-
-    renderWindow->SetSize(600, 600);
-    renderWindow->Render();
-    renderWindowInteractor->Start();
-
-    return 0;
-}
-
-#endif // TEST40
 
 #ifdef TEST41
 
@@ -4711,108 +4484,7 @@ int main(int, char* [])
 
 #endif // TEST41
 
-#ifdef TEST42
 
-#include <vtkUnstructuredGridReader.h>
-#include <vtkUnstructuredGrid.h>
-#include <vtkPolyData.h>
-#include <vtkActor.h>
-#include <vtkCamera.h>
-#include <vtkCellCenters.h>
-#include <vtkGlyph3DMapper.h>
-#include <vtkNew.h>
-#include <vtkDataSetMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSmartPointer.h>
-#include <vtkSphereSource.h>
-
-#include <algorithm>
-#include <vector>
-
-int main(int argc, char* argv[])
-{
-    vtkNew<vtkUnstructuredGridReader> reader;
-    reader->SetFileName("elbow.vtk");
-    reader->Update();
-
-    // 获取三个方向的最大最小值
-    std::vector<double> bounds(6);
-    reader->GetOutput()->GetBounds(bounds.data());
-
-    // 获取三个方向的范围值
-    std::vector<double> range(3);
-    for (int i = 0; i < 3; ++i)
-    {
-        range[i] = bounds[2 * i + 1] - bounds[2 * i];
-    }
-
-    vtkNew<vtkCellCenters> centers;
-    centers->SetInputData(reader->GetOutput());
-    centers->Update();
-
-    // 对于vtkCellCenters过滤器，最后的输出只存在节点，不存在单元
-    // 获取单元中心的坐标值
-    // vtkPolyData* cellCenter = centers->GetOutput();
-    // for (vtkIdType pointIndex = 0; pointIndex < cellCenter->GetNumberOfPoints(); ++pointIndex)
-    // {
-    //     double pointCoord[3];
-    //     cellCenter->GetPoint(pointIndex, pointCoord);
-    //     std::cout << "单元 " << pointIndex << " 的中心的坐标为：" << std::endl
-    //               << "X : " << pointCoord[0] << std::endl
-    //               << "Y : " << pointCoord[1] << std::endl
-    //               << "Z : " << pointCoord[2] << std::endl;
-    // }
-
-    // 获取三个方向范围的最大值
-    double maxValue = *std::max_element(range.begin(), range.end());
-    double r = maxValue * 0.001;
-
-    // 用球体来表示单元中心
-    vtkNew<vtkSphereSource> sphere;
-    sphere->SetPhiResolution(11);
-    sphere->SetThetaResolution(11);
-    sphere->SetRadius(r);
-
-    vtkNew<vtkGlyph3DMapper> pointMapper;
-    pointMapper->SetInputConnection(centers->GetOutputPort());
-    // 以球的形式表现单元中心
-    pointMapper->SetSourceConnection(sphere->GetOutputPort());
-
-    vtkNew<vtkActor> pointActor;
-    pointActor->SetMapper(pointMapper);
-
-    vtkNew<vtkDataSetMapper> mapper;
-    mapper->SetInputData(reader->GetOutput());
-
-    vtkNew<vtkActor> actor;
-    actor->SetMapper(mapper);
-    actor->GetProperty()->SetOpacity(0.5);
-    actor->GetProperty()->EdgeVisibilityOn(); // 边界线
-    actor->GetProperty()->SetInterpolationToFlat();
-
-    vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-    renderer->AddActor(actor);
-    renderer->AddActor(pointActor);
-
-    renderer->GradientBackgroundOn();
-    renderer->SetBackground(1, 1, 1);
-    renderer->SetBackground2(0.4, 0.55, 0.75);
-    renderer->ResetCamera();
-
-    renderWindow->Render();
-
-    renderWindowInteractor->Start();
-
-    return EXIT_SUCCESS;
-}
-#endif // TEST42
 
 #ifdef TEST43
 

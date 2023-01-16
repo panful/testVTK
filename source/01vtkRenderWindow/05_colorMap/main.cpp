@@ -1,24 +1,29 @@
 ﻿/*
 * 100 云图，渐变线，点和单元设置流场参数，颜色过渡方式，颜色映射表，色卡
 * 101 vtkColorLegend  https://vtk.org/doc/nightly/html/classvtkColorLegend.html
-* 
+*
 * 201 云图 stl文件
 * 202 vtkStreamTracer 流线图 展示流体流动的轨迹和流动方向 有点像线框式的云图 vtkOpenFOAMReader
 * 203 vtkContourFilter  等值面
-* 
+*
 * 300 vtkGlyph3D 官方示例 矢量图
 * 301 vtkGlyph2D 官方示例 vtkGlyph2D继承自vtkGlyph3D
 * 302 vtkGlyph3D 常用函数，色卡
 * 303 vtkGlyph3DMapper 官方示例 vtkGlyph3D在GPU上计算的版本
 * 304 vtkGlyph3DMapper 使用方法
-* 
-* 
-* 36 矢量图箭头大小
-* 302 矢量图 ，从vtkGlyph3D获取源数据
+* 305 从vtkGlyph3D获取源数据 从经过vtkAlgorithm变换后的数据获取源数据
+* 306 矢量图标签大小的设置
+*
+
+* 8 矢量图颜色设置以及恢复
+* 21 官方例子，球面法向量  矢量图
+* 10 2D直线 vtkGlyph3D 矢量图箭头方向，箭头起始段末端翻转
+* 40 vtkCellDataToPointData 单元标量数据转顶点数据，等值线vtkContourFilter
+* 42 vtkCellCenters 获取单元中心即格心，并用球体标注格心(矢量图）
 */
 
 
-#define TEST100
+#define TEST307
 
 #ifdef TEST100
 
@@ -2224,7 +2229,8 @@ int main(int, char* [])
     glyph->SetInputData(polydata);             // 顶点数据，即矢量图每一个图案的位置
     glyph->SetSourceData(source->GetOutput()); // 资源数据，即矢量图的图案
     glyph->SetScaleFactor(1.);                 // 缩放比例
-    glyph->SetRange(0, 1);                     // 
+    //glyph->SetClamping(true);
+    //glyph->SetRange(0, 1);                     // 
 
     // 默认颜色由标量决定
     // 默认大小由标量决定
@@ -2252,7 +2258,7 @@ int main(int, char* [])
     glyph->SetVectorModeToUseVector();              // 方向由向量决定
     //glyph->SetVectorModeToVectorRotationOff();      // 关闭跟随向量旋转
 
-    
+
     std::cout << "--------------------------------------------\n" <<
         "color: " << glyph->GetColorModeAsString() <<
         "\nscale: " << glyph->GetScaleModeAsString() <<
@@ -2466,200 +2472,281 @@ int main(int, char* [])
 
 #endif // TEST304
 
-#ifdef TEST9
-
-//https://kitware.github.io/vtk-examples/site/Cxx/Filtering/Glyph3D/
+#ifdef TEST305
 
 #include <vtkArrowSource.h>
-
 #include <vtkActor.h>
 #include <vtkCellArray.h>
 #include <vtkCubeSource.h>
 #include <vtkGlyph3D.h>
 #include <vtkGlyph2D.h>
-#include <vtkNamedColors.h>
 #include <vtkNew.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
+#include <vtkGlyph3DMapper.h>
+#include <vtkDataSetMapper.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 #include <vtkDoubleArray.h>
 #include <vtkPointData.h>
-#include <vtkFloatArray.h>
 #include <vtkLookupTable.h>
-#include <vtkVector.h>
-#include <vtkCleanPolyData.h>
+#include <vtkScalarBarActor.h>
+
 #include <vtkAlgorithmOutput.h>
+
+#include <iostream>
 
 int main(int, char* [])
 {
-    // Create 3 points
+    // 矢量图的图案
+    vtkNew<vtkArrowSource> source;
+    source->Update();
+
+    // 颜色映射表
+    vtkNew<vtkLookupTable> colorTable;
+    colorTable->SetNumberOfColors(20);
+    colorTable->SetHueRange(.0, .3334); // red 0 green 0.3334 blue 0.6667
+    colorTable->SetRange(1, 4);
+    colorTable->Build();
+
+    // 色卡
+    vtkNew<vtkScalarBarActor> legendActor;
+    legendActor->SetNumberOfLabels(20);
+    legendActor->SetLookupTable(colorTable);
+    legendActor->SetMaximumNumberOfColors(20);
+
+    // 顶点数据，即矢量图位置
     vtkNew<vtkPoints> points;
     points->InsertNextPoint(0.0, 0.0, 0.0);
     points->InsertNextPoint(1.0, 1.0, 0.0);
     points->InsertNextPoint(1.0, 0.0, 0.0);
     points->InsertNextPoint(0.0, 1.0, 0.0);
 
-    // Add the points to a polydata
     vtkNew<vtkPolyData> polydata;
     polydata->SetPoints(points);
 
-    vtkVector2f vecF(1, 2);
-    vecF.Set(1, 2);
-    auto ret = vecF.Norm();
+    // 每一个顶点的标量
+    vtkNew<vtkDoubleArray> pointScalars;
+    pointScalars->InsertNextValue(1.);
+    pointScalars->InsertNextValue(4.);
+    pointScalars->InsertNextValue(3.);
+    pointScalars->InsertNextValue(2.);
+    polydata->GetPointData()->SetScalars(pointScalars);
 
-    vtkNew<vtkFloatArray> arr;
+    // 每一个顶点的向量
+    vtkNew<vtkDoubleArray> pointVectors;
+    pointVectors->SetNumberOfComponents(3); // 3维向量 {x,y,z}
+    pointVectors->InsertNextTuple3(5.0, 0.0, 0.0);
+    pointVectors->InsertNextTuple3(0.0, 3.0, 0.0);
+    pointVectors->InsertNextTuple3(1.0, 1.0, 1.0);
+    pointVectors->InsertNextTuple3(-1.0, -1.0, 0.0);
+    polydata->GetPointData()->SetVectors(pointVectors);
 
-    // Set point normals
-    vtkNew<vtkDoubleArray> pointNormalsArray;
-    auto com = pointNormalsArray->GetNumberOfComponents(); // 默认为1，向量的维度
-    pointNormalsArray->SetNumberOfComponents(3); // 3d normals (ie x,y,z)
-    pointNormalsArray->SetNumberOfTuples(polydata->GetNumberOfPoints());
+    vtkNew<vtkGlyph3D> glyph;
+    glyph->SetInputData(polydata);             // 顶点数据，即矢量图每一个图案的位置
+    glyph->SetSourceData(source->GetOutput()); // 资源数据，即矢量图的图案
 
-    // 法线只能控制箭头方向
-    double pN1[3] = { 1.0, 0.0, 0.0 };
-    double pN2[3] = { 0.0, 1.0, 0.0 };
-    double pN3[3] = { 1.0, 1.0, 1.0 };
-    double pN4[3] = { 0.0, 0.0, 0.0 };
+    // 颜色
+    glyph->SetColorModeToColorByScalar();           // 颜色由标量决定
+    // 大小
+    glyph->SetScaleModeToScaleByScalar();           // 大小由标量决定
+    // 方向
+    glyph->SetVectorModeToUseVector();              // 方向由向量决定
 
-    // Add the data to the normals array
-    pointNormalsArray->SetTuple(0, pN1);  //SetTuple4(id,v0,v1,v2,v3)
-    pointNormalsArray->SetTuple(1, pN2);
-    pointNormalsArray->SetTuple(2, pN3);
-    pointNormalsArray->SetTuple(3, pN4);
+    // mapper
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetLookupTable(colorTable);
+    mapper->SetScalarRange(colorTable->GetRange());
+    mapper->SetInputConnection(glyph->GetOutputPort());
 
-    // Add the normals to the points in the polydata
-    //polydata->GetPointData()->SetNormals(pointNormalsArray);
-    polydata->GetPointData()->SetVectors(pointNormalsArray); //用向量控制箭头的颜色，方向，大小
-
-    // add scalar for colors
-    // 标量可以控制箭头的大小以及颜色
-    vtkSmartPointer<vtkFloatArray> scalars = vtkSmartPointer<vtkFloatArray>::New();
-    scalars->InsertTuple1(0, 1);
-    scalars->InsertTuple1(1, 2);
-    scalars->InsertTuple1(2, 3);
-    scalars->InsertTuple1(3, 4);
-
-    //polydata->GetPointData()->SetScalars(scalars);
-
-    // color map
-    vtkNew<vtkLookupTable> pColorTable;
-    pColorTable->SetNumberOfColors(10);
-    //pColorTable->SetHueRange(.0, .67);
-    pColorTable->Build();
-
-    vtkNew<vtkNamedColors> colors;
-
-    // Create anything you want here, we will use a cube/arrow for the demo.
-    vtkNew<vtkCubeSource> cubeSource;
-    vtkNew<vtkArrowSource> arrowSource;
-    arrowSource->SetShaftRadius(0.01);
-    arrowSource->SetTipRadius(0.05);
-    arrowSource->SetTipLength(0.2);
-
-    //arrowSource->SetTipLength(0.02);
-    //arrowSource->SetShaftRadius(0.1);
-    //arrowSource->SetTipLength(1);
-    //SetShaftRadius        设置轴线半径，轴的粗细
-    //    SetShaftResolution    设置轴线分辨率，轴截面的圆由多少个线段构成
-    //    SetTipRadius        设置端点圆锥体半径，圆锥体底面圆的半径
-    //    SetTipResolution    设置端点圆锥体分辨率，圆锥体侧面由多少个三角构成，
-    //    SetTipLength        设置端点圆锥体长度，圆锥体的高度
-
-    vtkNew<vtkGlyph2D> glyph3D;
-    //glyph3D->SetSourceConnection(cubeSource->GetOutputPort());
-    glyph3D->SetSourceConnection(arrowSource->GetOutputPort());
-
-    auto mode = glyph3D->GetColorModeAsString();
-    //glyph3D->SetColorModeToColorByScale();    // 颜色使用标量控制（类似云图颜色映射）
-    glyph3D->SetColorModeToColorByVector();    // 使用向量映射颜色（不再需要设置scalerRange）
-    glyph3D->SetScaleModeToDataScalingOff();   // 关闭由于数据（标量或向量）导致的缩放
-    //glyph3D->SetScaleModeToScaleByVectorComponents();
-    //glyph3D->SetInputArrayToProcess()
-
-    glyph3D->SetVectorModeToUseVector();  // 使用向量设置方向
-    //glyph3D->SetVectorModeToUseNormal();// 使用法线设置方向
-    glyph3D->SetInputData(polydata);
-    //glyph3D->SetInputConnection()
-    auto scale = glyph3D->GetScaleFactor();
-    //glyph3D->SetScaleFactor(2.0);  //设置缩放比例，默认为1
-    glyph3D->Update();
-
-    // Visualize
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputConnection(glyph3D->GetOutputPort());
-    // 使用可视化管线
-    //auto connect = mapper->GetInputConnection(0, 0);
-    //if (glyph3D->GetOutputPort() == connect)
-    //    std::cout << "same";
-
-    //mapper->SetInputData(glyph3D->GetOutput());
-    //mapper->SetScalarRange(1, 4);
-
-    //mapper->SetColorModeToDirectScalars();
-    //mapper->SetColorModeToDefault();
-    mapper->SetLookupTable(pColorTable);
-
-    // 如果添加的是向量，获取的范围就是向量的【模长】最大最小值
-    auto range = mapper->GetInput()->GetScalarRange();
-    mapper->SetScalarRange(range);
-
+    // actor
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
 
+    //--------------------------------------------------------------------------------------
     // 从经过vtkAlgorithm变换后的数据获取源数据（注意使用的是独立数据集还是管道连接方式）
-    vtkSmartPointer<vtkAlgorithm> algorithm = actor->GetMapper()->GetInputConnection(0, 0)->GetProducer();
-    auto reference = dynamic_cast<vtkGlyph2D*>(algorithm.GetPointer()); // 如果没有经过algorithm变换，reference为nullptr
-    //auto originSource = vtkPolyData::SafeDownCast(reference->GetInput());
-    //auto originPointNum = originSource->GetNumberOfPoints(); // 源数据共有四个顶点
-
+    if (vtkSmartPointer<vtkAlgorithm> algorithm = actor->GetMapper()->GetInputConnection(0, 0)->GetProducer())
+    {
+        // 如果没有经过algorithm变换，reference为nullptr
+        if (auto reference = vtkGlyph3D::SafeDownCast(algorithm.GetPointer()))
+        {
+            if (auto originSource = vtkPolyData::SafeDownCast(reference->GetInput()))
+            {
+                auto originPointNum = originSource->GetNumberOfPoints(); // 源数据顶点个数
+                
+                for (long long i = 0; i < originPointNum; i++)
+                {
+                    double pt[3]{ 0 };
+                    originSource->GetPoint(i, pt);
+                    std::cout << pt[0] << '\t' << pt[1] << '\t' << pt[2] << '\n';
+                }
+            }
+        }
+    }
+    //--------------------------------------------------------------------------------------
 
     vtkNew<vtkRenderer> renderer;
     vtkNew<vtkRenderWindow> renderWindow;
     renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
     vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
+    renderer->AddActor(legendActor);
     renderer->AddActor(actor);
-    renderer->SetBackground(colors->GetColor3d("SlateGray").GetData());
+    renderer->SetBackground(.1, .2, .3);
 
-    renderWindow->SetWindowName("Glyph3D");
+    renderWindow->SetWindowName("vector");
     renderWindow->Render();
     renderWindowInteractor->Start();
 
     return EXIT_SUCCESS;
 }
 
-#endif // TEST9
+#endif // TEST305
 
-#ifdef TEST8
+#ifdef TEST306
 
 #include <vtkArrowSource.h>
-
 #include <vtkActor.h>
 #include <vtkCellArray.h>
 #include <vtkCubeSource.h>
 #include <vtkGlyph3D.h>
 #include <vtkGlyph2D.h>
-#include <vtkNamedColors.h>
 #include <vtkNew.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
+#include <vtkGlyph3DMapper.h>
+#include <vtkDataSetMapper.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 #include <vtkDoubleArray.h>
 #include <vtkPointData.h>
-#include <vtkFloatArray.h>
 #include <vtkLookupTable.h>
-#include <vtkVector.h>
-#include <vtkCleanPolyData.h>
-#include <vtkAlgorithmOutput.h>
+#include <vtkScalarBarActor.h>
+
+
+int main(int, char* [])
+{
+    // 矢量图的图案
+    vtkNew<vtkArrowSource> source;
+    source->Update();
+
+    // 颜色映射表
+    vtkNew<vtkLookupTable> colorTable;
+    colorTable->SetNumberOfColors(20);
+    colorTable->SetHueRange(.0, .3334); // red 0 green 0.3334 blue 0.6667
+    colorTable->SetRange(1, 4);
+    colorTable->Build();
+
+    // 色卡
+    vtkNew<vtkScalarBarActor> legendActor;
+    legendActor->SetNumberOfLabels(20);
+    legendActor->SetLookupTable(colorTable);
+    legendActor->SetMaximumNumberOfColors(20);
+
+    // 顶点数据，即矢量图位置
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0.0, 0.0, 0.0);
+    points->InsertNextPoint(1.0, 1.0, 0.0);
+    points->InsertNextPoint(1.0, 0.0, 0.0);
+    points->InsertNextPoint(0.0, 1.0, 0.0);
+
+    vtkNew<vtkPolyData> polydata;
+    polydata->SetPoints(points);
+
+    // 每一个顶点的标量
+    vtkNew<vtkDoubleArray> pointScalars;
+    pointScalars->InsertNextValue(1.);
+    pointScalars->InsertNextValue(4.);
+    pointScalars->InsertNextValue(3.);
+    pointScalars->InsertNextValue(2.);
+    polydata->GetPointData()->SetScalars(pointScalars);
+
+    // 每一个顶点的向量
+    vtkNew<vtkDoubleArray> pointVectors;
+    pointVectors->SetNumberOfComponents(3); // 3维向量 {x,y,z}
+    pointVectors->InsertNextTuple3(5.0, 0.0, 0.0);
+    pointVectors->InsertNextTuple3(0.0, 3.0, 0.0);
+    pointVectors->InsertNextTuple3(1.0, 1.0, 1.0);
+    pointVectors->InsertNextTuple3(-1.0, -1.0, 0.0);
+    polydata->GetPointData()->SetVectors(pointVectors);
+
+    vtkNew<vtkGlyph3D> glyph;
+    glyph->SetInputData(polydata);             // 顶点数据，即矢量图每一个图案的位置
+    glyph->SetSourceData(source->GetOutput()); // 资源数据，即矢量图的图案
+
+    glyph->SetScaleFactor(1.);                 // 缩放比例
+    glyph->SetClamping(true);                  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
+    glyph->SetRange(0, 5);                     // 箭头大小映射表，因为大小由向量决定，所以这里的范围应该为{0,所有点的向量模长最大值}，向量模长始终不小于0
+
+    // 颜色
+    glyph->SetColorModeToColorByScalar();           // 颜色由标量决定
+    // 大小
+    glyph->SetScaleModeToScaleByVector();           // 大小由向量决定
+    // 方向
+    glyph->SetVectorModeToUseVector();              // 方向由向量决定
+    glyph->Update();
+
+    double range[2]{ 0 };
+    glyph->GetRange(range);
+    std::cout << "range: " << range[0] << '\t' << range[1] << '\n';
+
+    // mapper
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetLookupTable(colorTable);
+    mapper->SetScalarRange(colorTable->GetRange());
+    mapper->SetInputConnection(glyph->GetOutputPort());
+
+    // actor
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderer->AddActor(legendActor);
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+
+    renderWindow->SetWindowName("vector");
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST306
+
+#ifdef TEST307
+
+#include <vtkArrowSource.h>
+#include <vtkActor.h>
+#include <vtkCellArray.h>
+#include <vtkCubeSource.h>
+#include <vtkGlyph3D.h>
+#include <vtkGlyph2D.h>
+#include <vtkNew.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkGlyph3DMapper.h>
+#include <vtkDataSetMapper.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkDoubleArray.h>
+#include <vtkPointData.h>
+#include <vtkLookupTable.h>
+#include <vtkScalarBarActor.h>
+
+#include <vtkSmartPointer.h>
+#include <vtkProperty.h>
 #include <vtkInteractorStyleRubberBand3D.h>
 
 class CustomStyle :
@@ -2670,26 +2757,76 @@ public:
     vtkTypeMacro(CustomStyle, vtkInteractorStyleRubberBand3D);
 
 protected:
-
-    void OnLeftButtonDown() override
+    void OnLeftButtonUp() override
     {
+        if (this->Interactor && m_actor && m_mapper)
+        {
+            m_actor->GetProperty()->SetColor(1, 1, 1);
+            m_mapper->ScalarVisibilityOff();
+            this->Interactor->Render();
+        }
 
-        Superclass::OnLeftButtonDown();
+        Superclass::OnLeftButtonUp();
     }
 
     void OnMiddleButtonUp() override
     {
+        if (this->Interactor && m_actor && m_mapper)
+        {
+            std::cout << "visibility: " << m_mapper->GetScalarVisibility() << '\n';
+        }
 
         Superclass::OnMiddleButtonUp();
     }
 
+    void OnRightButtonUp() override
+    {
+        if (this->Interactor && m_actor && m_mapper)
+        {
+            m_mapper->ScalarVisibilityOn();
+            this->Interactor->Render();
+        }
+
+        Superclass::OnRightButtonUp();
+    }
+public:
+    void SetActor(const vtkSmartPointer<vtkActor>& actor)
+    {
+        m_actor = actor;
+    }
+
+    void SetMapper(const vtkSmartPointer<vtkMapper>& mapper)
+    {
+        m_mapper = mapper;
+    }
+private:
+    vtkSmartPointer<vtkActor> m_actor{ nullptr };
+    vtkSmartPointer<vtkMapper> m_mapper{ nullptr };
 };
 
 vtkStandardNewMacro(CustomStyle);
 
+
 int main(int, char* [])
 {
+    // 矢量图的图案
+    vtkNew<vtkArrowSource> source;
+    source->Update();
 
+    // 颜色映射表
+    vtkNew<vtkLookupTable> colorTable;
+    colorTable->SetNumberOfColors(20);
+    colorTable->SetHueRange(.0, .3334); // red 0 green 0.3334 blue 0.6667
+    colorTable->SetRange(1, 4);
+    colorTable->Build();
+
+    // 色卡
+    vtkNew<vtkScalarBarActor> legendActor;
+    legendActor->SetNumberOfLabels(20);
+    legendActor->SetLookupTable(colorTable);
+    legendActor->SetMaximumNumberOfColors(20);
+
+    // 顶点数据，即矢量图位置
     vtkNew<vtkPoints> points;
     points->InsertNextPoint(0.0, 0.0, 0.0);
     points->InsertNextPoint(1.0, 1.0, 0.0);
@@ -2699,128 +2836,212 @@ int main(int, char* [])
     vtkNew<vtkPolyData> polydata;
     polydata->SetPoints(points);
 
+    // 每一个顶点的标量
+    vtkNew<vtkDoubleArray> pointScalars;
+    pointScalars->InsertNextValue(1.);
+    pointScalars->InsertNextValue(4.);
+    pointScalars->InsertNextValue(3.);
+    pointScalars->InsertNextValue(2.);
+    polydata->GetPointData()->SetScalars(pointScalars);
 
-    // Set point normals
-    vtkNew<vtkDoubleArray> pointNormalsArray;
-    auto numOfComponents = pointNormalsArray->GetNumberOfComponents(); // 默认为1，向量的维度
-    pointNormalsArray->SetNumberOfComponents(3); // 3d normals (ie x,y,z)
-    pointNormalsArray->SetNumberOfTuples(polydata->GetNumberOfPoints());
+    // 每一个顶点的向量
+    vtkNew<vtkDoubleArray> pointVectors;
+    pointVectors->SetNumberOfComponents(3); // 3维向量 {x,y,z}
+    pointVectors->InsertNextTuple3(5.0, 0.0, 0.0);
+    pointVectors->InsertNextTuple3(0.0, 3.0, 0.0);
+    pointVectors->InsertNextTuple3(1.0, 1.0, 1.0);
+    pointVectors->InsertNextTuple3(-1.0, -1.0, 0.0);
+    polydata->GetPointData()->SetVectors(pointVectors);
 
-    // 法线只能控制箭头方向
-    double pN1[3] = { 1.0, 0.0, 0.0 };
-    double pN2[3] = { 0.0, 1.0, 0.0 };
-    double pN3[3] = { 1.0, 1.0, 1.0 };
-    double pN4[3] = { 0.0, 0.0, 0.0 };
+    vtkNew<vtkGlyph3D> glyph;
+    glyph->SetInputData(polydata);             // 顶点数据，即矢量图每一个图案的位置
+    glyph->SetSourceData(source->GetOutput()); // 资源数据，即矢量图的图案
 
-    // Add the data to the normals array
-    pointNormalsArray->SetTuple(0, pN1);  //SetTuple4(id,v0,v1,v2,v3)
-    pointNormalsArray->SetTuple(1, pN2);
-    pointNormalsArray->SetTuple(2, pN3);
-    pointNormalsArray->SetTuple(3, pN4);
+    glyph->SetScaleFactor(1.);                 // 缩放比例
+    glyph->SetClamping(true);                  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
+    glyph->SetRange(0, 5);                     // 箭头大小映射表，因为大小由向量决定，所以这里的范围应该为{0,所有点的向量模长最大值}，向量模长始终不小于0
 
-    // Add the normals to the points in the polydata
-    //polydata->GetPointData()->SetNormals(pointNormalsArray);
-    polydata->GetPointData()->SetVectors(pointNormalsArray); //用向量控制箭头的颜色，方向，大小
+    // 颜色
+    glyph->SetColorModeToColorByScalar();           // 颜色由标量决定
+    // 大小
+    glyph->SetScaleModeToScaleByVector();           // 大小由向量决定
+    // 方向
+    glyph->SetVectorModeToUseVector();              // 方向由向量决定
+    glyph->Update();
 
-    // add scalar for colors
-    // 标量可以控制箭头的大小以及颜色
-    vtkSmartPointer<vtkFloatArray> scalars = vtkSmartPointer<vtkFloatArray>::New();
-    scalars->InsertTuple1(0, 1);
-    scalars->InsertTuple1(1, 2);
-    scalars->InsertTuple1(2, 3);
-    scalars->InsertTuple1(3, 4);
-
-    //polydata->GetPointData()->SetScalars(scalars);
-
-    // color map
-    vtkNew<vtkLookupTable> pColorTable;
-    pColorTable->SetNumberOfColors(10);
-    //pColorTable->SetHueRange(.0, .67);
-    pColorTable->Build();
-
-    vtkNew<vtkNamedColors> colors;
-
-    // Create anything you want here, we will use a cube/arrow for the demo.
-    vtkNew<vtkCubeSource> cubeSource;
-    vtkNew<vtkArrowSource> arrowSource;
-    arrowSource->SetShaftRadius(0.01);
-    arrowSource->SetTipRadius(0.05);
-    arrowSource->SetTipLength(0.2);
-
-    vtkNew<vtkGlyph3D> glyph3D;
-    //glyph3D->SetSourceConnection(cubeSource->GetOutputPort());
-    glyph3D->SetSourceConnection(arrowSource->GetOutputPort());
-
-    auto mode = glyph3D->GetColorModeAsString();
-    //glyph3D->SetColorModeToColorByScale();    // 颜色使用标量控制（类似云图颜色映射）
-    glyph3D->SetColorModeToColorByVector();    // 使用向量映射颜色（不再需要设置scalerRange）
-    glyph3D->SetScaleModeToDataScalingOff();   // 关闭由于数据（标量或向量）导致的缩放
-    //glyph3D->SetScaleModeToScaleByVectorComponents();
-    //glyph3D->SetInputArrayToProcess()
-
-    glyph3D->SetVectorModeToUseVector();  // 使用向量设置方向
-    //glyph3D->SetVectorModeToUseNormal();// 使用法线设置方向
-    glyph3D->SetInputData(polydata);
-    //glyph3D->SetInputConnection()
-    auto scale = glyph3D->GetScaleFactor();
-    //glyph3D->SetScaleFactor(2.0);  //设置缩放比例，默认为1
-    glyph3D->Update();
-
-    // Visualize
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputConnection(glyph3D->GetOutputPort());
-    // 使用可视化管线
-    //auto connect = mapper->GetInputConnection(0, 0);
-    //if (glyph3D->GetOutputPort() == connect)
-    //    std::cout << "same";
-
-    //mapper->SetInputData(glyph3D->GetOutput());
-    //mapper->SetScalarRange(1, 4);
-
-    //mapper->SetColorModeToDirectScalars();
-    //mapper->SetColorModeToDefault();
-    mapper->SetLookupTable(pColorTable);
-
-    // 如果添加的是向量，获取的范围就是向量的【模长】最大最小值
-    auto range = mapper->GetInput()->GetScalarRange();
-    mapper->SetScalarRange(range);
-
-
-
-    vtkNew<vtkActor> actor;
-    actor->SetMapper(mapper);
-    mapper->ScalarVisibilityOff();
-    actor->GetProperty()->SetColor(1, 0, 0);
+    // mapper
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetLookupTable(colorTable);
+    mapper->SetScalarRange(colorTable->GetRange());
+    mapper->SetInputConnection(glyph->GetOutputPort());
     mapper->ScalarVisibilityOn();
 
-    // 从经过vtkAlgorithm变换后的数据获取源数据（注意使用的是独立数据集还是管道连接方式）
-    vtkSmartPointer<vtkAlgorithm> algorithm = actor->GetMapper()->GetInputConnection(0, 0)->GetProducer();
-    auto reference = dynamic_cast<vtkGlyph2D*>(algorithm.GetPointer()); // 如果没有经过algorithm变换，reference为nullptr
-    //auto originSource = vtkPolyData::SafeDownCast(reference->GetInput());
-    //auto originPointNum = originSource->GetNumberOfPoints(); // 源数据共有四个顶点
-
+    // actor
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
 
     vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(legendActor);
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+
     vtkNew<vtkRenderWindow> renderWindow;
     renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
     vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
-    renderer->AddActor(actor);
-    renderer->SetBackground(colors->GetColor3d("SlateGray").GetData());
+    vtkNew<CustomStyle> style;
+    style->SetActor(actor);
+    style->SetMapper(mapper);
+    renderWindowInteractor->SetInteractorStyle(style);
 
-    renderWindow->SetWindowName("Glyph3D");
+    renderWindow->SetWindowName("vector");
     renderWindow->Render();
     renderWindowInteractor->Start();
 
     return EXIT_SUCCESS;
 }
 
-#endif // TEST8
+#endif // TEST307
 
-#ifdef TEST36
 
-// 01_02_TEST17
+
+
+
+#ifdef TEST21
+
+// https://kitware.github.io/vtk-examples/site/Cxx/Points/NormalEstimation/
+
+#include <vtkArrowSource.h>
+#include <vtkCamera.h>
+#include <vtkGlyph3D.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPCANormalEstimation.h>
+#include <vtkPointSource.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+#include <vtkLineSource.h>
+
+#include <vtkPolyDataNormals.h>
+
+namespace {
+    void MakeGlyphs(vtkPolyData* src, double size, vtkGlyph3D* glyph);
+}
+
+int main(int, char* [])
+{
+    double radius = 1.0;
+    vtkNew<vtkPointSource> points;
+    points->SetNumberOfPoints(1000);
+    points->SetRadius(radius);
+    points->SetCenter(0.0, 0.0, 0.0);
+    points->SetDistributionToShell();
+
+    double p0[3] = { 1.0, 0.0, 0.0 };
+    double p1[3] = { 0.0, 1.0, 0.0 };
+
+    vtkNew<vtkLineSource> lineSource;
+    lineSource->SetPoint1(p0);
+    lineSource->SetPoint2(p1);
+
+    vtkNew<vtkPolyDataNormals> nor;
+
+    int sampleSize = 10;
+    vtkNew<vtkPCANormalEstimation> normals;
+    normals->SetInputConnection(points->GetOutputPort());
+    normals->SetSampleSize(sampleSize);
+    normals->SetNormalOrientationToGraphTraversal();
+    normals->Update();
+
+    vtkNew<vtkNamedColors> colors;
+
+    vtkNew<vtkGlyph3D> glyph3D;
+    MakeGlyphs(normals->GetOutput(), radius * 0.2, glyph3D.GetPointer());
+
+    vtkNew<vtkPolyDataMapper> glyph3DMapper;
+    glyph3DMapper->SetInputConnection(glyph3D->GetOutputPort());
+
+    vtkNew<vtkActor> glyph3DActor;
+    glyph3DActor->SetMapper(glyph3DMapper);
+    glyph3DActor->GetProperty()->SetDiffuseColor(
+        colors->GetColor3d("Banana").GetData());
+
+    vtkNew<vtkSphereSource> sphere;
+    sphere->SetRadius(1.0);
+    sphere->SetThetaResolution(41);
+    sphere->SetPhiResolution(21);
+
+    vtkNew<vtkPolyDataMapper> sphereMapper;
+    sphereMapper->SetInputConnection(sphere->GetOutputPort());
+
+    vtkNew<vtkActor> sphereActor;
+    sphereActor->SetMapper(sphereMapper);
+    sphereActor->GetProperty()->SetDiffuseColor(
+        colors->GetColor3d("Tomato").GetData());
+
+    // Create graphics stuff
+    //
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(colors->GetColor3d("SlateGray").GetData());
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(640, 480);
+    renderWindow->SetWindowName("NormalEstimation");
+
+    vtkNew<vtkRenderWindowInteractor> interactor;
+    interactor->SetRenderWindow(renderWindow);
+
+    // Add the actors to the renderer, set the background and size
+    //
+    renderer->AddActor(glyph3DActor);
+    renderer->AddActor(sphereActor);
+
+    // Generate an interesting view
+    //
+    renderer->ResetCamera();
+    renderer->GetActiveCamera()->Azimuth(0);
+    renderer->GetActiveCamera()->Elevation(30);
+    renderer->GetActiveCamera()->Dolly(1.0);
+    renderer->ResetCameraClippingRange();
+
+    renderWindow->Render();
+    interactor->Initialize();
+    interactor->Start();
+
+    return EXIT_SUCCESS;
+}
+namespace {
+    void MakeGlyphs(vtkPolyData* src, double size, vtkGlyph3D* glyph)
+    {
+        // Source for the glyph filter
+        vtkNew<vtkArrowSource> arrow;
+        arrow->SetTipResolution(16);
+        arrow->SetTipLength(0.3);
+        arrow->SetTipRadius(0.1);
+
+        glyph->SetSourceConnection(arrow->GetOutputPort());
+        glyph->SetInputData(src);
+        glyph->SetVectorModeToUseNormal();
+        glyph->SetScaleModeToScaleByVector();
+        glyph->SetScaleFactor(size);
+        glyph->OrientOn();
+        glyph->Update();
+    }
+} // namespace
+
+#endif // TEST21
+
+#ifdef TEST10
+
+// 01_02 TEST17
 
 #include <vtkArrowSource.h>
 
@@ -2845,155 +3066,529 @@ int main(int, char* [])
 #include <vtkVector.h>
 #include <vtkCleanPolyData.h>
 #include <vtkAlgorithmOutput.h>
+#include <vtkPolyDataNormals.h>
+#include <vtkCellData.h>
+#include <vtkCellCenters.h>
+#include <vtkTransform.h>
 
-std::vector<float> vecPoints{
-    // ===1===
-    //0.0, 0.0, 0.0,
-    //1.0, 1.0, 0.0,
-    //1.0, 0.0, 0.0,
-    //0.0, 1.0, 0.0,
-
-    // ===2===
-    100,200,100,
-    500,200,100,
-    0,0,0,
-    0.1,0.001,100,
-};
-
-std::vector<float> vecScalars{
-    1.0f,
-    2.0f,
-    3.0f,
-    4.0f,
-};
-std::vector<float> vecNormals{
-    1.0, 0.0, 0.0,
-    0.0, 1.0, 0.0,
-    1.0, 1.0, 1.0,
-    0.0, 0.0, 0.0,
-};
-std::vector<float> vecVectors{
-    1.0, 0.0, 0.0,
-    0.0, 1.0, 0.0,
-    1.0, 1.0, 1.0,
-    0.0, 0.0, 1.0,
-};
+#include <array>
 
 int main(int, char* [])
 {
-    vtkNew<vtkPoints> points;
-    for (size_t i = 0; i < vecPoints.size(); i += 3)
+    // Points
+    vtkNew<vtkPoints> points1;
+    points1->InsertNextPoint(0.0, 0.0, 0.0);
+    points1->InsertNextPoint(0.0, 1.0, 0.0);
+    points1->InsertNextPoint(0.0, 2.0, 0.0);
+    points1->InsertNextPoint(0.0, 3.0, 0.0);
+
+    vtkNew<vtkPoints> points2;
+    points2->InsertNextPoint(2.0, 0.0, 0.0);
+    points2->InsertNextPoint(2.0, 1.0, 0.0);
+    points2->InsertNextPoint(2.0, 2.0, 0.0);
+    points2->InsertNextPoint(2.0, 3.0, 0.0);
+
+    vtkNew<vtkPoints> points3;
+    points3->InsertNextPoint(4.0, 3.0, 0.0);
+    points3->InsertNextPoint(4.0, 2.0, 0.0);
+    points3->InsertNextPoint(4.0, 1.0, 0.0);
+    points3->InsertNextPoint(4.0, 0.0, 0.0);
+
+    //vtkNew<vtkPoints> points4;
+    //points4->InsertNextPoint(0.0, 4.0, 0.0);
+    //points4->InsertNextPoint(1.0, 5.0, 0.0);
+    //points4->InsertNextPoint(2.0, 6.0, 0.0);
+    //points4->InsertNextPoint(3.0, 7.0, 0.0);
+
+    vtkNew<vtkPoints> points4;
+    points4->InsertNextPoint(6.0, 3.0, 0.0);
+    points4->InsertNextPoint(6.0, 2.0, 0.0);
+    points4->InsertNextPoint(6.0, 1.0, 0.0);
+    points4->InsertNextPoint(6.0, 0.0, 0.0);
+
+    // Cell : shared index data
+    vtkNew<vtkCellArray> lines;
+    lines->InsertNextCell({ 0,1 });
+    lines->InsertNextCell({ 1,2 });
+    lines->InsertNextCell({ 2,3 });
+
+    // PolyData Mapper Actor
+    vtkNew<vtkPolyData> poly1;
+    poly1->SetPoints(points1);
+    poly1->SetLines(lines);
+    vtkNew<vtkPolyDataMapper> mapper1;
+    mapper1->SetInputData(poly1);
+    vtkNew<vtkActor> actor1;
+    actor1->SetMapper(mapper1);
+
+    vtkNew<vtkPolyData> poly2;
+    poly2->SetPoints(points2);
+    poly2->SetLines(lines);
+    vtkNew<vtkPolyDataMapper> mapper2;
+    mapper2->SetInputData(poly2);
+    vtkNew<vtkActor> actor2;
+    actor2->SetMapper(mapper2);
+
+    vtkNew<vtkPolyData> poly3;
+    poly3->SetPoints(points3);
+    poly3->SetLines(lines);
+    vtkNew<vtkPolyDataMapper> mapper3;
+    mapper3->SetInputData(poly3);
+    vtkNew<vtkActor> actor3;
+    actor3->SetMapper(mapper3);
+
+    vtkNew<vtkPolyData> poly4;
+    poly4->SetPoints(points4);
+    poly4->SetLines(lines);
+    vtkNew<vtkPolyDataMapper> mapper4;
+    mapper4->SetInputData(poly4);
+    vtkNew<vtkActor> actor4;
+    actor4->SetMapper(mapper4);
+
+    // Arrow
+    vtkNew<vtkActor> glyphActor1;
     {
-        points->InsertNextPoint(vecPoints[i], vecPoints[i + 1], vecPoints[i + 2]);
+        vtkNew<vtkFloatArray> centerVectors;
+        centerVectors->SetNumberOfComponents(3);
+
+        double dir = -1.0;
+
+        for (size_t i = 1; i < static_cast<size_t>(poly1->GetNumberOfPoints()); ++i)
+        {
+            std::array<double, 2>  startPoint = { poly1->GetPoint(i - 1)[0],poly1->GetPoint(i - 1)[1] };
+            std::array<double, 2>  endPoint = { poly1->GetPoint(i)[0],poly1->GetPoint(i)[1] };
+
+            //线段的方向
+            std::array<double, 2> lineVector = { endPoint[0] - startPoint[0],endPoint[1] - startPoint[1] };
+
+            // 如果平行于y轴
+            if (std::abs(lineVector[0] - 0.0) < 1e-6 && std::abs(lineVector[1] - 0.0) > 1e-6)
+            {
+                centerVectors->InsertNextTuple3(dir, 0.0, 0.0);
+                continue;
+            }
+
+            // 如果平行于x轴
+            if (std::abs(lineVector[0] - 0.0) > 1e-6 && std::abs(lineVector[1] - 0.0) < 1e-6)
+            {
+                centerVectors->InsertNextTuple3(0.0, dir, 0.0);
+                continue;
+            }
+
+            centerVectors->InsertNextTuple3(dir, -dir * (lineVector[0] / lineVector[1]), 0.0);
+        }
+
+        vtkNew<vtkCellCenters> cellCenters;
+        cellCenters->SetInputData(poly1);
+        cellCenters->Update(); // 必须在调用SetVectors之前Update
+
+        cellCenters->GetOutput()->GetPointData()->SetVectors(centerVectors);
+        cellCenters->Update();
+
+        vtkNew<vtkArrowSource> arrow;
+        arrow->Update();
+
+        vtkNew<vtkGlyph3D> glyph;
+        glyph->SetInputData(cellCenters->GetOutput());
+        glyph->SetSourceConnection(arrow->GetOutputPort());
+        glyph->SetVectorModeToUseVector();
+        glyph->Update();
+
+        vtkNew<vtkPolyDataMapper> glyphMapper;
+        glyphMapper->SetInputConnection(glyph->GetOutputPort());
+        glyphActor1->SetMapper(glyphMapper);
     }
 
-    // Add the points to a polydata
-    vtkNew<vtkPolyData> polydata;
-    polydata->SetPoints(points);
-    auto bounds = polydata->GetBounds(); // 返回polyData在xyz上的范围
-    auto length = polydata->GetLength(); // 返回包围盒对角线的长度
-    std::cout << "bounds:\t" << bounds[0] << '\t' << bounds[1] << '\t' << bounds[2] << '\t' << bounds[3]
-        << '\t' << bounds[4] << '\t' << bounds[5] << "\tlength:\t" << length << '\n';
-
-    vtkNew<vtkFloatArray> scalars;
-    vtkNew<vtkFloatArray> vectors;
-    vtkNew<vtkFloatArray> normals;
-    vectors->SetNumberOfComponents(3);
-    normals->SetNumberOfComponents(3);
-
-    for (size_t i = 0; i < vecScalars.size(); i++)
+    vtkNew<vtkActor> glyphActor2;
     {
-        scalars->InsertNextValue(vecScalars[i]);
+        vtkNew<vtkFloatArray> centerVectors;
+        centerVectors->SetNumberOfComponents(3);
+
+        double dir = 1.0;
+
+        for (size_t i = 1; i < static_cast<size_t>(poly2->GetNumberOfPoints()); ++i)
+        {
+            std::array<double, 2>  startPoint = { poly2->GetPoint(i - 1)[0],poly2->GetPoint(i - 1)[1] };
+            std::array<double, 2>  endPoint = { poly2->GetPoint(i)[0],poly2->GetPoint(i)[1] };
+
+            //线段的方向
+            std::array<double, 2> lineVector = { endPoint[0] - startPoint[0],endPoint[1] - startPoint[1] };
+
+            // 如果平行于y轴
+            if (std::abs(lineVector[0] - 0.0) < 1e-6 && std::abs(lineVector[1] - 0.0) > 1e-6)
+            {
+                centerVectors->InsertNextTuple3(dir, 0.0, 0.0);
+                continue;
+            }
+
+            // 如果平行于x轴
+            if (std::abs(lineVector[0] - 0.0) > 1e-6 && std::abs(lineVector[1] - 0.0) < 1e-6)
+            {
+                centerVectors->InsertNextTuple3(0.0, dir, 0.0);
+                continue;
+            }
+
+            centerVectors->InsertNextTuple3(dir, -dir * (lineVector[0] / lineVector[1]), 0.0);
+        }
+
+        vtkNew<vtkCellCenters> cellCenters;
+        cellCenters->SetInputData(poly2);
+        cellCenters->Update(); // 必须在调用SetVectors之前Update
+        cellCenters->GetOutput()->GetPointData()->SetVectors(centerVectors);
+
+        vtkNew<vtkArrowSource> arrow;
+        arrow->SetInvert(true);  // 将箭头的起始端和末端翻转
+        arrow->Update();
+
+        vtkNew<vtkTransform> transform;
+        transform->RotateZ(180);
+        transform->Update();
+
+        vtkNew<vtkGlyph3D> glyph;
+        glyph->SetInputConnection(cellCenters->GetOutputPort());
+        glyph->SetSourceData(arrow->GetOutput());
+        glyph->SetVectorModeToUseVector();
+        //glyph->SetSourceTransform(transform);
+        glyph->Update();
+
+        vtkNew<vtkPolyDataMapper> glyphMapper;
+        glyphMapper->SetInputConnection(glyph->GetOutputPort());
+        glyphActor2->SetMapper(glyphMapper);
     }
-    for (size_t i = 0; i < vecVectors.size(); i += 3)
+
+    vtkNew<vtkActor> glyphActor3;
     {
-        vectors->InsertNextTuple3(vecVectors[i], vecVectors[i + 1], vecVectors[i + 2]);
+        vtkNew<vtkFloatArray> centerVectors;
+        centerVectors->SetNumberOfComponents(3);
+
+        double dir = -1.0;
+
+        for (size_t i = 1; i < static_cast<size_t>(poly3->GetNumberOfPoints()); ++i)
+        {
+            std::array<double, 2>  startPoint = { poly3->GetPoint(i - 1)[0],poly3->GetPoint(i - 1)[1] };
+            std::array<double, 2>  endPoint = { poly3->GetPoint(i)[0],poly3->GetPoint(i)[1] };
+
+            //线段的方向
+            std::array<double, 2> lineVector = { endPoint[0] - startPoint[0],endPoint[1] - startPoint[1] };
+
+            // 如果平行于y轴
+            if (std::abs(lineVector[0] - 0.0) < 1e-6 && std::abs(lineVector[1] - 0.0) > 1e-6)
+            {
+                centerVectors->InsertNextTuple3(dir, 0.0, 0.0);
+                continue;
+            }
+
+            // 如果平行于x轴
+            if (std::abs(lineVector[0] - 0.0) > 1e-6 && std::abs(lineVector[1] - 0.0) < 1e-6)
+            {
+                centerVectors->InsertNextTuple3(0.0, dir, 0.0);
+                continue;
+            }
+
+            centerVectors->InsertNextTuple3(dir, -dir * (lineVector[0] / lineVector[1]), 0.0);
+        }
+
+        vtkNew<vtkCellCenters> cellCenters;
+        cellCenters->SetInputData(poly3);
+        cellCenters->Update(); // 必须在调用SetVectors之前Update
+        cellCenters->GetOutput()->GetPointData()->SetVectors(centerVectors);
+
+        vtkNew<vtkArrowSource> arrow;
+        arrow->Update();
+
+        vtkNew<vtkGlyph3D> glyph;
+        glyph->SetInputConnection(cellCenters->GetOutputPort());
+        glyph->SetSourceConnection(arrow->GetOutputPort());
+        glyph->SetVectorModeToUseVector();
+        //glyph->OrientOff();  关闭箭头和输入的向量方向相同
+        glyph->Update();
+
+        vtkNew<vtkPolyDataMapper> glyphMapper;
+        glyphMapper->SetInputConnection(glyph->GetOutputPort());
+        glyphActor3->SetMapper(glyphMapper);
     }
-    for (size_t i = 0; i < vecNormals.size(); i += 3)
+
+    vtkNew<vtkActor> glyphActor4;
     {
-        normals->InsertNextTuple3(vecNormals[i], vecNormals[i + 1], vecNormals[i + 2]);
+        vtkNew<vtkFloatArray> centerVectors;
+        centerVectors->SetNumberOfComponents(3);
+
+        double dir = -1.0;
+
+        for (size_t i = 1; i < static_cast<size_t>(poly4->GetNumberOfPoints()); ++i)
+        {
+            std::array<double, 2>  startPoint = { poly4->GetPoint(i - 1)[0],poly4->GetPoint(i - 1)[1] };
+            std::array<double, 2>  endPoint = { poly4->GetPoint(i)[0],poly4->GetPoint(i)[1] };
+
+            //线段的方向
+            std::array<double, 2> lineVector = { endPoint[0] - startPoint[0],endPoint[1] - startPoint[1] };
+
+            // 如果平行于y轴
+            if (std::abs(lineVector[0] - 0.0) < 1e-6 && std::abs(lineVector[1] - 0.0) > 1e-6)
+            {
+                centerVectors->InsertNextTuple3(dir, 0.0, 0.0);
+                continue;
+            }
+
+            // 如果平行于x轴
+            if (std::abs(lineVector[0] - 0.0) > 1e-6 && std::abs(lineVector[1] - 0.0) < 1e-6)
+            {
+                centerVectors->InsertNextTuple3(0.0, dir, 0.0);
+                continue;
+            }
+
+            centerVectors->InsertNextTuple3(dir, -dir * (lineVector[0] / lineVector[1]), 0.0);
+        }
+
+        vtkNew<vtkCellCenters> cellCenters;
+        cellCenters->SetInputData(poly4);
+        cellCenters->Update(); // 必须在调用SetVectors之前Update
+        cellCenters->GetOutput()->GetPointData()->SetVectors(centerVectors);
+
+        vtkNew<vtkArrowSource> arrow;
+        arrow->Update();
+
+        vtkNew<vtkGlyph3D> glyph;
+        glyph->SetInputConnection(cellCenters->GetOutputPort());
+        glyph->SetSourceConnection(arrow->GetOutputPort());
+        glyph->SetVectorModeToUseVector();
+        //glyph->OrientOff();  关闭箭头和输入的向量方向相同
+        glyph->Update();
+
+        vtkNew<vtkPolyDataMapper> glyphMapper;
+        glyphMapper->SetInputConnection(glyph->GetOutputPort());
+        glyphActor4->SetMapper(glyphMapper);
     }
 
-    polydata->GetPointData()->SetScalars(scalars); // 标量可以控制箭头的大小以及颜色
-    polydata->GetPointData()->SetNormals(normals); // 法线可以控制方向
-    polydata->GetPointData()->SetVectors(vectors); // 向量可以控制箭头的颜色，方向，大小
-
-    vtkNew<vtkArrowSource> arrowSource;
-    arrowSource->SetShaftRadius(0.01);
-    arrowSource->SetTipRadius(0.05);
-    arrowSource->SetTipLength(0.2);
-
-    vtkNew<vtkGlyph2D> glyph3D;
-    glyph3D->SetSourceConnection(arrowSource->GetOutputPort());
-    auto colorMode = glyph3D->GetColorModeAsString();    // "ColorByScale"
-    auto scaleMode = glyph3D->GetScaleModeAsString();    // "ScaleByScalar"
-    auto vectorMode = glyph3D->GetVectorModeAsString();  // "UseVector"
-    auto scaleFactor = glyph3D->GetScaleFactor();        // 1.0
-    std::cout << "Befor mode:\t" << colorMode << '\t' << scaleMode << '\t' << vectorMode << '\t' << scaleFactor << '\n';
-
-    // 比例（大小）
-    //glyph3D->SetScaleModeToDataScalingOff(); // 关闭由于数据（标量或向量）导致的缩放
-    //glyph3D->SetScaleModeToScaleByScalar();  // 使用标量数据设置箭头的大小
-    //glyph3D->SetScaleModeToScaleByVector();   // 使用向量的长度设置箭头的大小
-    //glyph3D->SetScaleModeToScaleByVectorComponents();
-
-    // 颜色
-    //glyph3D->SetColorModeToColorByScalar();
-    //glyph3D->SetColorModeToColorByVector(); // 使用向量映射颜色（不再需要设置scalerRange）
-    //glyph3D->SetColorModeToColorByScale();  // 使用标量控制颜色（类似云图颜色映射）
-
-    // 方向
-    //glyph3D->SetVectorModeToVectorRotationOff();     // 关闭法线和向量导致的方向更改
-    //glyph3D->SetVectorModeToUseNormal();             // 使用法线设置方向
-    //glyph3D->SetVectorModeToUseVector();             // 使用向量设置方向
-    //glyph3D->SetVectorModeToFollowCameraDirection();
-
-    // 比例因子（控制大小）,包围盒长度会影响箭头大小，所以比例因子应该根据包围盒长度动态设置
-    // 上面的比例，颜色，方向全部注释，顶点使用第二组数据，比例因子过小就不能显示
-    //glyph3D->SetScaleFactor(.5); // 设置缩放比例，默认为1
-    glyph3D->SetScaleFactor(length);
-
-    glyph3D->SetInputData(polydata);
-    glyph3D->Update();
-
-    auto colorMode1 = glyph3D->GetColorModeAsString();    // "ColorByScale"
-    auto scaleMode1 = glyph3D->GetScaleModeAsString();    // "ScaleByScalar"
-    auto vectorMode1 = glyph3D->GetVectorModeAsString();  // "UseVector"
-    auto scaleFactor1 = glyph3D->GetScaleFactor();        // 1.0
-    std::cout << "After mode:\t" << colorMode1 << '\t' << scaleMode1 << '\t' << vectorMode1 << '\t' << scaleFactor1 << '\n';
-
-    // color map
-    vtkNew<vtkLookupTable> pColorTable;
-    pColorTable->SetNumberOfColors(10);
-    pColorTable->SetHueRange(.0, .67);
-    pColorTable->Build();
-
-    // Visualize
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputConnection(glyph3D->GetOutputPort());
-    mapper->SetLookupTable(pColorTable);
-    // 如果添加的是向量，获取的范围就是向量的【模长】最大最小值
-    auto range = mapper->GetInput()->GetScalarRange();
-    mapper->SetScalarRange(range);
-
-    vtkNew<vtkActor> actor;
-    actor->SetMapper(mapper);
-
+    // Renderer
     vtkNew<vtkRenderer> renderer;
-    renderer->ResetCamera();
+    renderer->AddActor(actor1);
+    renderer->AddActor(actor2);
+    renderer->AddActor(actor3);
+    renderer->AddActor(actor4);
+
+    renderer->AddActor(glyphActor1);
+    renderer->AddActor(glyphActor2);
+    renderer->AddActor(glyphActor3);
+    renderer->AddActor(glyphActor4);
+
+    // Window
     vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
     renderWindow->AddRenderer(renderer);
     vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
-    renderer->AddActor(actor);
     renderer->SetBackground(.1, .2, .3);
-
-    renderWindow->SetWindowName("Glyph3D");
     renderWindow->Render();
     renderWindowInteractor->Start();
 
     return EXIT_SUCCESS;
 }
 
-#endif // TEST36
+#endif // TEST10
+
+#ifdef TEST40
+
+#include <vtkActor.h>
+#include <vtkFloatArray.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkSmartPointer.h>
+#include <vtkSTLReader.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkCellData.h>
+#include <vtkProperty.h>
+#include <vtkCellDataToPointData.h>
+#include <vtkDataSetMapper.h>
+#include <vtkContourFilter.h>
+
+int main(int, char* [])
+{
+    // 顶点
+    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+    for (size_t i = 0; i < 10; i++)
+    {
+        points->InsertNextPoint(i, 0, 0);
+        points->InsertNextPoint(i + 1, 1, 0);
+        points->InsertNextPoint(i, 2, 0);
+        points->InsertNextPoint(i + 1, 3, 0);
+    }
+
+    // 拓扑
+    vtkSmartPointer<vtkCellArray> cell_poly = vtkSmartPointer<vtkCellArray>::New();
+    for (long long i = 0; i < 33; i += 4)
+    {
+        cell_poly->InsertNextCell({ i,i + 1,i + 5,i + 4 });
+        cell_poly->InsertNextCell({ i + 1,i + 2,i + 6,i + 5 });
+        cell_poly->InsertNextCell({ i + 2,i + 3,i + 7,i + 6 });
+    }
+
+    // 标量
+    vtkSmartPointer<vtkFloatArray> scalars = vtkSmartPointer<vtkFloatArray>::New();
+    scalars->SetNumberOfValues(27);
+    for (int i = 0; i < 27; i++)
+    {
+        scalars->SetValue(i, i);
+    }
+
+    vtkSmartPointer<vtkPolyData> poly1 = vtkSmartPointer<vtkPolyData>::New();
+    poly1->SetPoints(points);
+    poly1->SetPolys(cell_poly);
+    poly1->GetCellData()->SetScalars(scalars);
+
+    // 单元标量数据转为顶点数据
+    vtkNew<vtkCellDataToPointData> cellToPoint;
+    cellToPoint->SetInputData(poly1);
+    cellToPoint->PassCellDataOff();
+    cellToPoint->Update(); //updata不能少
+
+    vtkNew<vtkContourFilter> contourFilter;
+    contourFilter->SetInputData(cellToPoint->GetOutput());
+    contourFilter->GenerateValues(50, 0, 26);
+    contourFilter->Update();
+
+    // 创建颜色查找表
+    vtkSmartPointer<vtkLookupTable> hueLut = vtkSmartPointer<vtkLookupTable>::New();
+    hueLut->SetHueRange(0.67, 0.0);            // 设定HSV颜色范围，色调H取值范围为0°～360°，从红色开始按逆时针方向计算，红色为0°/0.0，绿色为120°/0.34,蓝色为240°/0.67
+    hueLut->Build();
+
+    vtkSmartPointer<vtkDataSetMapper> mapper1 = vtkSmartPointer<vtkDataSetMapper>::New();
+    mapper1->SetInputData(cellToPoint->GetOutput());
+    mapper1->SetInputData(contourFilter->GetOutput());
+    mapper1->SetScalarRange(0, 26);            // 设置标量值的范围
+    mapper1->SetLookupTable(hueLut);
+
+    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
+    actor->SetMapper(mapper1);
+
+    vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
+
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+    renderWindow->AddRenderer(renderer);
+
+    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    vtkSmartPointer<vtkInteractorStyleTrackballCamera> style = vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderer->AddActor(actor);
+
+    renderWindow->SetSize(600, 600);
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST40
+
+#ifdef TEST42
+
+#include <vtkUnstructuredGridReader.h>
+#include <vtkUnstructuredGrid.h>
+#include <vtkPolyData.h>
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkCellCenters.h>
+#include <vtkGlyph3DMapper.h>
+#include <vtkNew.h>
+#include <vtkDataSetMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+
+#include <algorithm>
+#include <vector>
+
+int main(int argc, char* argv[])
+{
+    vtkNew<vtkUnstructuredGridReader> reader;
+    reader->SetFileName("elbow.vtk");
+    reader->Update();
+
+    // 获取三个方向的最大最小值
+    std::vector<double> bounds(6);
+    reader->GetOutput()->GetBounds(bounds.data());
+
+    // 获取三个方向的范围值
+    std::vector<double> range(3);
+    for (int i = 0; i < 3; ++i)
+    {
+        range[i] = bounds[2 * i + 1] - bounds[2 * i];
+    }
+
+    vtkNew<vtkCellCenters> centers;
+    centers->SetInputData(reader->GetOutput());
+    centers->Update();
+
+    // 对于vtkCellCenters过滤器，最后的输出只存在节点，不存在单元
+    // 获取单元中心的坐标值
+    // vtkPolyData* cellCenter = centers->GetOutput();
+    // for (vtkIdType pointIndex = 0; pointIndex < cellCenter->GetNumberOfPoints(); ++pointIndex)
+    // {
+    //     double pointCoord[3];
+    //     cellCenter->GetPoint(pointIndex, pointCoord);
+    //     std::cout << "单元 " << pointIndex << " 的中心的坐标为：" << std::endl
+    //               << "X : " << pointCoord[0] << std::endl
+    //               << "Y : " << pointCoord[1] << std::endl
+    //               << "Z : " << pointCoord[2] << std::endl;
+    // }
+
+    // 获取三个方向范围的最大值
+    double maxValue = *std::max_element(range.begin(), range.end());
+    double r = maxValue * 0.001;
+
+    // 用球体来表示单元中心
+    vtkNew<vtkSphereSource> sphere;
+    sphere->SetPhiResolution(11);
+    sphere->SetThetaResolution(11);
+    sphere->SetRadius(r);
+
+    vtkNew<vtkGlyph3DMapper> pointMapper;
+    pointMapper->SetInputConnection(centers->GetOutputPort());
+    // 以球的形式表现单元中心
+    pointMapper->SetSourceConnection(sphere->GetOutputPort());
+
+    vtkNew<vtkActor> pointActor;
+    pointActor->SetMapper(pointMapper);
+
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(reader->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetOpacity(0.5);
+    actor->GetProperty()->EdgeVisibilityOn(); // 边界线
+    actor->GetProperty()->SetInterpolationToFlat();
+
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderer->AddActor(actor);
+    renderer->AddActor(pointActor);
+
+    renderer->GradientBackgroundOn();
+    renderer->SetBackground(1, 1, 1);
+    renderer->SetBackground2(0.4, 0.55, 0.75);
+    renderer->ResetCamera();
+
+    renderWindow->Render();
+
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+#endif // TEST42
