@@ -8,7 +8,7 @@
 * 88.照相机属性，获取网格的最大最小边界，无限放大缩小
 */
 
-#define TEST6
+#define TEST7
 
 #ifdef TEST1
 
@@ -1316,7 +1316,7 @@ protected:
             this->Interactor->Render();
         }
 
-        Superclass::OnLeftButtonDown();
+        //Superclass::OnLeftButtonDown();
     }
 
     void OnMiddleButtonUp() override
@@ -1332,7 +1332,7 @@ protected:
             camera->SetClippingRange(-10, 1000);
         }
 
-        Superclass::OnMiddleButtonUp();
+        //Superclass::OnMiddleButtonUp();
     }
 
 
@@ -1419,9 +1419,10 @@ int main(int, char* [])
     //renderer->SetClippingRangeExpansion(1000);
     renderer->GetActiveCamera()->SetPosition(50, 50, 0);
     renderer->GetActiveCamera()->SetFocalPoint(0, 20, 0);
-    renderer->GetActiveCamera()->SetViewUp(1, 0, 0);
+    renderer->GetActiveCamera()->SetViewUp(1, 0.1, 0);
     //renderer->GetActiveCamera()->SetParallelScale(1.56921);
     //renderer->GetActiveCamera()->SetDistance(1.93185);
+
     //RenderWindow
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
@@ -1442,6 +1443,118 @@ int main(int, char* [])
 }
 
 #endif // TEST6
+
+#ifdef TEST7
+
+#include <vtkCubeSource.h>
+#include <vtkSmartPointer.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkLegendScaleActor.h>
+#include <vtkProperty.h>
+#include <vtkObjectFactory.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <iostream>
+
+class CustomStyle :
+    public vtkInteractorStyleRubberBand3D
+{
+public:
+    static CustomStyle* New();
+    vtkTypeMacro(CustomStyle, vtkInteractorStyleRubberBand3D);
+
+protected:
+    void OnChar() override
+    {
+        if (!this->Interactor || !this->CurrentRenderer)
+        {
+            return;
+        }
+
+        switch (this->Interactor->GetKeyCode())
+        {
+        case 'x':
+        case 'X':
+        {
+
+        }
+        break;
+        default:
+            break;
+        }
+
+        return Superclass::OnChar();
+    }
+
+    void OnLeftButtonDown() override
+    {
+        if (this->Interactor && this->GetCurrentRenderer())
+        {
+            auto renderer = this->GetCurrentRenderer();
+            auto camera = renderer->GetActiveCamera();
+            std::cout << "-----------------------------------------------\n";
+            camera->Print(std::cout);
+        }
+
+        Superclass::OnLeftButtonDown();
+    }
+};
+
+vtkStandardNewMacro(CustomStyle);
+
+
+int main(int, char* [])
+{
+    vtkNew<vtkCubeSource> cubeSource;
+    cubeSource->SetCenter(0, 0, 0);
+    cubeSource->SetXLength(10);
+    cubeSource->SetYLength(20);
+    cubeSource->SetZLength(30);
+    cubeSource->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(cubeSource->GetOutput());
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkLegendScaleActor> scale;
+    scale->BottomAxisVisibilityOff();//下面的比例尺不显示
+    scale->LeftAxisVisibilityOff();  //左边比例尺不显示
+    scale->RightAxisVisibilityOff();
+    scale->TopAxisVisibilityOff();
+
+    //renderer
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+    renderer->AddActor(actor);
+    renderer->AddActor(scale);
+    renderer->ResetCamera();
+    renderer->GetActiveCamera()->SetParallelProjection(true); // 平行投影
+
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<CustomStyle> style;
+    iren->SetInteractorStyle(style);
+
+    //数据交互
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST7
 
 #ifdef TEST88
 
