@@ -13,9 +13,9 @@
 * 304 vtkGlyph3DMapper 使用方法
 * 305 从vtkGlyph3D获取源数据 从经过vtkAlgorithm变换后的数据获取源数据
 * 306 矢量图标签大小的设置
-*
+* 307 开启关闭矢量图颜色映射
 
-* 8 矢量图颜色设置以及恢复
+
 * 21 官方例子，球面法向量  矢量图
 * 10 2D直线 vtkGlyph3D 矢量图箭头方向，箭头起始段末端翻转
 * 40 vtkCellDataToPointData 单元标量数据转顶点数据，等值线vtkContourFilter
@@ -23,7 +23,7 @@
 */
 
 
-#define TEST307
+#define TEST101
 
 #ifdef TEST100
 
@@ -2761,6 +2761,7 @@ protected:
     {
         if (this->Interactor && m_actor && m_mapper)
         {
+            std::cout << "visibility off\n";
             m_actor->GetProperty()->SetColor(1, 1, 1);
             m_mapper->ScalarVisibilityOff();
             this->Interactor->Render();
@@ -2783,6 +2784,7 @@ protected:
     {
         if (this->Interactor && m_actor && m_mapper)
         {
+            std::cout << "visibility on\n";
             m_mapper->ScalarVisibilityOn();
             this->Interactor->Render();
         }
@@ -2888,6 +2890,7 @@ int main(int, char* [])
     vtkNew<vtkRenderWindow> renderWindow;
     renderWindow->AddRenderer(renderer);
     renderWindow->SetSize(800, 600);
+    renderWindow->SetWindowName("vector");
 
     vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
     renderWindowInteractor->SetRenderWindow(renderWindow);
@@ -2897,7 +2900,6 @@ int main(int, char* [])
     style->SetMapper(mapper);
     renderWindowInteractor->SetInteractorStyle(style);
 
-    renderWindow->SetWindowName("vector");
     renderWindow->Render();
     renderWindowInteractor->Start();
 
