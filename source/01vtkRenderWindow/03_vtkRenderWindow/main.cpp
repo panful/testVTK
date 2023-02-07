@@ -44,11 +44,11 @@
 43 直线与图元的交点 vtkOBBTree  线与线的交点 IntersectWithLine
 44 
 45.图层设置，让某个mapper始终在最上层或最下层，或中间某一层
-46.vtkBillboardTextActor3D 鼠标旋转，文本始终朝向观察者，广告板
+46.45备份
 47.vtkSmartPointer指向的数据置空
 */
 
-#define TEST47
+#define TEST45
 
 #ifdef TEST1
 
@@ -5998,6 +5998,220 @@ int main(int, char* [])
 #include <iostream>
 #include <array>
 
+
+
+namespace
+{
+    vtkNew<vtkRenderer> renderer1;
+    vtkNew<vtkRenderer> renderer2;
+
+    class InteractorStyle : public vtkInteractorStyleTrackballCamera
+    {
+    public:
+        static InteractorStyle* New();
+        vtkTypeMacro(InteractorStyle, vtkInteractorStyleTrackballCamera);
+
+        void OnLeftButtonUp() override
+        {
+            Superclass::OnLeftButtonUp();
+
+            if (this->Interactor && this->CurrentRenderer)
+            {
+                // 多个图层拾取
+                if (0)
+                {
+                    auto eventPos = this->Interactor->GetEventPosition();
+
+                    vtkNew<vtkCoordinate> coord1;
+                    coord1->SetCoordinateSystemToDisplay();
+                    coord1->SetValue(static_cast<double>(eventPos[0]), static_cast<double>(eventPos[1]));
+                    //auto pickWorldPos = coord1->GetComputedWorldValue(renderer1);
+
+                    vtkNew<vtkPropPicker> picker;
+                    this->Interactor->SetPicker(picker);
+                    if (picker->Pick(eventPos[0], eventPos[1], 0., renderer1) != 0)
+                    {
+                        auto pickModelCoordPos = picker->GetPickPosition();
+
+                        vtkNew<vtkCoordinate> coord2;
+                        coord2->SetCoordinateSystemToWorld();
+                        coord2->SetValue(pickModelCoordPos);
+                        auto pickDisplayPos = coord1->GetComputedDisplayValue(renderer1);
+
+                        std::cout << "-----------------------------------------\n";
+                        std::cout << "mouse pos: " << eventPos[0] << ',' << eventPos[1] << '\n';
+                        //std::cout << "pick world pos: " << pickWorldPos[0] << ',' << pickWorldPos[1] << ',' << pickWorldPos[2] << '\n';
+                        std::cout << "pick modelcoord pos: " << pickModelCoordPos[0] << ',' << pickModelCoordPos[1] << ',' << pickModelCoordPos[2] << '\n';
+                        std::cout << "pick display pos: " << pickDisplayPos[0] << ',' << pickDisplayPos[1] << ',' << pickDisplayPos[2] << '\n';
+
+                        //vtkNew<vtkCoordinate> coord3;
+                        //coord3->SetCoordinateSystemToDisplay();
+                        //coord3->SetValue(static_cast<double>(pickDisplayPos[0]), static_cast<double>(pickDisplayPos[1]));
+                        //auto renderer2Pos = coord1->GetComputedWorldValue(renderer2);
+
+                        //vtkNew< vtkRegularPolygonSource> circle;
+                        //circle->GeneratePolygonOn();
+                        //circle->SetNumberOfSides(30);
+                        //circle->SetRadius(.1);
+                        //circle->SetCenter(renderer2Pos);
+                        //vtkNew<vtkPolyDataMapper> mapper;
+                        //mapper->SetInputConnection(circle->GetOutputPort());
+                        //vtkNew<vtkActor> actor;
+                        //actor->SetMapper(mapper);
+                        //actor->GetProperty()->SetColor(0, 0, 1);
+
+                        //renderer2->AddActor(actor);
+
+                        //this->Interactor->Render();
+                    }
+                }
+                //
+                if (1)
+                {
+                    if (this->CurrentRenderer == renderer1)
+                    {
+                        std::cout << "renderer 1\n";
+                    }
+                    else if (this->CurrentRenderer == renderer2)
+                    {
+                        std::cout << "renderer 2\n";
+                    }
+                }
+            }
+        }
+        void OnMouseMove()override
+        {
+            Superclass::OnMouseMove();
+        }
+    };
+
+    vtkStandardNewMacro(InteractorStyle);
+}
+
+int main()
+{
+    {
+        std::array<float, 3 * 3> vertices{
+            -1,-1,0,
+            0,1,0,
+            1,-1,0
+        };
+
+        vtkNew<vtkPoints> points;
+        for (size_t i = 0; i < vertices.size(); i += 3)
+        {
+            points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+        }
+
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0,1,2 });
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(1, 0, 0);
+        renderer1->AddActor(actor);
+    }
+
+    {
+        std::array<float, 3 * 3> vertices{
+            0,-1,0,
+            1,1,0,
+            2,-1,0
+        };
+
+        vtkNew<vtkPoints> points;
+        for (size_t i = 0; i < vertices.size(); i += 3)
+        {
+            points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+        }
+
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0,1,2 });
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(0, 1, 0);
+        //renderer2->AddActor(actor);
+    }
+
+    renderer1->SetBackground(1, 1, 0);
+    renderer1->ResetCamera();
+    renderer1->SetLayer(0);
+
+    renderer2->SetBackground(0, 1, 1);
+    //renderer2->ResetCamera();
+    renderer2->SetLayer(1);
+
+    //renderer2->SetActiveCamera(renderer1->GetActiveCamera());
+    renderer2->GetActiveCamera()->SetPosition(0, 0, 100);
+    renderer2->GetActiveCamera()->SetFocalPoint(0, 0, 0);
+    renderer2->GetActiveCamera()->SetViewUp(0, 1, 0);
+
+    // 开启关闭交互
+    renderer1->InteractiveOff();
+    renderer2->InteractiveOn();
+    auto interactive = renderer2->GetInteractive();
+
+    // renderWindow可以添加多个vtkRenderer
+    // 每个vtkRenderer可以设置图层
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(600, 600);
+    renderWindow->SetNumberOfLayers(2);
+
+    // 如果当前有多个renderer都开起了交互
+    // 则鼠标交互响应的最后添加的renderer
+    // 如果当前只有一个renderer开启了交互
+    // 则鼠标交互响应的是开启交互的renderer
+    renderWindow->AddRenderer(renderer2);
+    renderWindow->AddRenderer(renderer1);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<InteractorStyle> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+
+#endif // TEST45
+
+#ifdef TEST46
+
+#include <iostream>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+#include <vtkActor.h>
+#include <vtkConeSource.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkSphereSource.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkProperty.h>
+#include <vtkCamera.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkCoordinate.h>
+#include <vtkPicker.h>
+#include <vtkPropPicker.h>
+#include <vtkRegularPolygonSource.h>
+
+#include <iostream>
+#include <array>
+
 //#define TEST_MAPPER // 使用Mapper设置图层效果
 
 #ifdef TEST_MAPPER
@@ -6243,285 +6457,6 @@ int main()
 #endif // TEST_MAPPER
 
 #endif // TEST45
-
-#ifdef TEST46
-
-#include <vtkActor.h>
-#include <vtkBillboardTextActor3D.h>
-#include <vtkCallbackCommand.h>
-#include <vtkNew.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkCubeSource.h>
-#include <vtkTextProperty.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-
-#include <vtkMatrix4x4.h>
-#include <vtkCamera.h>
-#include <vtkPerspectiveTransform.h>
-
-#include <iostream>
-#include "magic_enum.hpp"
-
-namespace
-{
-    enum class MyState
-    {
-        _VTKIS_ROTATE = 1,
-        _VTKIS_PAN,
-        _VTKIS_SPIN,
-        _VTKIS_DOLLY,
-        _VTKIS_ZOOM,
-        _VTKIS_USCALE,
-        _VTKIS_TIMER,
-        _VTKIS_FORWARDFLY,
-        _VTKIS_REVERSEFLY,
-        _VTKIS_TWO_POINTER,
-        _VTKIS_CLIP,
-        _VTKIS_PICK,
-        _VTKIS_LOAD_CAMERA_POSE,
-        _VTKIS_POSITION_PROP,
-        _VTKIS_EXIT,
-        _VTKIS_TOGGLE_DRAW_CONTROLS,
-        _VTKIS_MENU,
-        _VTKIS_GESTURE,
-        _VTKIS_ENV_ROTATE
-    };
-
-    vtkNew<vtkActor> actor;
-    vtkNew<vtkBillboardTextActor3D> textActor;
-
-    class InteractorStyle : public vtkInteractorStyleTrackballCamera
-    {
-    public:
-        static InteractorStyle* New();
-        vtkTypeMacro(InteractorStyle, vtkInteractorStyleTrackballCamera);
-
-        void OnLeftButtonUp() override
-        {
-            std::cout << "############################################\n";
-            if (this->Interactor)
-            {
-                if (0)
-                {
-                    textActor->Print(std::cout);
-
-                    auto actorPos = actor->GetPosition();
-                    auto textPos = textActor->GetPosition();
-                    std::cout << "cube Pos: " << actorPos[0] << ',' << actorPos[1] << ',' << actorPos[2] << '\n';
-                    std::cout << "text Pos: " << textPos[0] << ',' << textPos[1] << ',' << textPos[2] << '\n';
-
-                    std::cout << "--------------------------------\n";
-                    auto actorMat = actor->GetMatrix();
-                    auto textMat = textActor->GetMatrix();
-                    std::cout << "Cube: ";
-                    actorMat->Print(std::cout);
-                    std::cout << "Text: ";
-                    textMat->Print(std::cout);
-
-                    auto textUserMat = textActor->GetUserMatrix();
-                    if (textUserMat) textUserMat->Print(std::cout);
-                    auto cubeUserMat = actor->GetUserMatrix();
-                    if (cubeUserMat) cubeUserMat->Print(std::cout);
-                }
-                if (1)
-                {
-                    // 缩放矩阵，xyz都缩放为原来的0.5
-                    double scale[4][4]{
-                        0.5, 0.0, 0.0, 0.0,
-                        0.0, 0.5, 0.0, 0.0,
-                        0.0, 0.0, 0.5, 0.0,
-                        0.0, 0.0, 0.0, 1.0
-                    };
-                    // 平移矩阵，xy都平移0.5个单位
-                    double translation[16]{
-                        0.5, 0.0, 0.0, 0.5,
-                        0.0, 0.5, 0.0, 0.5,
-                        0.0, 0.0, 0.5, 0.0,
-                        0.0, 0.0, 0.0, 1.0
-                    };
-                    // 旋转矩阵
-                    double rotation[16]{
-                        0.5, 0.0, 0.0, 0.0,
-                        0.0, 0.5, 0.0, 0.0,
-                        0.0, 0.0, 0.5, 0.0,
-                        0.0, 0.0, 0.0, 1.0
-                    };
-
-                    vtkNew<vtkMatrix4x4> mat;
-                    for (size_t i = 0; i < 4; i++)
-                    {
-                        for (size_t j = 0; j < 4; j++)
-                        {
-                            mat->SetElement(i, j, scale[i][j]);
-                        }
-                    }
-
-                    actor->SetUserMatrix(mat);
-                }
-            }
-            Superclass::OnLeftButtonUp();
-        }
-        void OnMouseMove() override
-        {
-            auto name = magic_enum::enum_name(static_cast<MyState>(this->State));
-            if (name.length() > 0) std::cout << "State: " << name << '\n';
-
-            if (this->State == VTKIS_ROTATE)
-            {
-                auto rwi = this->Interactor;
-                int dx = rwi->GetEventPosition()[0] - rwi->GetLastEventPosition()[0];
-                int dy = rwi->GetEventPosition()[1] - rwi->GetLastEventPosition()[1];
-
-                const int* size = this->CurrentRenderer->GetRenderWindow()->GetSize();
-
-                double delta_elevation = -20.0 / size[1];
-                double delta_azimuth = -20.0 / size[0];
-
-                double rxf = dx * delta_azimuth * this->MotionFactor;
-                double ryf = dy * delta_elevation * this->MotionFactor;
-
-                vtkCamera* camera = this->CurrentRenderer->GetActiveCamera();
-                auto viewUp = camera->GetViewUp();          // 视图向上方向矢量
-                auto focalPoint = camera->GetFocalPoint();  // 焦点
-
-                actor->GetUserTransform();
-
-#if(0)
-                // Azimuth
-                {
-                    double newPosition[3];
-                    double* fp = camera->GetFocalPoint();
-                    camera->Transform->Identity();
-
-                    // translate the focal point to the origin,
-                    // rotate about view up,
-                    // translate back again
-                    camera->Transform->Translate(+fp[0], +fp[1], +fp[2]);
-                    camera->Transform->RotateWXYZ(angle, camera->ViewUp);
-                    camera->Transform->Translate(-fp[0], -fp[1], -fp[2]);
-
-                    // apply the transform to the position
-                    camera->Transform->TransformPoint(camera->Position, newPosition);
-                    camera->SetPosition(newPosition);
-                }
-
-                // Elevation
-                {
-                    double axis[3], newPosition[3], savedViewUp[3];
-                    double* fp = camera->GetFocalPoint();
-                    camera->Transform->Identity();
-
-                    // snatch the axis from the view transform matrix
-                    axis[0] = -camera->ViewTransform->GetMatrix()->GetElement(0, 0);
-                    axis[1] = -camera->ViewTransform->GetMatrix()->GetElement(0, 1);
-                    axis[2] = -camera->ViewTransform->GetMatrix()->GetElement(0, 2);
-
-                    // temporarily set the view up with the transformation applied
-                    // to avoid bad cross product computations during SetPosition call
-                    camera->GetViewUp(savedViewUp);
-                    camera->Transform->RotateWXYZ(angle, axis);
-                    camera->Transform->TransformPoint(camera->ViewUp, camera->ViewUp);
-                    camera->Transform->Identity();
-
-                    // translate the focal point to the origin,
-                    // rotate about axis,
-                    // translate back again
-                    camera->Transform->Translate(+fp[0], +fp[1], +fp[2]);
-                    camera->Transform->RotateWXYZ(angle, axis);
-                    camera->Transform->Translate(-fp[0], -fp[1], -fp[2]);
-
-                    // now transform position
-                    camera->Transform->TransformPoint(camera->Position, newPosition);
-                    camera->SetPosition(newPosition);
-
-                    // restore the previous ViewUp vector
-                    camera->ViewUp[0] = savedViewUp[0];
-                    camera->ViewUp[1] = savedViewUp[1];
-                    camera->ViewUp[2] = savedViewUp[2];
-                    // camera is needed since the last time Modified was called (in SetPosition),
-                    // the ViewUp was not same as savedViewUp. Since we're changing its value
-                    // here, we need to fire Modified event. We don't call `SetViewUp` since we
-                    // don't want the computation of the view transform to happen again.
-                    camera->Modified();
-                }
-#endif
-
-                // 围绕以焦点为中心的视图向上矢量旋转相机。结果是相机水平旋转。绕x轴（焦点为0,0,0)
-                camera->Azimuth(rxf);
-                // 用焦点作为旋转中心，围绕投影方向的负值和视图上方向向量的交叉积旋转相机。结果是场景的垂直旋转。绕y轴（焦点为0,0,0)
-                camera->Elevation(ryf);
-
-                camera->OrthogonalizeViewUp();
-
-                rwi->Render();
-
-                return;
-            }
-
-            Superclass::OnMouseMove();
-        }
-    };
-
-    vtkStandardNewMacro(InteractorStyle);
-}
-
-int main(int, char* [])
-{
-    // Create a renderer
-    vtkNew<vtkRenderer> renderer;
-    renderer->SetBackground(.1, .2, .3);
-    renderer->GetActiveCamera()->SetFocalPoint(0, 0, 0);
-    renderer->GetActiveCamera()->SetPosition(0, 0, 15);
-
-    // Create a render window
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("BillboardTextActor3D");
-
-    // Create an interactor
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-
-    vtkNew<InteractorStyle> style;
-    renderWindowInteractor->SetInteractorStyle(style);
-
-    // Create a sphere
-    vtkNew<vtkCubeSource> cubeSource;
-    cubeSource->SetCenter(0.0, 0.0, 0.0);
-    cubeSource->SetXLength(1);
-    cubeSource->SetYLength(2);
-    cubeSource->SetZLength(3);
-
-    // 立方体
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputConnection(cubeSource->GetOutputPort());
-    actor->SetMapper(mapper);
-    actor->SetPosition(0, 0, 0);
-    actor->GetProperty()->SetColor(1, 0, 0);
-
-    // 广告板
-    textActor->SetInput("Test Text");
-    textActor->SetPosition(3, 4, 5);
-    textActor->GetTextProperty()->SetFontSize(12);
-    textActor->GetTextProperty()->SetColor(1, 1, 0);
-    textActor->GetTextProperty()->SetJustificationToCentered();
-
-    renderer->AddActor(actor);
-    renderer->AddActor(textActor);
-
-    renderWindow->Render();
-    renderWindow->SetWindowName("BillboardTextActor3D");
-    renderWindowInteractor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST46
 
 #ifdef TEST47
 
