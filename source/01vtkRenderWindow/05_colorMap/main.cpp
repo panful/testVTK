@@ -19,11 +19,12 @@
 * 21 官方例子，球面法向量  矢量图
 * 10 2D直线 vtkGlyph3D 矢量图箭头方向，箭头起始段末端翻转
 * 40 vtkCellDataToPointData 单元标量数据转顶点数据，等值线vtkContourFilter
+* 41 vtkPointDataToCellData vtkCellCenters 顶点标量数据转单元数据
 * 42 vtkCellCenters 获取单元中心即格心，并用球体标注格心(矢量图）
 */
 
 
-#define TEST100
+#define TEST41
 
 #ifdef TEST100
 
@@ -1624,6 +1625,7 @@ namespace {
 
 #endif // TEST101
 
+//---------------------------------------------------
 
 #ifdef TEST200
 
@@ -1848,8 +1850,6 @@ int main()
 
 #endif // TEST202
 
-
-
 #ifdef TEST203
 //https://kitware.github.io/vtk-examples/site/Cxx/VisualizationAlgorithms/FilledContours/
 #include <vtkActor.h>
@@ -2013,6 +2013,8 @@ int main(int argc, char* argv[])
 }
 
 #endif // TEST203
+
+//---------------------------------------------------
 
 #ifdef TEST300
 
@@ -2908,7 +2910,7 @@ int main(int, char* [])
 
 #endif // TEST307
 
-
+//---------------------------------------------------
 
 
 
@@ -3491,6 +3493,265 @@ int main(int, char* [])
 }
 
 #endif // TEST40
+
+#ifdef TEST41
+
+#include <vtkActor.h>
+#include <vtkFloatArray.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkSmartPointer.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkCellData.h>
+#include <vtkProperty.h>
+#include <vtkPointDataToCellData.h>
+#include <vtkDataSetMapper.h>
+#include <vtkVariant.h>
+#include <vtkCellCenters.h>
+
+int main(int, char* [])
+{
+    // 顶点
+    vtkNew<vtkPoints> points;
+    for (size_t i = 0; i < 10; i++)
+    {
+        points->InsertNextPoint(i, 0, 0);
+        points->InsertNextPoint(i + 1, 1, 0);
+        points->InsertNextPoint(i, 2, 0);
+        points->InsertNextPoint(i + 1, 3, 0);
+    }
+
+    // 拓扑
+    vtkNew<vtkCellArray> cell_poly;
+    for (long long i = 0; i < 33; i += 4)
+    {
+        cell_poly->InsertNextCell({ i,i + 1,i + 5,i + 4 });
+        cell_poly->InsertNextCell({ i + 1,i + 2,i + 6,i + 5 });
+        cell_poly->InsertNextCell({ i + 2,i + 3,i + 7,i + 6 });
+    }
+
+    // 标量数据
+    // 40个点，每一个顶点都有一个标量数据（27个单元）
+    vtkNew<vtkFloatArray> scalars;
+    scalars->SetNumberOfValues(40);
+    for (int i = 0; i < 40; i++)
+    {
+        scalars->SetValue(i, i);
+    }
+
+    // 向量数据
+    // 40个顶点每一个顶点都有一个三维的向量数据
+    vtkNew<vtkFloatArray> vectors;
+    vectors->SetNumberOfComponents(3);
+    for (long long i = 0; i < 40; i++)
+    {
+        vectors->InsertNextTuple3(i, i + 1, i + 2);
+    }
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cell_poly);
+    polyData->GetPointData()->SetScalars(scalars);
+    polyData->GetPointData()->SetVectors(vectors);
+
+    //------------------------------------------------------------------------------------
+
+    if (auto scalar = polyData->GetCellData()->GetScalars())
+    {
+        std::cout << "scalar for cells is not null\n";
+    }
+    else
+    {
+        std::cout << "scalar for cells is null\n";
+    }
+
+    if (auto vector = polyData->GetCellData()->GetVectors())
+    {
+        std::cout << "vector for cells is not null\n";
+    }
+    else
+    {
+        std::cout << "vector for cells is null\n";
+    }
+
+    std::cout << "-------------------------------------------------\n";
+
+    // 求构成第n个单元的所有顶点的标量值
+    if (auto scalar = polyData->GetPointData()->GetScalars())
+    {
+        std::cout << "scalar for points is not null\n";
+        vtkNew<vtkIdList> ptids;
+        polyData->GetCellPoints(0, ptids); // 第0个单元
+
+        std::cout << "scalar value for cell 0: ";
+        for (size_t i = 0; i < ptids->GetNumberOfIds(); i++)
+        {
+            auto variantValue = scalar->GetVariantValue(ptids->GetId(i));
+            auto value = variantValue.IsDouble() ? variantValue.ToDouble() : variantValue.IsFloat() ? variantValue.ToFloat() : 0;
+            std::cout << "point " << i << ": " << value << '\t';
+        }
+        std::cout << '\n';
+    }
+    else
+    {
+        std::cout << "scalar for points is null\n";
+    }
+
+    // 求构成第n个单元的所有顶点的向量值
+    if (auto vector = polyData->GetPointData()->GetVectors())
+    {
+        std::cout << "vector for points is not null\n";
+        vtkNew<vtkIdList> ptids;
+        polyData->GetCellPoints(0, ptids); // 第0个单元
+
+        std::cout << "vector value for cell 0: ";
+        for (size_t i = 0; i < ptids->GetNumberOfIds(); i++)
+        {
+            auto value = vector->GetTuple3(i);
+            std::cout << "point " << i << ": v1 " << value[0] << ", v2 " << value[1] << ", v3 " << value[2] << ", \t";
+        }
+        std::cout << '\n';
+    }
+    else
+    {
+        std::cout << "vector for points is null\n";
+    }
+
+    vtkNew<vtkPointDataToCellData> pointToCell;
+    pointToCell->SetInputData(polyData);
+    //pointToCell->PassPointDataOn();
+    pointToCell->Update();
+
+    std::cout << "-------------------------------------------------\n";
+
+    // 求转换之后的第n个单元的标量值
+    if (auto scalar = pointToCell->GetOutput()->GetCellData()->GetScalars())
+    {
+        std::cout << "scalar for cells is not null\n";
+
+        auto variantValue = scalar->GetVariantValue(0); // 第0个cell
+        auto value = variantValue.IsDouble() ? variantValue.ToDouble() : variantValue.IsFloat() ? variantValue.ToFloat() : 0;
+        std::cout << "scalar value for cell 0: " << value << '\n';
+    }
+    else
+    {
+        std::cout << "scalar for cells is null\n";
+    }
+
+    // 求转换之后的第n个单元的向量值
+    if (auto vector = pointToCell->GetOutput()->GetCellData()->GetVectors())
+    {
+        std::cout << "vector for cells is not null\n";
+        auto value = vector->GetTuple3(0);
+        std::cout << "vector value for cell 0: " << value[0] << ',' << value[1] << ',' << value[2] << '\n';
+    }
+    else
+    {
+        std::cout << "scalar for cells is null\n";
+    }
+
+    std::cout << "-------------------------------------------------\n";
+
+    vtkNew<vtkCellCenters> cellCenters;
+    cellCenters->SetInputData(pointToCell->GetOutput());
+    cellCenters->Update();
+
+    // 获取每个单元的中心顶点，该顶点的标量和向量就是CellData的标量和向量
+    if (auto vector = cellCenters->GetOutput()->GetPointData()->GetVectors())
+    {
+        std::cout << "vector for cell centers not null\n";
+        auto value = vector->GetTuple3(0);
+        std::cout << "vector value for point 0: " << value[0] << ',' << value[1] << ',' << value[2] << '\n';
+    }
+    else
+    {
+        std::cout << "vector for cell centers null\n";
+    }
+
+    if (auto scalar = cellCenters->GetOutput()->GetPointData()->GetScalars())
+    {
+        std::cout << "scalar for cell centers not null\n";
+        auto variantValue = scalar->GetVariantValue(0); // 第0个单元中心点
+        auto value = variantValue.IsDouble() ? variantValue.ToDouble() : variantValue.IsFloat() ? variantValue.ToFloat() : 0;
+        std::cout << "scalar value for point 0: " << value << '\n';
+    }
+    else
+    {
+        std::cout << "scalar for cell centers null\n";
+    }
+
+    std::cout << "-------------------------------------------------\n";
+
+    // 源数据如果没有给每个单元设置标量或向量数据，则单元的中心也就没有标量或向量数据
+    // 如果想从只给每个顶点设置了标量或向量数据的polyData中获取每个单元中心的标量或向量数据
+    // 就先得将pointData转为cellData，然后再使用cellCenter获取每个单元中心的值
+    vtkNew<vtkCellCenters> cellCenters1;
+    cellCenters1->SetInputData(polyData);
+    cellCenters1->Update();
+    if (auto vector = cellCenters1->GetOutput()->GetPointData()->GetVectors())
+    {
+        std::cout << "vector for cell centers not null\n";
+        auto value = vector->GetTuple3(0);
+        std::cout << "vector value for point 0: " << value[0] << ',' << value[1] << ',' << value[2] << '\n';
+    }
+    else
+    {
+        std::cout << "vector for cell centers null\n";
+    }
+
+    if (auto scalar = cellCenters1->GetOutput()->GetPointData()->GetScalars())
+    {
+        std::cout << "scalar for cell centers not null\n";
+        auto variantValue = scalar->GetVariantValue(0); // 第0个单元中心点
+        auto value = variantValue.IsDouble() ? variantValue.ToDouble() : variantValue.IsFloat() ? variantValue.ToFloat() : 0;
+        std::cout << "scalar value for point 0: " << value << '\n';
+    }
+    else
+    {
+        std::cout << "scalar for cell centers null\n";
+    }
+
+    //------------------------------------------------------------------------------------
+
+    // 创建颜色查找表
+    vtkNew<vtkLookupTable> hueLut;
+    hueLut->SetHueRange(0.67, 0.0); // 设定HSV颜色范围，色调H取值范围为0°～360°，从红色开始按逆时针方向计算，红色为0°/0.0，绿色为120°/0.34,蓝色为240°/0.67
+    hueLut->Build();
+
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(pointToCell->GetOutput());
+    mapper->SetScalarRange(0, 39);            // 设置标量值的范围
+    mapper->SetLookupTable(hueLut);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+    renderer->AddActor(actor);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(600, 600);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST41
 
 #ifdef TEST42
 

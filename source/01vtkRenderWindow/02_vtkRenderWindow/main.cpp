@@ -11,15 +11,15 @@
 */
 
 /*
-1.鼠标左键弹起后修改actor颜色
-2.绘制点，GetCell()函数崩溃的问题
-3.（顶点 + 索引）绘制立方体（和opengl ebo方式类似），每个顶点添加一个颜色值
-4.简单的平面，使用顶点属性数据设置颜色 vtkDataArray
-5.通过定义三个指定x-y-z方向坐标的阵列来创建直线栅格。
-6.批量生成一大堆线条
-7.点构成线条，使用索引
-8.
-9.绘制点，线，面，类似Opengl 顶点+索引的绘制方式
+01.鼠标左键弹起后修改actor颜色
+02.绘制点，GetCell()函数崩溃的问题
+03.（顶点 + 索引）绘制立方体（和opengl ebo方式类似），每个顶点添加一个颜色值
+04.简单的平面，使用顶点属性数据设置颜色 vtkDataArray
+05.通过定义三个指定x-y-z方向坐标的阵列来创建直线栅格。
+06.批量生成一大堆线条
+07.点构成线条，使用索引
+08.光照
+09.绘制点，线，面，类似Opengl 顶点+索引的绘制方式
 10.2D网格绘制
 11.拟合样条曲线生成柱状体
 12.vtkAppendPolyData合并多个polydata
@@ -49,9 +49,9 @@
 36.探针
 37.探针 https://blog.csdn.net/liushao1031177/article/details/122860254
 38.plot https://kitware.github.io/vtk-examples/site/Cxx/Plotting/LinePlot/
-39.以单元形式设置标量数据
+39.vtkProbeFilter 以单元形式设置标量数据
 40.
-41.vtkPointDataToCellData 顶点标量数据转单元数据
+41.
 42.
 43.reverse access ,从经过算法(vtkAlgorithm,vtkPolyDataAlgorithm)变换的数据中获取源数据（vtkPolyData,vtkDataSet）
 44.vtkChart https://kitware.github.io/vtk-examples/site/Cxx/DataStructures/OctreeTimingDemo/
@@ -776,9 +776,71 @@ int main(int argc, char* argv[])
 
 #ifdef TEST8
 
-int main() {}
-#endif // TEST8
+#include <vtkCubeSource.h>
+#include <vtkSmartPointer.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkLightCollection.h>
+#include <vtkLight.h>
 
+#include <iostream>
+
+int main(int, char* [])
+{
+    vtkNew<vtkCubeSource> cube;
+
+    //mapper
+    vtkNew<vtkPolyDataMapper> cubeMapper;
+    cubeMapper->SetInputConnection(cube->GetOutputPort());
+
+    //actor
+    vtkNew<vtkActor> cubeActor;
+    cubeActor->SetMapper(cubeMapper);
+    cubeActor->GetProperty()->SetColor(0, 1, 0);
+    //cubeActor->GetProperty()->
+
+    //camera
+    vtkNew<vtkCamera> camera;
+    camera->SetPosition(1, 1, 1);//设置相机位置
+    camera->SetFocalPoint(0, 0, 0);//设置相机焦点
+
+    //renderer
+    vtkNew<vtkRenderer> renderer;
+    renderer->GradientBackgroundOn();
+    renderer->SetBackground(.8, .92, .97);
+    renderer->SetBackground2(.49, .78, .92);
+
+    renderer->AddActor(cubeActor);
+
+    renderer->SetActiveCamera(camera);
+    renderer->ResetCamera();
+
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(600, 600);//设置window大小
+
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    auto lights =renderer->GetLights();
+    auto numLiths = lights->GetNumberOfItems();
+    std::cout << numLiths << '\n';
+
+    //数据交互
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST8
 
 #ifdef TEST9
 
@@ -4389,100 +4451,7 @@ int main(int, char* [])
 
 
 
-#ifdef TEST41
 
-#include <vtkActor.h>
-#include <vtkFloatArray.h>
-#include <vtkLookupTable.h>
-#include <vtkPointData.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkSmartPointer.h>
-#include <vtkSTLReader.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkCellData.h>
-#include <vtkProperty.h>
-#include <vtkPointDataToCellData.h>
-#include <vtkDataSetMapper.h>
-
-int main(int, char* [])
-{
-    // 顶点
-    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
-    for (size_t i = 0; i < 10; i++)
-    {
-        points->InsertNextPoint(i, 0, 0);
-        points->InsertNextPoint(i + 1, 1, 0);
-        points->InsertNextPoint(i, 2, 0);
-        points->InsertNextPoint(i + 1, 3, 0);
-    }
-
-    // 拓扑
-    vtkSmartPointer<vtkCellArray> cell_poly = vtkSmartPointer<vtkCellArray>::New();
-    for (long long i = 0; i < 33; i += 4)
-    {
-        cell_poly->InsertNextCell({ i,i + 1,i + 5,i + 4 });
-        cell_poly->InsertNextCell({ i + 1,i + 2,i + 6,i + 5 });
-        cell_poly->InsertNextCell({ i + 2,i + 3,i + 7,i + 6 });
-    }
-
-    // 标量
-    vtkSmartPointer<vtkFloatArray> scalars = vtkSmartPointer<vtkFloatArray>::New();
-    scalars->SetNumberOfValues(40); // 40个点，27个单元
-    for (int i = 0; i < 40; i++)
-    {
-        scalars->SetValue(i, i);
-    }
-
-    vtkSmartPointer<vtkPolyData> poly1 = vtkSmartPointer<vtkPolyData>::New();
-    poly1->SetPoints(points);
-    poly1->SetPolys(cell_poly);
-    poly1->GetPointData()->SetScalars(scalars);
-    //poly1->GetCellData()->SetScalars(scalars);
-
-    vtkNew<vtkPointDataToCellData> pointToCell;
-    pointToCell->SetInputData(poly1);
-    //pointToCell->PassCellDataOn();
-    pointToCell->Update();
-
-    // 创建颜色查找表
-    vtkSmartPointer<vtkLookupTable> hueLut = vtkSmartPointer<vtkLookupTable>::New();
-    hueLut->SetHueRange(0.67, 0.0);            // 设定HSV颜色范围，色调H取值范围为0°～360°，从红色开始按逆时针方向计算，红色为0°/0.0，绿色为120°/0.34,蓝色为240°/0.67
-    hueLut->Build();
-
-    vtkSmartPointer<vtkDataSetMapper> mapper1 = vtkSmartPointer<vtkDataSetMapper>::New();
-    mapper1->SetInputData(pointToCell->GetOutput());
-    mapper1->SetScalarRange(0, 39);            // 设置标量值的范围
-    mapper1->SetLookupTable(hueLut);
-
-    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-    actor->SetMapper(mapper1);
-
-    vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
-
-    renderer->SetBackground(.1, .2, .3);
-
-    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
-    renderWindow->AddRenderer(renderer);
-
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-    vtkSmartPointer<vtkInteractorStyleTrackballCamera> style = vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
-    renderWindowInteractor->SetInteractorStyle(style);
-
-    renderer->AddActor(actor);
-
-    renderWindow->SetSize(600, 600);
-    renderWindow->Render();
-    renderWindowInteractor->Start();
-
-    return 0;
-}
-
-#endif // TEST41
 
 
 
