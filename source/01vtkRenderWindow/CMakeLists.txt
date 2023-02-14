@@ -7,4 +7,5 @@ add_subdirectory ("02_vtkRenderWindow")
 add_subdirectory ("03_vtkRenderWindow")
 add_subdirectory ("04_cameraTransform")
 add_subdirectory ("05_colorMap")
+add_subdirectory ("06_parallelProcess")
 

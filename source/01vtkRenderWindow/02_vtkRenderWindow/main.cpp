@@ -43,7 +43,7 @@
 30.范围拾取 vtkAreaPicker 点到actor的最短距离 vtkCellLocator
 31.比例尺(vtkLegendScaleActor)
 32.
-33.vtkMaskPoints
+33.vtkMaskPoints 对输入的数据进行挑拣筛选
 34.vtkprobefilter    探针
 35.
 36.探针
@@ -3966,7 +3966,6 @@ int main()
 
 
 #endif // TEST33
-
 
 #ifdef TEST34
 #include <vtkActor.h>

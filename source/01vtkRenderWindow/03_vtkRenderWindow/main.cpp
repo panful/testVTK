@@ -35,9 +35,9 @@
 34.vtkElevationFilter 沿指定方向生成Scalars https://kitware.github.io/vtk-examples/site/Cxx/Visualization/ProjectSphere/
 35 拾取并标记
 36.
-37.异步创建actor std::future 多线程
-38.vtkMultiThreader 和 std::thread
-39 MPI
+37.
+38.
+39 
 40 vtkDataSet 和 vtkPolyData
 41.vtk序列化反序列化 https://vtk.org/doc/nightly/html/classvtkDataWriter.html
 42.表面重建 vtkSurfaceReconstructionFilter TEST30 三角剖分
@@ -4973,165 +4973,7 @@ int main()
 
 
 
-#ifdef TEST37
 
-
-#include <vtkCubeSource.h>
-#include <vtkSmartPointer.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkActor.h>
-#include <vtkCamera.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkSphereSource.h>
-
-#include <chrono>
-#include <thread>
-#include <future>
-
-constexpr size_t MaxNumOfActors = 10;
-
-vtkSmartPointer<vtkActor> CreateActor(double x, double y, double z)
-{
-    vtkNew<vtkCubeSource> cube;
-    cube->SetCenter(x, y, z);
-
-    //mapper
-    vtkNew<vtkPolyDataMapper> cubeMapper;
-    cubeMapper->SetInputConnection(cube->GetOutputPort());
-
-    //actor
-    vtkNew<vtkActor> cubeActor;
-    cubeActor->SetMapper(cubeMapper);
-    cubeActor->GetProperty()->SetColor(0, 1, 0);
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-
-    return cubeActor;
-}
-
-#define MultiThread
-
-int main(int argc, char* argv[])
-{
-    vtkNew<vtkRenderer> renderer;
-
-    auto start = std::chrono::high_resolution_clock::now();
-
-#ifdef MultiThread
-    std::vector<std::future<vtkSmartPointer<vtkActor>>> vecActors;
-    vecActors.reserve(MaxNumOfActors);
-
-    for (size_t i = 0; i < MaxNumOfActors; ++i)
-    {
-        auto axis = static_cast<double>(i);
-        vecActors.emplace_back(std::async(std::launch::async, CreateActor, axis, axis, axis));
-    }
-
-    for (auto& actor : vecActors)
-    {
-        renderer->AddActor(actor.get());
-    }
-#else
-    for (size_t i = 0; i < MaxNumOfActors; ++i)
-    {
-        auto axis = static_cast<double>(i);
-        renderer->AddActor(CreateActor(axis, axis, axis));
-    }
-
-#endif // MultiThread
-
-    std::cout << "took:\t" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count() << std::endl;
-    renderer->ResetCamera();
-
-    //RenderWindow
-    vtkNew<vtkRenderWindow> renWin;
-    renWin->AddRenderer(renderer);
-    renWin->SetSize(600, 600);//设置window大小
-
-    //RenderWindowInteractor
-    vtkNew<vtkRenderWindowInteractor> iren;
-    iren->SetRenderWindow(renWin);
-
-    std::thread t([&]() {renWin->Render(); iren->Start(); });
-    t.join(); // 此处不能用detach()
-
-    //renWin->Render();
-    //iren->Start();
-
-    return 0;
-}
-
-#endif // TEST37
-
-#ifdef TEST38
-
-#include "vtkMultiThreader.h"
-#include "vtkSmartPointer.h"
-
-#include <thread>
-#include <chrono>
-#include <iostream>
-#include <vector>
-
-VTK_THREAD_RETURN_TYPE MyFunction(void*)
-{
-    //for (const auto& elem : { 1,2,3,4,5 })
-    //{
-    //    std::cout << elem << '\t';
-    //}
-    //std::cout << '\n';
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-
-    return VTK_THREAD_RETURN_VALUE;
-}
-
-int main()
-{
-    auto start = std::chrono::high_resolution_clock::now();
-
-    constexpr size_t TreadNum = 8;
-
-    // vtk多线程
-    {
-        vtkNew<vtkMultiThreader> multiThread;
-        // 设置共有8个线程
-        multiThread->SetNumberOfThreads(TreadNum);
-        // 将MyFunction放在多线程中执行
-        multiThread->SetSingleMethod(MyFunction, nullptr);
-        // 执行线程
-        multiThread->SingleMethodExecute();
-    }
-    auto vtkTookTime = std::chrono::high_resolution_clock::now();
-    std::cout << "vtk took:\t" << std::chrono::duration_cast<std::chrono::milliseconds>(vtkTookTime - start).count() << '\n';
-
-    // 标准库多线程
-    {
-        std::vector<std::thread> vecThreads;
-        vecThreads.reserve(TreadNum);
-
-        for (size_t i = 0; i < TreadNum; ++i)
-        {
-            vecThreads.emplace_back(std::thread(MyFunction, nullptr));
-        }
-        for (auto& thread : vecThreads)
-        {
-            thread.join();
-        }
-    }
-
-    // 以上两种方式效果是一样的
-    std::cout << "std took:\t" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - vtkTookTime).count() << '\n';
-
-}
-
-#endif // TEST38
-
-#ifdef TEST39
-
-#endif // TEST39
 
 #ifdef TEST40
 
