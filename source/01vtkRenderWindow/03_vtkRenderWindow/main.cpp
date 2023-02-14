@@ -347,7 +347,6 @@ int main(int argc, char* argv[])
 #include <vtkRenderer.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkActor.h>
-#include <vtkAreaPicker.h>
 #include <vtkDataSetMapper.h>
 #include <vtkDataSetSurfaceFilter.h>
 #include <vtkExtractGeometry.h>
@@ -1050,7 +1049,6 @@ namespace {
 #include <vtkRenderer.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkActor.h>
-#include <vtkAreaPicker.h>
 #include <vtkDataSetMapper.h>
 #include <vtkDataSetSurfaceFilter.h>
 #include <vtkExtractGeometry.h>
