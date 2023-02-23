@@ -5858,70 +5858,52 @@ namespace
             if (this->Interactor && this->CurrentRenderer)
             {
                 // 多个图层拾取
-                if (0)
+                if (1)
                 {
                     auto eventPos = this->Interactor->GetEventPosition();
 
-                    vtkNew<vtkCoordinate> coord1;
-                    coord1->SetCoordinateSystemToDisplay();
-                    coord1->SetValue(static_cast<double>(eventPos[0]), static_cast<double>(eventPos[1]));
-                    //auto pickWorldPos = coord1->GetComputedWorldValue(renderer1);
-
                     vtkNew<vtkPropPicker> picker;
                     this->Interactor->SetPicker(picker);
+
                     if (picker->Pick(eventPos[0], eventPos[1], 0., renderer1) != 0)
                     {
                         auto pickModelCoordPos = picker->GetPickPosition();
 
+                        // 将鼠标所在的位置转化为世界坐标
+                        vtkNew<vtkCoordinate> coord1;
+                        coord1->SetCoordinateSystemToDisplay();
+                        coord1->SetValue(static_cast<double>(eventPos[0]), static_cast<double>(eventPos[1]));
+                        auto eventWorldPos = coord1->GetComputedWorldValue(renderer1);
+
+                        // 将拾取到的世界坐标转化为屏幕坐标
                         vtkNew<vtkCoordinate> coord2;
                         coord2->SetCoordinateSystemToWorld();
                         coord2->SetValue(pickModelCoordPos);
-                        auto pickDisplayPos = coord1->GetComputedDisplayValue(renderer1);
+                        auto pickDisplayPos = coord2->GetComputedDisplayValue(renderer1);
 
                         std::cout << "-----------------------------------------\n";
-                        std::cout << "mouse pos: " << eventPos[0] << ',' << eventPos[1] << '\n';
-                        //std::cout << "pick world pos: " << pickWorldPos[0] << ',' << pickWorldPos[1] << ',' << pickWorldPos[2] << '\n';
-                        std::cout << "pick modelcoord pos: " << pickModelCoordPos[0] << ',' << pickModelCoordPos[1] << ',' << pickModelCoordPos[2] << '\n';
-                        std::cout << "pick display pos: " << pickDisplayPos[0] << ',' << pickDisplayPos[1] << ',' << pickDisplayPos[2] << '\n';
-
-                        //vtkNew<vtkCoordinate> coord3;
-                        //coord3->SetCoordinateSystemToDisplay();
-                        //coord3->SetValue(static_cast<double>(pickDisplayPos[0]), static_cast<double>(pickDisplayPos[1]));
-                        //auto renderer2Pos = coord1->GetComputedWorldValue(renderer2);
-
-                        //vtkNew< vtkRegularPolygonSource> circle;
-                        //circle->GeneratePolygonOn();
-                        //circle->SetNumberOfSides(30);
-                        //circle->SetRadius(.1);
-                        //circle->SetCenter(renderer2Pos);
-                        //vtkNew<vtkPolyDataMapper> mapper;
-                        //mapper->SetInputConnection(circle->GetOutputPort());
-                        //vtkNew<vtkActor> actor;
-                        //actor->SetMapper(mapper);
-                        //actor->GetProperty()->SetColor(0, 0, 1);
-
-                        //renderer2->AddActor(actor);
-
-                        //this->Interactor->Render();
+                        std::cout << "display coordinate\tmouse pos:\t" << eventPos[0] << ',' << eventPos[1] << '\n';
+                        std::cout << "world coordinate\tmouse pos:\t" << eventWorldPos[0] << ',' << eventWorldPos[1] << ',' << eventWorldPos[2] << '\n';
+                        std::cout << "display coordinate\tpick pos:\t" << pickDisplayPos[0] << ',' << pickDisplayPos[1] << '\n';
+                        std::cout << "world coordinate\tpick pos:\t" << pickModelCoordPos[0] << ',' << pickModelCoordPos[1] << ',' << pickModelCoordPos[2] << '\n';
                     }
                 }
                 //
-                if (1)
-                {
-                    if (this->CurrentRenderer == renderer1)
-                    {
-                        std::cout << "renderer 1\n";
-                    }
-                    else if (this->CurrentRenderer == renderer2)
-                    {
-                        std::cout << "renderer 2\n";
-                    }
-                }
             }
         }
-        void OnMouseMove()override
+
+        void OnRightButtonUp()override
         {
-            Superclass::OnMouseMove();
+            if (this->CurrentRenderer == renderer1)
+            {
+                std::cout << "current renderer is renderer 1\n";
+            }
+            else if (this->CurrentRenderer == renderer2)
+            {
+                std::cout << "current renderer is  renderer 2\n";
+            }
+
+            Superclass::OnRightButtonUp();
         }
     };
 
@@ -5930,11 +5912,13 @@ namespace
 
 int main()
 {
+    // renderer1（底下的图层）添加一个红色的矩形
     {
-        std::array<float, 3 * 3> vertices{
-            -1,-1,0,
-            0,1,0,
-            1,-1,0
+        std::array<float, 4 * 3> vertices{
+            -1.f,-1.f, 0.f,
+             1.f,-1.f, 0.f,
+             1.f, 1.f, 0.f,
+            -1.f, 1.f, 0.f
         };
 
         vtkNew<vtkPoints> points;
@@ -5945,7 +5929,7 @@ int main()
 
         vtkNew<vtkPolyData> polyData;
         vtkNew<vtkCellArray> cells;
-        cells->InsertNextCell({ 0,1,2 });
+        cells->InsertNextCell({ 0,1,2,3 });
         polyData->SetPoints(points);
         polyData->SetPolys(cells);
         vtkNew<vtkPolyDataMapper> mapper;
@@ -5956,11 +5940,12 @@ int main()
         renderer1->AddActor(actor);
     }
 
+    // renderer2（上层的图层）添加一个绿色的三角形
     {
         std::array<float, 3 * 3> vertices{
-            0,-1,0,
-            1,1,0,
-            2,-1,0
+            -1.f, -1.f, 0.1f,
+             1.f, -1.f, 0.1f,
+             0.f,  1.f, 0.1f,
         };
 
         vtkNew<vtkPoints> points;
@@ -5979,26 +5964,25 @@ int main()
         vtkNew<vtkActor> actor;
         actor->SetMapper(mapper);
         actor->GetProperty()->SetColor(0, 1, 0);
-        //renderer2->AddActor(actor);
+        renderer2->AddActor(actor);
     }
 
-    renderer1->SetBackground(1, 1, 0);
+    renderer1->SetBackground(.1, .2, .3);
     renderer1->ResetCamera();
     renderer1->SetLayer(0);
 
-    renderer2->SetBackground(0, 1, 1);
-    //renderer2->ResetCamera();
+    // renderer2和renderer1使用同一个camera
+    renderer2->SetBackground(1, 1, 0);
+    renderer2->SetActiveCamera(renderer1->GetActiveCamera());
+    // renderer2始终在上面
     renderer2->SetLayer(1);
 
-    //renderer2->SetActiveCamera(renderer1->GetActiveCamera());
-    renderer2->GetActiveCamera()->SetPosition(0, 0, 100);
-    renderer2->GetActiveCamera()->SetFocalPoint(0, 0, 0);
-    renderer2->GetActiveCamera()->SetViewUp(0, 1, 0);
-
     // 开启关闭交互
-    renderer1->InteractiveOff();
-    renderer2->InteractiveOn();
-    auto interactive = renderer2->GetInteractive();
+    renderer1->InteractiveOn();
+    renderer2->InteractiveOff();
+
+    std::cout << "renderer1 interactive: " << renderer1->GetInteractive() << '\n';
+    std::cout << "renderer2 interactive: " << renderer2->GetInteractive() << '\n';
 
     // renderWindow可以添加多个vtkRenderer
     // 每个vtkRenderer可以设置图层
