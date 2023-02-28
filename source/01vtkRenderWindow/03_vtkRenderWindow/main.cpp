@@ -16,7 +16,7 @@
 15.vtkOrientationMarkerWidget左键事件屏蔽对父窗口的响应
 16.网格模型的特征边与封闭性检测 https://www.cnblogs.com/ybqjymy/p/14241831.html
 17.按键盘p键显示物体的包围盒，边框
-18.vtkLODActor 加载大型网格  vtkSelectPolyData 多边形剪切
+18.
 19.单元拾取 cellpick
 20.按钮 vtkButtonWidget
 21.vtkFeatureEdges 封闭性检测 TEST16 标注边界的类型  https://kitware.github.io/vtk-examples/site/Cxx/Meshes/BoundaryEdges/
@@ -34,8 +34,8 @@
 33.vtkCaptionWidget 标注某一个点，标注类：vtkTextWidget,vtkScalarBarWidget,vtkOrientationMarkerWidget,vtkBalloonWidget
 34.vtkElevationFilter 沿指定方向生成Scalars https://kitware.github.io/vtk-examples/site/Cxx/Visualization/ProjectSphere/
 35 拾取并标记
-36.
-37.
+36.vtkLODProp3D 对于绘制大型网格可以提高渲染效率
+37.vtkLODActor 加载大型网格  vtkSelectPolyData 多边形剪切
 38.
 39
 40 vtkDataSet 和 vtkPolyData
@@ -48,7 +48,7 @@
 47.
 */
 
-#define TEST46
+#define TEST37
 
 #ifdef TEST1
 
@@ -2102,104 +2102,7 @@ int main(int, char* [])
 
 #endif // TEST17
 
-#ifdef TEST18
 
-#include <vtkClipPolyData.h>
-#include <vtkLODActor.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSelectPolyData.h>
-#include <vtkSphereSource.h>
-
-int main(int, char* [])
-{
-
-    vtkNew<vtkNamedColors> colors;
-
-    vtkNew<vtkSphereSource> sphereSource;
-    sphereSource->SetPhiResolution(50);
-    sphereSource->SetThetaResolution(100);
-    sphereSource->Update();
-
-    vtkNew<vtkPoints> selectionPoints;
-
-    selectionPoints->InsertPoint(0, -0.16553, 0.135971, 0.451972);
-    selectionPoints->InsertPoint(1, -0.0880123, -0.134952, 0.4747);
-    selectionPoints->InsertPoint(2, 0.00292618, -0.134604, 0.482459);
-    selectionPoints->InsertPoint(3, 0.0641941, 0.067112, 0.490947);
-    selectionPoints->InsertPoint(4, 0.15577, 0.0734765, 0.469245);
-    selectionPoints->InsertPoint(5, 0.166667, -0.129217, 0.454622);
-    selectionPoints->InsertPoint(6, 0.241259, -0.123363, 0.420581);
-    selectionPoints->InsertPoint(7, 0.240334, 0.0727106, 0.432555);
-    selectionPoints->InsertPoint(8, 0.308529, 0.0844311, 0.384357);
-    selectionPoints->InsertPoint(9, 0.32672, -0.121674, 0.359187);
-    selectionPoints->InsertPoint(10, 0.380721, -0.117342, 0.302527);
-    selectionPoints->InsertPoint(11, 0.387804, 0.0455074, 0.312375);
-    selectionPoints->InsertPoint(12, 0.43943, -0.111673, 0.211707);
-    selectionPoints->InsertPoint(13, 0.470984, -0.0801913, 0.147919);
-    selectionPoints->InsertPoint(14, 0.436777, 0.0688872, 0.233021);
-    selectionPoints->InsertPoint(15, 0.44874, 0.188852, 0.109882);
-    selectionPoints->InsertPoint(16, 0.391352, 0.254285, 0.176943);
-    selectionPoints->InsertPoint(17, 0.373274, 0.154162, 0.294296);
-    selectionPoints->InsertPoint(18, 0.274659, 0.311654, 0.276609);
-    selectionPoints->InsertPoint(19, 0.206068, 0.31396, 0.329702);
-    selectionPoints->InsertPoint(20, 0.263789, 0.174982, 0.387308);
-    selectionPoints->InsertPoint(21, 0.213034, 0.175485, 0.417142);
-    selectionPoints->InsertPoint(22, 0.169113, 0.261974, 0.390286);
-    selectionPoints->InsertPoint(23, 0.102552, 0.25997, 0.414814);
-    selectionPoints->InsertPoint(24, 0.131512, 0.161254, 0.454705);
-    selectionPoints->InsertPoint(25, 0.000192443, 0.156264, 0.475307);
-    selectionPoints->InsertPoint(26, -0.0392091, 0.000251724, 0.499943);
-    selectionPoints->InsertPoint(27, -0.096161, 0.159646, 0.46438);
-
-    vtkNew<vtkSelectPolyData> loop;
-    loop->SetInputConnection(sphereSource->GetOutputPort());
-    loop->SetLoop(selectionPoints);
-    loop->GenerateSelectionScalarsOn();
-    loop->SetSelectionModeToSmallestRegion(); // negative scalars inside
-
-    vtkNew<vtkClipPolyData> clip;
-    clip->SetInputConnection(loop->GetOutputPort());
-
-    vtkNew<vtkPolyDataMapper> clipMapper;
-    clipMapper->SetInputConnection(clip->GetOutputPort());
-    clipMapper->ScalarVisibilityOff();
-
-    vtkNew<vtkProperty> backProp;
-    backProp->SetColor(colors->GetColor3d("Tomato").GetData());
-
-    vtkNew<vtkLODActor> clipActor;
-    clipActor->SetMapper(clipMapper);
-    clipActor->SetBackfaceProperty(backProp);
-    clipActor->GetProperty()->SetColor(0, 1, 0);
-
-    vtkNew<vtkRenderer> renderer;
-
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("SelectPolyData");
-
-    vtkNew<vtkRenderWindowInteractor> interactor;
-    interactor->SetRenderWindow(renderWindow);
-
-    // Add the actors to the renderer, set the background and size
-    renderer->AddActor(clipActor);
-    renderer->SetBackground(colors->GetColor3d("SlateGray").GetData());
-
-    renderWindow->SetSize(500, 500);
-
-    renderWindow->Render();
-    interactor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST18
 
 #ifdef TEST19
 
@@ -4971,8 +4874,207 @@ int main()
 }
 #endif // TEST35
 
+#ifdef TEST36
 
+#include <vtkCallbackCommand.h>
+#include <vtkLODProp3D.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
 
+namespace {
+    void RefreshCallback(vtkObject* vtkNotUsed(caller),
+        long unsigned int vtkNotUsed(eventId), void* clientData,
+        void* vtkNotUsed(callData));
+}
+
+int main(int, char* [])
+{
+    vtkNew<vtkNamedColors> colors;
+
+    // High res sphere
+    vtkNew<vtkPolyDataMapper> highResMapper;
+    vtkNew<vtkProperty> propertyHighRes;
+    {
+        vtkNew<vtkSphereSource> highResSphereSource;
+        highResSphereSource->SetThetaResolution(100);
+        highResSphereSource->SetPhiResolution(100);
+        highResSphereSource->Update();
+
+        highResMapper->SetInputConnection(highResSphereSource->GetOutputPort());
+
+        propertyHighRes->SetDiffuseColor(0, 1, 0);
+        propertyHighRes->SetInterpolationToFlat();
+    }
+
+    // Low res sphere
+    vtkNew<vtkPolyDataMapper> lowResMapper;
+    vtkNew<vtkProperty> propertyLowRes;
+    {
+        vtkNew<vtkSphereSource> lowResSphereSource;
+        lowResSphereSource->SetThetaResolution(10);
+        lowResSphereSource->SetPhiResolution(10);
+        lowResSphereSource->Update();
+
+        lowResMapper->SetInputConnection(lowResSphereSource->GetOutputPort());
+
+        propertyLowRes->SetDiffuseColor(1, 0, 0);
+        propertyLowRes->SetInterpolationToFlat();
+    }
+
+    vtkNew<vtkLODProp3D> prop;
+    auto id1 = prop->AddLOD(lowResMapper, propertyLowRes, 0.0);
+    auto id2 = prop->AddLOD(highResMapper, propertyHighRes, 0.0);
+
+    std::cout << "There are " << prop->GetNumberOfLODs() << " LODs. " << "ID1: " << id1 << "\tID2: " << id2 << '\n';
+
+    // A renderer and render window
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetWindowName("LODProp3D");
+
+    // prop->SetAllocatedRenderTime(1e-6,renderer);
+    prop->SetAllocatedRenderTime(1e-12, renderer);
+
+    // An interactor
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    // Add the actors to the scene
+    renderer->AddActor(prop);
+    renderer->SetBackground(colors->GetColor3d("SlateGray").GetData());
+
+    vtkNew<vtkCallbackCommand> refreshCallback;
+    refreshCallback->SetCallback(RefreshCallback);
+    refreshCallback->SetClientData(prop);
+
+    renderWindow->AddObserver(vtkCommand::ModifiedEvent, refreshCallback);
+
+    renderWindow->Render();
+
+    // Begin mouse interaction
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+namespace {
+    void RefreshCallback(vtkObject* vtkNotUsed(caller),
+        long unsigned int vtkNotUsed(eventId), void* clientData,
+        void* vtkNotUsed(callData))
+    {
+        auto lodProp = static_cast<vtkLODProp3D*>(clientData);
+        std::cout << "Last rendered LOD ID: " << lodProp->GetLastRenderedLODID()
+            << std::endl;
+    }
+} // namespace
+
+#endif // TEST36
+
+#ifdef TEST37
+
+#include <vtkClipPolyData.h>
+#include <vtkLODActor.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSelectPolyData.h>
+#include <vtkSphereSource.h>
+
+int main(int, char* [])
+{
+    vtkNew<vtkSphereSource> sphereSource;
+    sphereSource->SetPhiResolution(50);
+    sphereSource->SetThetaResolution(100);
+    sphereSource->Update();
+
+    vtkNew<vtkPoints> selectionPoints;
+    selectionPoints->InsertNextPoint(-0.16553, 0.135971, 0.451972);
+    selectionPoints->InsertNextPoint(-0.0880123, -0.134952, 0.4747);
+    selectionPoints->InsertNextPoint(0.00292618, -0.134604, 0.482459);
+    selectionPoints->InsertNextPoint(0.0641941, 0.067112, 0.490947);
+    selectionPoints->InsertNextPoint(0.15577, 0.0734765, 0.469245);
+    selectionPoints->InsertNextPoint(0.166667, -0.129217, 0.454622);
+    selectionPoints->InsertNextPoint(0.241259, -0.123363, 0.420581);
+    selectionPoints->InsertNextPoint(0.240334, 0.0727106, 0.432555);
+    selectionPoints->InsertNextPoint(0.308529, 0.0844311, 0.384357);
+    selectionPoints->InsertNextPoint(0.32672, -0.121674, 0.359187);
+    selectionPoints->InsertNextPoint( 0.380721, -0.117342, 0.302527);
+    selectionPoints->InsertNextPoint( 0.387804, 0.0455074, 0.312375);
+    selectionPoints->InsertNextPoint( 0.43943, -0.111673, 0.211707);
+    selectionPoints->InsertNextPoint( 0.470984, -0.0801913, 0.147919);
+    selectionPoints->InsertNextPoint( 0.436777, 0.0688872, 0.233021);
+    selectionPoints->InsertNextPoint( 0.44874, 0.188852, 0.109882);
+    selectionPoints->InsertNextPoint( 0.391352, 0.254285, 0.176943);
+    selectionPoints->InsertNextPoint( 0.373274, 0.154162, 0.294296);
+    selectionPoints->InsertNextPoint( 0.274659, 0.311654, 0.276609);
+    selectionPoints->InsertNextPoint( 0.206068, 0.31396, 0.329702);
+    selectionPoints->InsertNextPoint( 0.263789, 0.174982, 0.387308);
+    selectionPoints->InsertNextPoint( 0.213034, 0.175485, 0.417142);
+    selectionPoints->InsertNextPoint( 0.169113, 0.261974, 0.390286);
+    selectionPoints->InsertNextPoint( 0.102552, 0.25997, 0.414814);
+    selectionPoints->InsertNextPoint( 0.131512, 0.161254, 0.454705);
+    selectionPoints->InsertNextPoint( 0.000192443, 0.156264, 0.475307);
+    selectionPoints->InsertNextPoint( -0.0392091, 0.000251724, 0.499943);
+    selectionPoints->InsertNextPoint( -0.096161, 0.159646, 0.46438);
+
+    // 指定选择的区域
+    vtkNew<vtkSelectPolyData> loop;
+    loop->SetInputConnection(sphereSource->GetOutputPort());
+    loop->SetLoop(selectionPoints);
+    loop->GenerateSelectionScalarsOn(); // 生成选择标量
+    loop->SetSelectionModeToSmallestRegion(); // negative scalars inside
+
+    vtkNew<vtkClipPolyData> clip;
+    clip->SetInputConnection(loop->GetOutputPort());
+
+    vtkNew<vtkPolyDataMapper> clipMapper;
+    clipMapper->SetInputConnection(clip->GetOutputPort());
+    clipMapper->ScalarVisibilityOff();
+
+    vtkNew<vtkProperty> backProp;
+    backProp->SetColor(1, 0, 0);
+
+    vtkNew<vtkLODActor> clipActor;
+    //clipActor->SetNumberOfCloudPoints(100000); // 设置最大点数
+    clipActor->SetMapper(clipMapper);    // 设置低细节级别的 Mapper
+    //clipActor->AddLODMapper(clipMapper); // 添加高细节级别的 Mapper
+    clipActor->SetBackfaceProperty(backProp);
+    clipActor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetWindowName("SelectPolyData");
+
+    vtkNew<vtkRenderWindowInteractor> interactor;
+    interactor->SetRenderWindow(renderWindow);
+
+    // Add the actors to the renderer, set the background and size
+    renderer->AddActor(clipActor);
+    renderer->SetBackground(.1, .2, .3);
+
+    renderWindow->SetSize(800, 600);
+
+    renderWindow->Render();
+    interactor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST37
 
 
 #ifdef TEST40
