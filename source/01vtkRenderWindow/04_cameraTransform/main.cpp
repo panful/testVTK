@@ -12,15 +12,15 @@
 * 11.vtkBillboardTextActor3D 鼠标旋转，文本始终朝向观察者，广告板
 * 12 vtkFollower 始终面向镜头 https://kitware.github.io/vtk-examples/site/Cxx/Visualization/Follower/
 * 13.vtkFollower 的原理
-* 
-* 
+* 14.vtkFollower vtkDistanceToCamera 指定图元大小不变，方向不变，始终在最上层
+*
 * 88.照相机属性，获取网格的最大最小边界，无限放大缩小
 */
 
 // https://blog.csdn.net/liushao1031177/article/details/116903698
 // https://www.cnblogs.com/ybqjymy/p/13925462.html
 
-#define TEST13
+#define TEST14
 
 #ifdef TEST1
 
@@ -2650,7 +2650,7 @@ int main(int, char* [])
 
     // Create a subclass of vtkActor: a vtkFollower that remains facing the camera
     vtkNew<vtkFollower> follower;
-    follower->SetPosition(.5,.5,.5); // vtkFollower的位置设置为actor应该在的位置，这样相机旋转时，vtkFollower的位置就可以跟着变化
+    follower->SetPosition(.5, .5, .5); // vtkFollower的位置设置为actor应该在的位置，这样相机旋转时，vtkFollower的位置就可以跟着变化
     //follower->SetScale(1);
     follower->SetMapper(mapper);
     follower->GetProperty()->SetColor(colors->GetColor3d("Gold").GetData());
@@ -2957,6 +2957,198 @@ int main(int, char* [])
 }
 
 #endif // TEST13
+
+#ifdef TEST14
+
+#include <vtkActor.h>
+#include <vtkArrowSource.h>
+#include <vtkDistanceToCamera.h>
+#include <vtkGlyph3D.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPointSource.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+#include <vtkCamera.h>
+#include <vtkRegularPolygonSource.h>
+#include <vtkAlgorithmOutput.h>
+#include <vtkPointSet.h>
+#include <vtkPropPicker.h>
+#include <vtkFollower.h>
+
+#include <array>
+#include <iostream>
+
+namespace {
+
+vtkNew<vtkFollower> actorGlyph;
+vtkNew<vtkRenderer> renderer;
+
+class MyInteractorStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyInteractorStyle* New();
+    vtkTypeMacro(MyInteractorStyle, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnLeftButtonUp() override
+    {
+        if (this->Interactor)
+        {
+            auto camera = this->CurrentRenderer->GetActiveCamera();
+            std::cout << camera->GetParallelScale() << '\n';
+
+            auto mousePos = this->Interactor->GetEventPosition();
+            std::cout << "mouse pos: " << mousePos[0] << '\t' << mousePos[1] << '\n';
+
+            vtkNew<vtkPropPicker> picker;
+            this->Interactor->SetPicker(picker);
+            if (picker->Pick(mousePos[0], mousePos[1], 0, this->CurrentRenderer) != 0)
+            {
+                auto actorCenter = actorGlyph->GetCenter();
+                auto actorPos = actorGlyph->GetPosition();
+                std::cout << "actor center: " << actorCenter[0] << '\t' << actorCenter[1] << '\t' << actorCenter[2] << '\n';
+                std::cout << "actor pos: " << actorPos[0] << '\t' << actorPos[1] << '\t' << actorPos[2] << '\n';
+
+                auto pickPos = picker->GetPickPosition();
+
+                // 从大小不变，方向不变，始终在最上面的actor获取原始数据
+                if (auto reference = vtkGlyph3D::SafeDownCast(actorGlyph->GetMapper()->GetInputConnection(0, 0)->GetProducer()))
+                {
+                    if (auto disToCamera = vtkDistanceToCamera::SafeDownCast(reference->GetInputConnection(0, 0)->GetProducer()))
+                    {
+                        auto screenSize = disToCamera->GetScreenSize();
+                        std::cout << "screen Size: " << screenSize << '\n';
+
+                        if (auto input = vtkPointSet::SafeDownCast(disToCamera->GetInput()))
+                        {
+                            for (size_t i = 0; i < input->GetNumberOfPoints(); i++)
+                            {
+                                // 多边形的原点（中心）
+                                auto pt = input->GetPoint(i);
+                                std::cout << "point " << i << " : " << pt[0] << '\t' << pt[1] << '\t' << pt[2] << '\n';
+
+                                vtkNew<vtkPoints> points;
+                                //points->InsertNextPoint(pickPos[0], pickPos[1], pickPos[2]);
+                                points->InsertNextPoint(0, 0, 0);
+                                input->SetPoints(points);
+
+                                actorGlyph->SetPosition(pickPos[0], pickPos[1], pickPos[2]);
+                            }
+                        }
+
+                    }
+                }
+            }
+        }
+
+
+        Superclass::OnLeftButtonUp();
+    }
+};
+
+vtkStandardNewMacro(MyInteractorStyle);
+}
+
+int main(int, char* [])
+{
+    // 左下角为{30,30,0}右上角为{40,40,0}的正方形
+    vtkNew<vtkActor> actorRect;
+    {
+        std::array<float, 4 * 3> vertices
+        {
+            30,30,0,
+            40,30,0,
+            40,40,0,
+            30,40,0
+        };
+
+        vtkNew<vtkPoints> points;
+        vtkNew<vtkCellArray> cells;
+
+        for (size_t i = 0; i < vertices.size(); i += 3)
+        {
+            points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+        }
+
+        cells->InsertNextCell({ 0,1,2,3 });
+
+        vtkNew<vtkPolyData> polyData;
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+
+        actorRect->SetMapper(mapper);
+        actorRect->GetProperty()->SetColor(0, 1, 0);
+    }
+
+    // 多边形的原点
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(35, 35, 0);
+    vtkNew<vtkPointSet> originPoint;
+    originPoint->SetPoints(points);
+
+    vtkNew<vtkDistanceToCamera> distToCamera;
+    distToCamera->SetInputData(originPoint);
+    distToCamera->SetScreenSize(50);
+
+    // 需要大小不变的多边形
+    vtkNew<vtkRegularPolygonSource> source;
+    source->GeneratePolygonOn();
+
+    // 实际添加到mapper中的polyData
+    vtkNew<vtkGlyph3D> glyph;
+    glyph->SetInputConnection(distToCamera->GetOutputPort());
+    glyph->SetSourceConnection(source->GetOutputPort());
+    // 大小不变
+    glyph->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "DistanceToCamera");
+
+    vtkNew<vtkPolyDataMapper> mapperGlyph;
+    mapperGlyph->SetInputConnection(glyph->GetOutputPort());
+    mapperGlyph->SetScalarVisibility(false); // 不关闭时，鼠标缩放会改变球的颜色
+
+    // 始终在最上面
+    const double units0 = -1.e6;
+    mapperGlyph->SetResolveCoincidentTopologyToPolygonOffset();
+    mapperGlyph->SetRelativeCoincidentTopologyPolygonOffsetParameters(0, units0);
+
+    actorGlyph->SetMapper(mapperGlyph);
+    actorGlyph->GetProperty()->SetColor(1, 0, 0);
+    actorGlyph->SetCamera(renderer->GetActiveCamera());
+
+    //---------------------------------------------------------------------------
+
+    renderer->AddActor(actorGlyph);
+    renderer->AddActor(actorRect);
+    renderer->SetBackground(.1, .2, .3);
+    distToCamera->SetRenderer(renderer);
+    renderer->GetActiveCamera()->ParallelProjectionOff();
+    //renderer->GetActiveCamera()->ParallelProjectionOn();
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+    renderWindow->SetWindowName("DistanceToCamera");
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    vtkNew<MyInteractorStyle> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST14
 
 #ifdef TEST89
 
