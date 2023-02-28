@@ -1,7 +1,7 @@
 ﻿/*
 1. 写ffmpeg
 2. vtkOpenGLFramebufferObject
-3. 
+3.
 4. 写ffmpeg
 5. vtkFFMPEGVideoSource
 6. vtk自带按钮动态设置窗口大小
@@ -37,18 +37,18 @@
 36.
 37.
 38.
-39 
+39
 40 vtkDataSet 和 vtkPolyData
 41.vtk序列化反序列化 https://vtk.org/doc/nightly/html/classvtkDataWriter.html
 42.表面重建 vtkSurfaceReconstructionFilter TEST30 三角剖分
 43 直线与图元的交点 vtkOBBTree  线与线的交点 IntersectWithLine
-44 
+44 通过设置mapper让某个图元始终在最下面或者最上面显示
 45.图层设置，让某个mapper始终在最上层或最下层，或中间某一层
-46.45备份
-47.vtkSmartPointer指向的数据置空
+46.vtkBorderWidget vtkFollower vtkDistanceToCamera
+47.
 */
 
-#define TEST45
+#define TEST46
 
 #ifdef TEST1
 
@@ -5812,7 +5812,171 @@ int main(int, char* [])
 
 #endif // TEST43
 
+#ifdef TEST44
 
+#include <iostream>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+#include <vtkActor.h>
+#include <vtkConeSource.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkSphereSource.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkProperty.h>
+#include <vtkCamera.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkCoordinate.h>
+#include <vtkPicker.h>
+#include <vtkPropPicker.h>
+#include <vtkRegularPolygonSource.h>
+
+#include <iostream>
+#include <array>
+
+namespace
+{
+    vtkNew<vtkRenderer> renderer1;
+
+    class InteractorStyle : public vtkInteractorStyleTrackballCamera
+    {
+    public:
+        static InteractorStyle* New();
+        vtkTypeMacro(InteractorStyle, vtkInteractorStyleTrackballCamera);
+
+        void OnLeftButtonUp() override
+        {
+            Superclass::OnLeftButtonUp();
+
+            if (this->Interactor && this->CurrentRenderer)
+            {
+                auto eventPos = this->Interactor->GetEventPosition();
+
+                vtkNew<vtkPropPicker> picker;
+                this->Interactor->SetPicker(picker);
+
+                if (picker->Pick(eventPos[0], eventPos[1], 0., renderer1) != 0)
+                {
+                    auto pickModelCoordPos = picker->GetPickPosition();
+
+                    // 将鼠标所在的位置转化为世界坐标
+                    vtkNew<vtkCoordinate> coord1;
+                    coord1->SetCoordinateSystemToDisplay();
+                    coord1->SetValue(static_cast<double>(eventPos[0]), static_cast<double>(eventPos[1]));
+                    auto eventWorldPos = coord1->GetComputedWorldValue(renderer1);
+
+                    // 将拾取到的世界坐标转化为屏幕坐标
+                    vtkNew<vtkCoordinate> coord2;
+                    coord2->SetCoordinateSystemToWorld();
+                    coord2->SetValue(pickModelCoordPos);
+                    auto pickDisplayPos = coord2->GetComputedDisplayValue(renderer1);
+
+                    std::cout << "-----------------------------------------\n";
+                    std::cout << "display coordinate\tmouse pos:\t" << eventPos[0] << ',' << eventPos[1] << '\n';
+                    std::cout << "world coordinate\tmouse pos:\t" << eventWorldPos[0] << ',' << eventWorldPos[1] << ',' << eventWorldPos[2] << '\n';
+                    std::cout << "display coordinate\tpick pos:\t" << pickDisplayPos[0] << ',' << pickDisplayPos[1] << '\n';
+                    std::cout << "world coordinate\tpick pos:\t" << pickModelCoordPos[0] << ',' << pickModelCoordPos[1] << ',' << pickModelCoordPos[2] << '\n';
+                }
+            }
+        }
+
+        void OnRightButtonUp()override
+        {
+
+            Superclass::OnRightButtonUp();
+        }
+    };
+
+    vtkStandardNewMacro(InteractorStyle);
+}
+
+int main()
+{
+    //（底下的图层）添加一个红色的矩形
+    {
+        std::array<float, 4 * 3> vertices{
+            -1.f,-1.f, 0.f,
+             1.f,-1.f, 0.f,
+             1.f, 1.f, 0.f,
+            -1.f, 1.f, 0.f
+        };
+
+        vtkNew<vtkPoints> points;
+        for (size_t i = 0; i < vertices.size(); i += 3)
+        {
+            points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+        }
+
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0,1,2,3 });
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(1, 0, 0);
+        renderer1->AddActor(actor);
+    }
+
+    //（上层的图层）添加一个绿色的三角形
+    {
+        std::array<float, 3 * 3> vertices{
+            -1.f, -1.f, 0.1f,
+             1.f, -1.f, 0.1f,
+             0.f,  1.f, 0.1f,
+        };
+
+        vtkNew<vtkPoints> points;
+        for (size_t i = 0; i < vertices.size(); i += 3)
+        {
+            points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+        }
+
+        vtkNew<vtkPolyData> polyData;
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0,1,2 });
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+
+        // 设置图元始终在最上面还是最下面
+        mapper->SetResolveCoincidentTopologyToPolygonOffset();
+        mapper->SetRelativeCoincidentTopologyPolygonOffsetParameters(0, -1.e6);     // 面类型 负值则在上面，正值则在下面
+        //sphereMapper->SetRelativeCoincidentTopologyLineOffsetParameters(0, units0); // 线类型
+        //sphereMapper->SetRelativeCoincidentTopologyPointOffsetParameter(units0);    // 点类型
+
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(0, 1, 0);
+        renderer1->AddActor(actor);
+    }
+
+    renderer1->SetBackground(.1, .2, .3);
+    renderer1->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(600, 600);
+    renderWindow->AddRenderer(renderer1);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<InteractorStyle> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+
+#endif // TEST44
 
 #ifdef TEST45
 
@@ -5838,8 +6002,6 @@ int main(int, char* [])
 #include <iostream>
 #include <array>
 
-
-
 namespace
 {
     vtkNew<vtkRenderer> renderer1;
@@ -5858,37 +6020,33 @@ namespace
             if (this->Interactor && this->CurrentRenderer)
             {
                 // 多个图层拾取
-                if (1)
+                auto eventPos = this->Interactor->GetEventPosition();
+
+                vtkNew<vtkPropPicker> picker;
+                this->Interactor->SetPicker(picker);
+
+                if (picker->Pick(eventPos[0], eventPos[1], 0., renderer1) != 0)
                 {
-                    auto eventPos = this->Interactor->GetEventPosition();
+                    auto pickModelCoordPos = picker->GetPickPosition();
 
-                    vtkNew<vtkPropPicker> picker;
-                    this->Interactor->SetPicker(picker);
+                    // 将鼠标所在的位置转化为世界坐标
+                    vtkNew<vtkCoordinate> coord1;
+                    coord1->SetCoordinateSystemToDisplay();
+                    coord1->SetValue(static_cast<double>(eventPos[0]), static_cast<double>(eventPos[1]));
+                    auto eventWorldPos = coord1->GetComputedWorldValue(renderer1);
 
-                    if (picker->Pick(eventPos[0], eventPos[1], 0., renderer1) != 0)
-                    {
-                        auto pickModelCoordPos = picker->GetPickPosition();
+                    // 将拾取到的世界坐标转化为屏幕坐标
+                    vtkNew<vtkCoordinate> coord2;
+                    coord2->SetCoordinateSystemToWorld();
+                    coord2->SetValue(pickModelCoordPos);
+                    auto pickDisplayPos = coord2->GetComputedDisplayValue(renderer1);
 
-                        // 将鼠标所在的位置转化为世界坐标
-                        vtkNew<vtkCoordinate> coord1;
-                        coord1->SetCoordinateSystemToDisplay();
-                        coord1->SetValue(static_cast<double>(eventPos[0]), static_cast<double>(eventPos[1]));
-                        auto eventWorldPos = coord1->GetComputedWorldValue(renderer1);
-
-                        // 将拾取到的世界坐标转化为屏幕坐标
-                        vtkNew<vtkCoordinate> coord2;
-                        coord2->SetCoordinateSystemToWorld();
-                        coord2->SetValue(pickModelCoordPos);
-                        auto pickDisplayPos = coord2->GetComputedDisplayValue(renderer1);
-
-                        std::cout << "-----------------------------------------\n";
-                        std::cout << "display coordinate\tmouse pos:\t" << eventPos[0] << ',' << eventPos[1] << '\n';
-                        std::cout << "world coordinate\tmouse pos:\t" << eventWorldPos[0] << ',' << eventWorldPos[1] << ',' << eventWorldPos[2] << '\n';
-                        std::cout << "display coordinate\tpick pos:\t" << pickDisplayPos[0] << ',' << pickDisplayPos[1] << '\n';
-                        std::cout << "world coordinate\tpick pos:\t" << pickModelCoordPos[0] << ',' << pickModelCoordPos[1] << ',' << pickModelCoordPos[2] << '\n';
-                    }
+                    std::cout << "-----------------------------------------\n";
+                    std::cout << "display coordinate\tmouse pos:\t" << eventPos[0] << ',' << eventPos[1] << '\n';
+                    std::cout << "world coordinate\tmouse pos:\t" << eventWorldPos[0] << ',' << eventWorldPos[1] << ',' << eventWorldPos[2] << '\n';
+                    std::cout << "display coordinate\tpick pos:\t" << pickDisplayPos[0] << ',' << pickDisplayPos[1] << '\n';
+                    std::cout << "world coordinate\tpick pos:\t" << pickModelCoordPos[0] << ',' << pickModelCoordPos[1] << ',' << pickModelCoordPos[2] << '\n';
                 }
-                //
             }
         }
 
@@ -6014,167 +6172,94 @@ int main()
 
 #ifdef TEST46
 
-#include <iostream>
 #include <vtkSmartPointer.h>
-#include <vtkSphereSource.h>
 #include <vtkActor.h>
-#include <vtkConeSource.h>
 #include <vtkRenderer.h>
 #include <vtkRenderWindow.h>
 #include <vtkPolyDataMapper.h>
-#include <vtkSphereSource.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkProperty.h>
 #include <vtkCamera.h>
 #include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkInteractorStyleRubberBand3D.h>
 #include <vtkCoordinate.h>
 #include <vtkPicker.h>
 #include <vtkPropPicker.h>
+#include <vtkBorderWidget.h>
+#include <vtkBorderRepresentation.h>
+#include <vtkPoints.h>
+#include <vtkCellArray.h>
+#include <vtkPolyData.h>
+#include <vtkDistanceToCamera.h>
+#include <vtkPointSet.h>
+#include <vtkGlyph3D.h>
+#include <vtkFollower.h>
 #include <vtkRegularPolygonSource.h>
 
 #include <iostream>
 #include <array>
 
-//#define TEST_MAPPER // 使用Mapper设置图层效果
-
-#ifdef TEST_MAPPER
-
-#define vtkSPtr vtkSmartPointer
-#define vtkSPtrNew(Var, Type) vtkSPtr<Type> Var = vtkSPtr<Type>::New();
-
-int main()
-{
-    vtkSPtrNew(sphere, vtkSphereSource);
-    sphere->SetCenter(0, 0, 0);
-    sphere->SetRadius(1);
-    sphere->Update();
-
-    // 图层设置
-    vtkSPtrNew(sphereMapper, vtkPolyDataMapper);
-    const double units0 = -1.e6;
-    sphereMapper->SetInputData(sphere->GetOutput());
-    sphereMapper->SetResolveCoincidentTopologyToPolygonOffset();
-    //sphereMapper->SetRelativeCoincidentTopologyLineOffsetParameters(0, units0);
-    sphereMapper->SetRelativeCoincidentTopologyPolygonOffsetParameters(0, units0);
-    //sphereMapper->SetRelativeCoincidentTopologyPointOffsetParameter(units0);
-
-    vtkSPtrNew(sphereActor, vtkActor);
-    sphereActor->SetMapper(sphereMapper);
-    sphereActor->GetProperty()->SetColor(1, 0, 0);
-
-    vtkSPtrNew(cone, vtkConeSource);
-    cone->SetRadius(2);
-    cone->SetHeight(4);
-    cone->Update();
-
-    vtkSPtrNew(coneMapper, vtkPolyDataMapper);
-    coneMapper->SetInputData(cone->GetOutput());
-    vtkSPtrNew(coneActor, vtkActor);
-    coneActor->SetMapper(coneMapper);
-
-    vtkSPtrNew(renderer, vtkRenderer);
-    renderer->AddActor(coneActor);
-    renderer->AddActor(sphereActor);
-    renderer->SetBackground(0, 0, 0);
-
-    vtkSPtrNew(renderWindow, vtkRenderWindow);
-    renderWindow->AddRenderer(renderer);
-
-    vtkSPtrNew(renderWindowInteractor, vtkRenderWindowInteractor);
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-
-    renderer->ResetCamera();
-    renderWindow->Render();
-    renderWindowInteractor->Start();
-
-    return 0;
-}
-
-#else
-
 namespace
 {
     vtkNew<vtkRenderer> renderer1;
-    vtkNew<vtkRenderer> renderer2;
+    vtkNew<vtkBorderWidget> border;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
 
-    class InteractorStyle : public vtkInteractorStyleTrackballCamera
+    class InteractorStyle : public vtkInteractorStyleRubberBand3D
     {
     public:
         static InteractorStyle* New();
-        vtkTypeMacro(InteractorStyle, vtkInteractorStyleTrackballCamera);
+        vtkTypeMacro(InteractorStyle, vtkInteractorStyleRubberBand3D);
 
         void OnLeftButtonUp() override
         {
-            Superclass::OnLeftButtonUp();
-
-            if (this->Interactor && this->CurrentRenderer)
+            if (this->Interactor)
             {
-                // 多个图层拾取
-                if (0)
+                this->FindPokedRenderer(this->Interactor->GetEventPosition()[0], this->Interactor->GetEventPosition()[1]);
+
+                if (this->CurrentRenderer)
                 {
                     auto eventPos = this->Interactor->GetEventPosition();
 
-                    vtkNew<vtkCoordinate> coord1;
-                    coord1->SetCoordinateSystemToDisplay();
-                    coord1->SetValue(static_cast<double>(eventPos[0]), static_cast<double>(eventPos[1]));
-                    //auto pickWorldPos = coord1->GetComputedWorldValue(renderer1);
-
                     vtkNew<vtkPropPicker> picker;
                     this->Interactor->SetPicker(picker);
+
                     if (picker->Pick(eventPos[0], eventPos[1], 0., renderer1) != 0)
                     {
                         auto pickModelCoordPos = picker->GetPickPosition();
 
+                        // 将鼠标所在的位置转化为世界坐标
+                        vtkNew<vtkCoordinate> coord1;
+                        coord1->SetCoordinateSystemToDisplay();
+                        coord1->SetValue(static_cast<double>(eventPos[0]), static_cast<double>(eventPos[1]));
+                        auto eventWorldPos = coord1->GetComputedWorldValue(renderer1);
+
+                        // 将拾取到的世界坐标转化为屏幕坐标
                         vtkNew<vtkCoordinate> coord2;
                         coord2->SetCoordinateSystemToWorld();
                         coord2->SetValue(pickModelCoordPos);
-                        auto pickDisplayPos = coord1->GetComputedDisplayValue(renderer1);
+                        auto pickDisplayPos = coord2->GetComputedDisplayValue(renderer1);
 
                         std::cout << "-----------------------------------------\n";
-                        std::cout << "mouse pos: " << eventPos[0] << ',' << eventPos[1] << '\n';
-                        //std::cout << "pick world pos: " << pickWorldPos[0] << ',' << pickWorldPos[1] << ',' << pickWorldPos[2] << '\n';
-                        std::cout << "pick modelcoord pos: " << pickModelCoordPos[0] << ',' << pickModelCoordPos[1] << ',' << pickModelCoordPos[2] << '\n';
-                        std::cout << "pick display pos: " << pickDisplayPos[0] << ',' << pickDisplayPos[1] << ',' << pickDisplayPos[2] << '\n';
-
-                        //vtkNew<vtkCoordinate> coord3;
-                        //coord3->SetCoordinateSystemToDisplay();
-                        //coord3->SetValue(static_cast<double>(pickDisplayPos[0]), static_cast<double>(pickDisplayPos[1]));
-                        //auto renderer2Pos = coord1->GetComputedWorldValue(renderer2);
-
-                        //vtkNew< vtkRegularPolygonSource> circle;
-                        //circle->GeneratePolygonOn();
-                        //circle->SetNumberOfSides(30);
-                        //circle->SetRadius(.1);
-                        //circle->SetCenter(renderer2Pos);
-                        //vtkNew<vtkPolyDataMapper> mapper;
-                        //mapper->SetInputConnection(circle->GetOutputPort());
-                        //vtkNew<vtkActor> actor;
-                        //actor->SetMapper(mapper);
-                        //actor->GetProperty()->SetColor(0, 0, 1);
-
-                        //renderer2->AddActor(actor);
-
-                        //this->Interactor->Render();
+                        std::cout << "display coordinate\tmouse pos:\t" << eventPos[0] << ',' << eventPos[1] << '\n';
+                        std::cout << "world coordinate\tmouse pos:\t" << eventWorldPos[0] << ',' << eventWorldPos[1] << ',' << eventWorldPos[2] << '\n';
+                        std::cout << "display coordinate\tpick pos:\t" << pickDisplayPos[0] << ',' << pickDisplayPos[1] << '\n';
+                        std::cout << "world coordinate\tpick pos:\t" << pickModelCoordPos[0] << ',' << pickModelCoordPos[1] << ',' << pickModelCoordPos[2] << '\n';
                     }
                 }
-                //
-                if (1)
-                {
-                    if (this->CurrentRenderer == renderer1)
-                    {
-                        std::cout << "renderer 1\n";
-                    }
-                    else if (this->CurrentRenderer == renderer2)
-                    {
-                        std::cout << "renderer 2\n";
-                    }
-                }
+
+                // 需要调用一次Render()否则窗口会黑屏
+                this->Interactor->Render();
             }
+
+            Superclass::OnLeftButtonUp();
         }
-        void OnMouseMove()override
+
+        void OnRightButtonUp()override
         {
-            Superclass::OnMouseMove();
+
+            Superclass::OnRightButtonUp();
         }
     };
 
@@ -6183,11 +6268,13 @@ namespace
 
 int main()
 {
+    //（底下的图层）添加一个红色的矩形
     {
-        std::array<float, 3 * 3> vertices{
-            -1,-1,0,
-            0,1,0,
-            1,-1,0
+        std::array<float, 4 * 3> vertices{
+            -1.f,-1.f, 0.f,
+             1.f,-1.f, 0.f,
+             1.f, 1.f, 0.f,
+            -1.f, 1.f, 0.f
         };
 
         vtkNew<vtkPoints> points;
@@ -6198,7 +6285,7 @@ int main()
 
         vtkNew<vtkPolyData> polyData;
         vtkNew<vtkCellArray> cells;
-        cells->InsertNextCell({ 0,1,2 });
+        cells->InsertNextCell({ 0,1,2,3 });
         polyData->SetPoints(points);
         polyData->SetPolys(cells);
         vtkNew<vtkPolyDataMapper> mapper;
@@ -6209,67 +6296,70 @@ int main()
         renderer1->AddActor(actor);
     }
 
+    //（上层的图层）添加一个绿色的三角形
     {
-        std::array<float, 3 * 3> vertices{
-            0,-1,0,
-            1,1,0,
-            2,-1,0
-        };
-
         vtkNew<vtkPoints> points;
-        for (size_t i = 0; i < vertices.size(); i += 3)
-        {
-            points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
-        }
+        points->InsertNextPoint(0, 0, 0);
+        vtkNew<vtkPointSet> pointset;
+        pointset->SetPoints(points);
 
-        vtkNew<vtkPolyData> polyData;
-        vtkNew<vtkCellArray> cells;
-        cells->InsertNextCell({ 0,1,2 });
-        polyData->SetPoints(points);
-        polyData->SetPolys(cells);
+        vtkNew<vtkDistanceToCamera> disToCamera;
+        disToCamera->SetInputData(pointset);
+        disToCamera->SetScreenSize(20.0);
+        disToCamera->SetRenderer(renderer1);
+
+        vtkNew<vtkRegularPolygonSource> source;
+        source->GeneratePolygonOff();
+        source->SetNumberOfSides(30);
+
+        vtkNew<vtkGlyph3D> glyph;
+        glyph->SetInputConnection(disToCamera->GetOutputPort());
+        glyph->SetSourceConnection(source->GetOutputPort());
+        glyph->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "DistanceToCamera");
+
         vtkNew<vtkPolyDataMapper> mapper;
-        mapper->SetInputData(polyData);
-        vtkNew<vtkActor> actor;
+        mapper->SetInputConnection(glyph->GetOutputPort());
+        mapper->SetScalarVisibility(false);
+
+        // 设置图元始终在最上面还是最下面
+        mapper->SetResolveCoincidentTopologyToPolygonOffset();
+        //mapper->SetRelativeCoincidentTopologyPolygonOffsetParameters(0, -1.e6);     // 面类型 负值则在上面，正值则在下面
+        mapper->SetRelativeCoincidentTopologyLineOffsetParameters(0, -1.e6); // 线类型
+        //sphereMapper->SetRelativeCoincidentTopologyPointOffsetParameter(units0);    // 点类型
+
+        vtkNew<vtkFollower> actor;
+        actor->SetCamera(renderer1->GetActiveCamera());
         actor->SetMapper(mapper);
         actor->GetProperty()->SetColor(0, 1, 0);
-        //renderer2->AddActor(actor);
+        renderer1->AddActor(actor);
     }
 
-    renderer1->SetBackground(1, 1, 0);
+    // border
+    {
+        border->SelectableOff();
+        border->ResizableOff();
+        border->ProcessEventsOff();
+        border->CreateDefaultRepresentation();
+        border->SetCurrentRenderer(renderer1);
+        border->GetRepresentation()->VisibilityOn();
+        border->GetBorderRepresentation()->SetPosition(0.4, 0.4);
+        border->GetBorderRepresentation()->SetPosition2(0.2, 0.2);
+        border->SetInteractor(renderWindowInteractor);
+        border->On();
+    }
+
+    renderer1->SetBackground(.1, .2, .3);
     renderer1->ResetCamera();
-    renderer1->SetLayer(0);
 
-    renderer2->SetBackground(0, 1, 1);
-    //renderer2->ResetCamera();
-    renderer2->SetLayer(1);
-
-    //renderer2->SetActiveCamera(renderer1->GetActiveCamera());
-    renderer2->GetActiveCamera()->SetPosition(0, 0, 100);
-    renderer2->GetActiveCamera()->SetFocalPoint(0, 0, 0);
-    renderer2->GetActiveCamera()->SetViewUp(0, 1, 0);
-
-    // 开启关闭交互
-    renderer1->InteractiveOff();
-    renderer2->InteractiveOn();
-    auto interactive = renderer2->GetInteractive();
-
-    // renderWindow可以添加多个vtkRenderer
-    // 每个vtkRenderer可以设置图层
     vtkNew<vtkRenderWindow> renderWindow;
     renderWindow->SetSize(600, 600);
-    renderWindow->SetNumberOfLayers(2);
-
-    // 如果当前有多个renderer都开起了交互
-    // 则鼠标交互响应的最后添加的renderer
-    // 如果当前只有一个renderer开启了交互
-    // 则鼠标交互响应的是开启交互的renderer
-    renderWindow->AddRenderer(renderer2);
     renderWindow->AddRenderer(renderer1);
 
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
+    // 自定义的style  vtk底层会报错
     vtkNew<InteractorStyle> style;
+    //vtkNew<vtkInteractorStyleTrackballCamera> style;
     renderWindowInteractor->SetInteractorStyle(style);
 
     renderWindow->Render();
@@ -6278,171 +6368,8 @@ int main()
     return 0;
 }
 
-#endif // TEST_MAPPER
 
-#endif // TEST45
+#endif // TEST46
 
-#ifdef TEST47
 
-#include <vtkSmartPointer.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkActor.h>
-#include <vtkCamera.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkCallbackCommand.h>
-#include <vtkCellArray.h>
-#include <vtkPolyData.h>
-#include <vtkPoints.h>
-
-#include <iostream>
-
-namespace
-{
-    std::array<float, 4 * 3> vertices{
-        0,0,0,
-        1,0,0,
-        1,1,0,
-        0,1,0
-    };
-
-    std::array<long long, 4 * 2> indices{
-        0,1,
-        1,2,
-        2,3,
-        3,0
-    };
-
-    class MyCommand : public vtkCommand
-    {
-    public:
-        static MyCommand* New();
-
-        virtual void Execute(vtkObject* caller, unsigned long, void*)
-        {
-            // 将Actor的Mapper的vtkPolyData修改，也会修改Actor
-            if (!m_polyData)
-            {
-                vtkNew<vtkPoints> points;
-                vtkNew<vtkCellArray> cells;
-                vtkNew<vtkCellArray> emptyCells;
-
-                for (size_t i = 0; i < vertices.size(); i += 3)
-                {
-                    points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
-                }
-
-                cells->InsertNextCell({ 0,1,2,3 });
-
-                m_polyData->SetPoints(points);
-                m_polyData->SetPolys(cells);
-                m_polyData->SetLines(emptyCells); // 如果不将线段置为空，原来的polydata就包含了线段和多边形
-            }
-
-            // 将Actor置为空
-            if (m_actor && m_mapper && m_polyData)
-            {
-                std::cout << "polyData ref count: " << m_polyData->GetReferenceCount() << '\n';
-                std::cout << "mapper ref count: " << m_mapper->GetReferenceCount() << '\n';
-
-                // 会将mapper的引用计数减一
-                // 不会将polyData的引用计数减一，因为mapper还没析构
-                //vtkNew<vtkPolyDataMapper> mapper;
-                //m_actor->SetMapper(mapper);
-
-                // 会将mapper等全部重新设置的actor属性的引用计数全部减一
-                // 具体可以看ShallowCopy的实现
-                vtkNew<vtkActor> emptyActor;
-                m_actor->ShallowCopy(emptyActor);
-
-                std::cout << "polyData ref count: " << m_polyData->GetReferenceCount() << '\n';
-                std::cout << "mapper ref count: " << m_mapper->GetReferenceCount() << '\n';
-            }
-        }
-
-        void SetPolyData(const vtkSmartPointer<vtkPolyData>& polydata)
-        {
-            m_polyData = polydata;
-        }
-        void SetActor(const vtkSmartPointer<vtkActor>& actor)
-        {
-            m_actor = actor;
-        }
-        void SetMapper(const vtkSmartPointer<vtkPolyDataMapper>& mapper)
-        {
-            m_mapper = mapper;
-        }
-
-    private:
-        vtkSmartPointer<vtkPolyData> m_polyData{ nullptr };
-        vtkSmartPointer<vtkActor> m_actor{ nullptr };
-        vtkSmartPointer<vtkPolyDataMapper> m_mapper{ nullptr };
-    };
-
-    vtkStandardNewMacro(MyCommand);
-}
-
-int main(int, char* [])
-{
-    vtkNew<vtkPolyData> polyData;
-    vtkNew<vtkPoints> points;
-    vtkNew<vtkCellArray> cells;
-
-    for (size_t i = 0; i < vertices.size(); i += 3)
-    {
-        points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
-    }
-    for (size_t i = 0; i < indices.size(); i += 2)
-    {
-        cells->InsertNextCell({ indices[i],indices[i + 1] });
-    }
-
-    polyData->SetPoints(points);
-    polyData->SetLines(cells);
-
-    //mapper
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputData(polyData);
-
-    //actor
-    vtkNew<vtkActor> actor;
-    actor->SetMapper(mapper);
-    actor->GetProperty()->SetColor(0, 1, 0);
-
-    //camera
-    vtkNew<vtkCamera> camera;
-    camera->SetPosition(1, 1, 1);//设置相机位置
-    camera->SetFocalPoint(0, 0, 0);//设置相机焦点
-
-    //renderer
-    vtkNew<vtkRenderer> renderer;
-    renderer->AddActor(actor);
-    renderer->SetActiveCamera(camera);
-    renderer->ResetCamera();
-
-    //RenderWindow
-    vtkNew<vtkRenderWindow> renWin;
-    renWin->AddRenderer(renderer);
-    renWin->SetSize(600, 600);//设置window大小
-
-    //RenderWindowInteractor
-    vtkNew<vtkRenderWindowInteractor> iren;
-    iren->SetRenderWindow(renWin);
-
-    vtkNew<MyCommand> cb;
-    cb->SetPolyData(polyData);
-    cb->SetActor(actor);
-    cb->SetMapper(mapper);
-    iren->AddObserver(vtkCommand::LeftButtonPressEvent, cb);
-
-    //数据交互
-    renWin->Render();
-    iren->Start();
-
-    return 0;
-}
-
-#endif // TEST47
 
