@@ -13,14 +13,15 @@
 * 12 vtkFollower 始终面向镜头 https://kitware.github.io/vtk-examples/site/Cxx/Visualization/Follower/
 * 13.vtkFollower 的原理
 * 14.vtkFollower vtkDistanceToCamera 指定图元大小不变，方向不变，始终在最上层
-*
+* 15.vtkActor2D 不响应缩放，平移，旋转
+* 
 * 88.照相机属性，获取网格的最大最小边界，无限放大缩小
 */
 
 // https://blog.csdn.net/liushao1031177/article/details/116903698
 // https://www.cnblogs.com/ybqjymy/p/13925462.html
 
-#define TEST14
+#define TEST15
 
 #ifdef TEST1
 
@@ -3149,6 +3150,88 @@ int main(int, char* [])
 }
 
 #endif // TEST14
+
+#ifdef TEST15
+
+#include <vtkActor2D.h>
+#include <vtkCoordinate.h>
+#include <vtkLineSource.h>
+#include <vtkRegularPolygonSource.h>
+#include <vtkPolyDataMapper2D.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkSmartPointer.h>
+#include <vtkVectorText.h>
+#include <vtkProperty2D.h>
+#include <vtkProperty.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkCubeSource.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+
+int main()
+{
+    // 创建一个渲染器和窗口
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+
+    // 创建一个立方体
+    vtkNew<vtkActor> cubeActor;
+    {
+        vtkNew<vtkCubeSource> cube;
+        vtkNew<vtkPolyDataMapper> cubeMapper;
+        cubeMapper->SetInputConnection(cube->GetOutputPort());
+        cubeActor->SetMapper(cubeMapper);
+        cubeActor->GetProperty()->SetColor(0, 1, 0);
+    }
+
+    // 创建一个多边形
+    vtkNew<vtkActor2D> regularActor;
+    {
+        vtkNew<vtkRegularPolygonSource> regular;
+        regular->SetCenter(500, 500, 0);
+        regular->SetRadius(50);
+        regular->Update();
+        vtkNew<vtkPolyDataMapper2D> mapper;
+        mapper->SetInputConnection(regular->GetOutputPort());
+        regularActor->SetMapper(mapper);
+        regularActor->GetProperty()->SetColor(1, 1, 0);
+    }
+
+    // 创建一些线条
+    vtkNew<vtkActor2D> lineActor;
+    {
+        vtkNew<vtkLineSource> lineSource;
+        lineSource->SetPoint1(100.0, 100.0, 0.0);
+        lineSource->SetPoint2(300.0, 300.0, 0.0);
+        vtkNew<vtkPolyDataMapper2D> lineMapper;
+        lineMapper->SetInputConnection(lineSource->GetOutputPort());
+        lineActor->SetMapper(lineMapper);
+        lineActor->GetProperty()->SetColor(0, 1, 0);
+    }
+
+    renderer->AddActor(cubeActor);
+
+    renderer->AddActor(lineActor);
+    //renderer->AddActor2D(lineActor);
+    renderer->AddActor(regularActor);
+    //renderer->AddActor2D(regularActor);
+
+    // 创建交互器并启动渲染窗口
+    vtkNew<vtkRenderWindowInteractor> interactor;
+    vtkNew< vtkInteractorStyleRubberBand3D> style;
+    interactor->SetInteractorStyle(style);
+    renderWindow->SetInteractor(interactor);
+
+    renderWindow->Render();
+    interactor->Start();
+
+    return 0;
+}
+
+#endif // TEST15
 
 #ifdef TEST89
 
