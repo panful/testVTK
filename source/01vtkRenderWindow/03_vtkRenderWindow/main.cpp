@@ -36,9 +36,9 @@
 35 拾取并标记
 36.vtkLODProp3D 对于绘制大型网格可以提高渲染效率
 37.vtkLODActor 加载大型网格  vtkSelectPolyData 多边形剪切
-38.
-39
-40 vtkDataSet 和 vtkPolyData
+38.vtkDataSet 和 vtkPolyData
+39.vtkPolyData设置不同图元（poly line...)
+40
 41.vtk序列化反序列化 https://vtk.org/doc/nightly/html/classvtkDataWriter.html
 42.表面重建 vtkSurfaceReconstructionFilter TEST30 三角剖分
 43 直线与图元的交点 vtkOBBTree  线与线的交点 IntersectWithLine
@@ -48,7 +48,7 @@
 47.
 */
 
-#define TEST37
+#define TEST40
 
 #ifdef TEST1
 
@@ -5010,24 +5010,24 @@ int main(int, char* [])
     selectionPoints->InsertNextPoint(0.240334, 0.0727106, 0.432555);
     selectionPoints->InsertNextPoint(0.308529, 0.0844311, 0.384357);
     selectionPoints->InsertNextPoint(0.32672, -0.121674, 0.359187);
-    selectionPoints->InsertNextPoint( 0.380721, -0.117342, 0.302527);
-    selectionPoints->InsertNextPoint( 0.387804, 0.0455074, 0.312375);
-    selectionPoints->InsertNextPoint( 0.43943, -0.111673, 0.211707);
-    selectionPoints->InsertNextPoint( 0.470984, -0.0801913, 0.147919);
-    selectionPoints->InsertNextPoint( 0.436777, 0.0688872, 0.233021);
-    selectionPoints->InsertNextPoint( 0.44874, 0.188852, 0.109882);
-    selectionPoints->InsertNextPoint( 0.391352, 0.254285, 0.176943);
-    selectionPoints->InsertNextPoint( 0.373274, 0.154162, 0.294296);
-    selectionPoints->InsertNextPoint( 0.274659, 0.311654, 0.276609);
-    selectionPoints->InsertNextPoint( 0.206068, 0.31396, 0.329702);
-    selectionPoints->InsertNextPoint( 0.263789, 0.174982, 0.387308);
-    selectionPoints->InsertNextPoint( 0.213034, 0.175485, 0.417142);
-    selectionPoints->InsertNextPoint( 0.169113, 0.261974, 0.390286);
-    selectionPoints->InsertNextPoint( 0.102552, 0.25997, 0.414814);
-    selectionPoints->InsertNextPoint( 0.131512, 0.161254, 0.454705);
-    selectionPoints->InsertNextPoint( 0.000192443, 0.156264, 0.475307);
-    selectionPoints->InsertNextPoint( -0.0392091, 0.000251724, 0.499943);
-    selectionPoints->InsertNextPoint( -0.096161, 0.159646, 0.46438);
+    selectionPoints->InsertNextPoint(0.380721, -0.117342, 0.302527);
+    selectionPoints->InsertNextPoint(0.387804, 0.0455074, 0.312375);
+    selectionPoints->InsertNextPoint(0.43943, -0.111673, 0.211707);
+    selectionPoints->InsertNextPoint(0.470984, -0.0801913, 0.147919);
+    selectionPoints->InsertNextPoint(0.436777, 0.0688872, 0.233021);
+    selectionPoints->InsertNextPoint(0.44874, 0.188852, 0.109882);
+    selectionPoints->InsertNextPoint(0.391352, 0.254285, 0.176943);
+    selectionPoints->InsertNextPoint(0.373274, 0.154162, 0.294296);
+    selectionPoints->InsertNextPoint(0.274659, 0.311654, 0.276609);
+    selectionPoints->InsertNextPoint(0.206068, 0.31396, 0.329702);
+    selectionPoints->InsertNextPoint(0.263789, 0.174982, 0.387308);
+    selectionPoints->InsertNextPoint(0.213034, 0.175485, 0.417142);
+    selectionPoints->InsertNextPoint(0.169113, 0.261974, 0.390286);
+    selectionPoints->InsertNextPoint(0.102552, 0.25997, 0.414814);
+    selectionPoints->InsertNextPoint(0.131512, 0.161254, 0.454705);
+    selectionPoints->InsertNextPoint(0.000192443, 0.156264, 0.475307);
+    selectionPoints->InsertNextPoint(-0.0392091, 0.000251724, 0.499943);
+    selectionPoints->InsertNextPoint(-0.096161, 0.159646, 0.46438);
 
     // 指定选择的区域
     vtkNew<vtkSelectPolyData> loop;
@@ -5076,8 +5076,7 @@ int main(int, char* [])
 
 #endif // TEST37
 
-
-#ifdef TEST40
+#ifdef TEST38
 
 // vtkPolyData的使用
 // https://zhuanlan.zhihu.com/p/336743251
@@ -5333,7 +5332,130 @@ int main(int, char* [])
     return EXIT_SUCCESS;
 }
 
-#endif // TEST40
+#endif // TEST38
+
+#ifdef TEST39
+
+#include <vtkPolyData.h>
+#include <vtkPoints.h>
+#include <vtkCellArray.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkProperty.h>
+#include <vtkCamera.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+
+#include <array>
+#include <iostream>
+
+namespace
+{
+    std::array<float, 6 * 3 * 3> vertices{
+        0.0f,0.0f,0.0f,  // 0
+        0.0f,1.0f,0.0f,
+        -.1f,0.9f,-.1f,
+        -.1f,0.9f,0.1f,
+        0.1f,0.9f,-.1f,
+        0.1f,0.9f,0.1f,  // 5
+
+        1.0f,0.0f,0.0f,  // 6
+        1.0f,1.0f,0.0f,
+        0.9f,0.9f,-.1f,
+        0.9f,0.9f,0.1f,
+        1.1f,0.9f,-.1f,
+        1.1f,0.9f,0.1f,  // 11
+
+        2.0f,0.0f,0.0f,  // 12
+        2.0f,1.0f,0.0f,
+        1.9f,0.9f,-.1f,
+        1.9f,0.9f,0.1f,
+        2.1f,0.9f,-.1f,
+        2.1f,0.9f,0.1f,  // 17
+    };
+
+    // 一个箭头由两个三角形和一条线段构成
+    std::array<long long, 3 * 2> linesIndices{
+        0,1,
+        6,7,
+        12,13,
+    };
+
+    std::array<long long, 3 * 6> triangleIndices{
+        1,2,3,
+        1,4,5,
+
+        7,8,9,
+        7,10,11,
+
+        13,14,15,
+        13,16,17
+    };
+}
+
+int main()
+{
+    vtkNew<vtkPolyData> polyData;
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cellsTriangles;
+    vtkNew<vtkCellArray> cellsLines;
+
+    for (size_t i = 0; i < vertices.size(); i += 3)
+    {
+        points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+    }
+    for (size_t i = 0; i < linesIndices.size(); i += 2)
+    {
+        cellsLines->InsertNextCell({ linesIndices[i],linesIndices[i + 1] });
+    }
+    for (size_t i = 0; i < triangleIndices.size(); i += 3)
+    {
+        cellsTriangles->InsertNextCell({ triangleIndices[i],triangleIndices[i + 1] ,triangleIndices[i + 2] });
+    }
+
+    polyData->SetPoints(points);
+    polyData->SetLines(cellsLines);
+    polyData->SetPolys(cellsTriangles);
+
+    //mapper
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+
+    //actor
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+    actor->GetProperty()->SetRepresentationToWireframe();
+
+    //renderer
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(600, 600);
+
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    // interactor syle
+    vtkNew<vtkInteractorStyleRubberBand3D> style;
+    iren->SetInteractorStyle(style);
+
+    //数据交互
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST39
+
 
 #ifdef TEST41
 

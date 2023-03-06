@@ -4,7 +4,7 @@
 */
 
 
-#define TEST1
+#define TEST2
 
 #ifdef TEST1
 
@@ -17,20 +17,22 @@
 #include <vtkRenderWindow.h>
 #include <vtkRenderer.h>
 #include <vtkRenderWindowInteractor.h>
+#include <vtkInteractorStyleRubberBand3D.h>
 
 int main(int, char* [])
 {
-    vtkNew<vtkCubeSource> cube;
+    vtkNew<vtkCubeSource> source;
+    source->Update();
 
     //mapper
-    vtkNew<vtkPolyDataMapper> cubeMapper;
-    cubeMapper->SetInputConnection(cube->GetOutputPort());
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputConnection(source->GetOutputPort());
     //cubeMapper->SetInputData(cube->GetOutput()); // 使用vtkPolyData方式，必须对Source进行Update()
 
     //actor
-    vtkNew<vtkActor> cubeActor;
-    cubeActor->SetMapper(cubeMapper);
-    cubeActor->GetProperty()->SetColor(0, 1, 0);
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
 
     //camera
     vtkNew<vtkCamera> camera;
@@ -39,7 +41,7 @@ int main(int, char* [])
 
     //renderer
     vtkNew<vtkRenderer> renderer;
-    renderer->AddActor(cubeActor);
+    renderer->AddActor(actor);
     renderer->SetActiveCamera(camera);
     renderer->ResetCamera();
 
@@ -51,6 +53,10 @@ int main(int, char* [])
     //RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
+
+    // interactor syle
+    vtkNew<vtkInteractorStyleRubberBand3D> style;
+    iren->SetInteractorStyle(style);
 
     //数据交互
     renWin->Render();
@@ -73,6 +79,7 @@ int main(int, char* [])
 #include <vtkProperty.h>
 #include <vtkCamera.h>
 #include <vtkRenderWindowInteractor.h>
+#include <vtkInteractorStyleRubberBand3D.h>
 
 #include <array>
 #include <iostream>
@@ -114,17 +121,17 @@ int main()
     polyData->SetLines(cells);
 
     //mapper
-    vtkNew<vtkPolyDataMapper> cubeMapper;
-    cubeMapper->SetInputData(polyData);
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
 
     //actor
-    vtkNew<vtkActor> cubeActor;
-    cubeActor->SetMapper(cubeMapper);
-    cubeActor->GetProperty()->SetColor(0, 1, 0);
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
 
     //renderer
     vtkNew<vtkRenderer> renderer;
-    renderer->AddActor(cubeActor);
+    renderer->AddActor(actor);
     renderer->ResetCamera();
 
     //RenderWindow
@@ -135,6 +142,10 @@ int main()
     //RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
+
+    // interactor syle
+    vtkNew<vtkInteractorStyleRubberBand3D> style;
+    iren->SetInteractorStyle(style);
 
     //数据交互
     renWin->Render();
