@@ -78,7 +78,7 @@
 
 */
 
-#define TEST33
+#define TEST20
 
 //在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 //#include <vtkAutoInit.h>
@@ -1877,7 +1877,6 @@ int main(int, char* [])
 #include <vtkNew.h>
 #include <vtkOrientationMarkerWidget.h>
 #include <vtkPolyDataMapper.h>
-#include <vtkPropAssembly.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>

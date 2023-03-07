@@ -6,10 +6,11 @@
 * 62 vtkInteractorStyleRubberBandPick 框选拾取
 * 19 单元拾取 cellpick
 * 35 拾取并标记
+* 40 拾取vtkAssembly vtkActor装配器
 *  多图层拾取
 */
 
-#define TEST27
+#define TEST40
 
 #ifdef TEST27
 
@@ -1222,70 +1223,215 @@ int main()
 #include <vtkRenderer.h>
 #include <vtkSphereSource.h>
 #include <vtkTransform.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkPropPicker.h>
+#include <vtkConeSource.h>
+#include <vtkAssemblyPath.h>
+#include <vtkCellPicker.h>
+
+namespace
+{
+    vtkNew<vtkActor> sphereActor;
+    vtkNew<vtkActor> cubeActor;
+    vtkNew<vtkActor> coneActor;
+
+    class InteractorStyle : public vtkInteractorStyleRubberBand3D
+    {
+    public:
+        static InteractorStyle* New();
+        vtkTypeMacro(InteractorStyle, vtkInteractorStyleRubberBand3D);
+
+        void OnLeftButtonUp() override
+        {
+            if (this->Interactor)
+            {
+                auto eventPos = this->Interactor->GetEventPosition();
+                this->FindPokedRenderer(eventPos[0], eventPos[1]);
+                if (this->CurrentRenderer)
+                {
+                    // 使用vtkPropPicker拾取
+                    {
+                        vtkNew<vtkPropPicker> picker;
+                        picker->PickFromListOn();
+                        picker->AddPickList(m_assembly);
+                        this->Interactor->SetPicker(picker);
+
+                        if (auto numPick = picker->Pick(eventPos[0], eventPos[1], 0, this->CurrentRenderer))
+                        {
+                            // assembly prop3D viewProp都是同一个对象，即assembly
+                            auto actor = picker->GetActor(); // null
+                            auto assembly = picker->GetAssembly();
+                            auto prop3D = picker->GetProp3D();
+                            auto propAssembly = picker->GetPropAssembly(); // null
+                            auto viewProp = picker->GetViewProp();
+                            auto pickList = picker->GetPickList(); // number = 0
+
+                            printf("---------------------------- prop pick\n");
+                            printf("actor\t\t%p\n", actor);
+                            printf("assembly\t%p\n", assembly);
+                            printf("prop3D\t\t%p\n", prop3D);
+                            printf("propAssembly\t%p\n", propAssembly);
+                            printf("viewProp\t%p\n", viewProp);
+                            printf("pickList\t%p\n", pickList);
+
+                            if (auto path = picker->GetPath())
+                            {
+                                printf("numOfItems\t%d\n", path->GetNumberOfItems());
+                                if (auto actor = vtkActor::SafeDownCast(path->GetLastNode()->GetViewProp()))
+                                {
+                                    // 始终都是同一个actor
+                                    // 所以不能使用vtkPropPicker来拾取vtkAssembly
+                                    printf("picked\t%p\n", actor);
+                                }
+                            }
+                        }
+                    }
+
+                    // 使用vtkCellPicker拾取
+                    {
+                        vtkNew<vtkCellPicker> picker;
+                        this->Interactor->SetPicker(picker);
+
+                        if (auto numPick = picker->Pick(eventPos[0], eventPos[1], 0, this->CurrentRenderer))
+                        {
+                            // assembly prop3D viewProp都是同一个对象，即assembly
+                            auto actor = picker->GetActor(); // null
+                            auto assembly = picker->GetAssembly();
+                            auto prop3D = picker->GetProp3D();
+                            auto propAssembly = picker->GetPropAssembly(); // null
+                            auto viewProp = picker->GetViewProp();
+                            auto pickList = picker->GetPickList(); // number = 0
+
+                            printf("---------------------------- cell pick\n");
+                            printf("actor\t\t%p\n", actor);
+                            printf("assembly\t%p\n", assembly);
+                            printf("prop3D\t\t%p\n", prop3D);
+                            printf("propAssembly\t%p\n", propAssembly);
+                            printf("viewProp\t%p\n", viewProp);
+                            printf("pickList\t%p\n", pickList);
+
+                            if (auto path = picker->GetPath())
+                            {
+                                printf("numOfItems\t%d\n", path->GetNumberOfItems());
+                                // 鼠标点击那个图元拾取的就是那个图元
+                                if (auto actor = vtkActor::SafeDownCast(path->GetLastNode()->GetViewProp()))
+                                {
+                                    printf("picked\t%p\n", actor);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Superclass::OnLeftButtonUp();
+            this->Interactor->Render();
+        }
+
+        void OnRightButtonUp() override
+        {
+            if (m_assembly)
+            {
+                // 从assembly中获取每个actor
+                vtkNew<vtkPropCollection> collection;
+                m_assembly->GetActors(collection);
+                collection->InitTraversal();
+                std::cout << "number of item: " << collection->GetNumberOfItems() << '\n';
+
+                for (vtkIdType i = 0; i < collection->GetNumberOfItems(); i++)
+                {
+                    dynamic_cast<vtkActor*>(collection->GetNextProp())->GetProperty()->SetOpacity(0.5);
+                }
+
+                this->Interactor->Render();
+            }
+
+            Superclass::OnRightButtonUp();
+        }
+
+        void SetAssembly(const vtkSmartPointer<vtkAssembly>& assembly)
+        {
+            m_assembly = assembly;
+        }
+
+    private:
+        vtkSmartPointer<vtkAssembly> m_assembly{ nullptr };
+    };
+
+    vtkStandardNewMacro(InteractorStyle);
+}
 
 int main(int, char* [])
 {
-    // Create a sphere
-    vtkNew<vtkSphereSource> sphereSource;
-    sphereSource->Update();
+    {
+        // Create a sphere
+        vtkNew<vtkSphereSource> sphereSource;
+        sphereSource->Update();
 
-    vtkNew<vtkPolyDataMapper> sphereMapper;
-    sphereMapper->SetInputConnection(sphereSource->GetOutputPort());
-    vtkNew<vtkActor> sphereActor;
-    sphereActor->SetMapper(sphereMapper);
-    sphereActor->GetProperty()->SetColor(1, 0, 0);
+        vtkNew<vtkPolyDataMapper> sphereMapper;
+        sphereMapper->SetInputConnection(sphereSource->GetOutputPort());
+        sphereActor->SetMapper(sphereMapper);
+        sphereActor->GetProperty()->SetColor(1, 0, 0);
 
-    // Create a cube
-    vtkNew<vtkCubeSource> cubeSource;
-    cubeSource->SetCenter(5.0, 0.0, 0.0);
-    cubeSource->Update();
+        // Create a cube
+        vtkNew<vtkCubeSource> cubeSource;
+        cubeSource->SetCenter(5.0, 0.0, 0.0);
+        cubeSource->Update();
 
-    vtkNew<vtkPolyDataMapper> cubeMapper;
-    cubeMapper->SetInputConnection(cubeSource->GetOutputPort());
-    vtkNew<vtkActor> cubeActor;
-    cubeActor->SetMapper(cubeMapper);
-    cubeActor->GetProperty()->SetColor(0, 1, 0);
+        vtkNew<vtkPolyDataMapper> cubeMapper;
+        cubeMapper->SetInputConnection(cubeSource->GetOutputPort());
+        cubeActor->SetMapper(cubeMapper);
+        cubeActor->GetProperty()->SetColor(0, 1, 0);
 
+        // Create a cone
+        vtkNew<vtkConeSource> coneSource;
+        coneSource->SetCenter(2.5, 0, 0);
+        coneSource->Update();
+
+        vtkNew<vtkPolyDataMapper> coneMapper;
+        coneMapper->SetInputConnection(coneSource->GetOutputPort());
+        coneActor->SetMapper(coneMapper);
+        coneActor->GetProperty()->SetColor(0, 1, 1);
+    }
 
     // Combine the sphere and cube into an assembly
     vtkNew<vtkAssembly> assembly;
     assembly->AddPart(sphereActor);
     assembly->AddPart(cubeActor);
 
-    // Apply a transform to the whole assembly
+    // 给整个vtkAssembly设置变换矩阵，会对vtkAssembly中所有的vtkActor生效
     //vtkNew<vtkTransform> transform;
     //transform->PostMultiply(); // this is the key line
     //transform->Translate(5.0, 0, 0);
-
     //assembly->SetUserTransform(transform);
-
-    // Extract each actor from the assembly and change its opacity
-    //vtkNew<vtkPropCollection> collection;
-
-    //assembly->GetActors(collection);
-    //collection->InitTraversal();
-    //for (vtkIdType i = 0; i < collection->GetNumberOfItems(); i++)
-    //{
-    //    dynamic_cast<vtkActor*>(collection->GetNextProp())
-    //        ->GetProperty()
-    //        ->SetOpacity(0.5);
-    //}
 
     // Visualization
     vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(assembly);
+    renderer->AddActor(coneActor);
+    //renderer->AddActor(cubeActor);
+    //renderer->AddActor(sphereActor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->ResetCamera();
+
+    printf("cubeActor:\t%p\n", cubeActor.GetPointer());
+    printf("sphereActor:\t%p\n", sphereActor.GetPointer());
+    printf("assembly:\t%p\n", assembly.GetPointer());
+    printf("coneActor:\t%p\n", coneActor.GetPointer());
+
     vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetWindowName("Assembly");
+    renderWindow->SetSize(800, 600);
     renderWindow->AddRenderer(renderer);
 
     vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
-    renderer->AddActor(assembly);
-    renderer->SetBackground(.1, .2, .3);
+    vtkNew<InteractorStyle> style;
+    style->SetAssembly(assembly);
+    renderWindowInteractor->SetInteractorStyle(style);
 
-    renderer->ResetCamera();
-    renderWindow->SetWindowName("Assembly");
     renderWindow->Render();
-
     renderWindowInteractor->Start();
 
     return EXIT_SUCCESS;
@@ -1901,3 +2047,4 @@ int main()
     return EXIT_SUCCESS;
 }
 #endif // TEST35
+

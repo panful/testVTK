@@ -38,7 +38,7 @@
 37.vtkLODActor 加载大型网格  vtkSelectPolyData 多边形剪切
 38.vtkDataSet 和 vtkPolyData
 39.vtkPolyData设置不同图元（poly line...)
-40
+40.
 41.vtk序列化反序列化 https://vtk.org/doc/nightly/html/classvtkDataWriter.html
 42.表面重建 vtkSurfaceReconstructionFilter TEST30 三角剖分
 43 直线与图元的交点 vtkOBBTree  线与线的交点 IntersectWithLine
@@ -1601,7 +1601,6 @@ int main(int argc, char* argv[])
 #include <vtkNew.h>
 #include <vtkOrientationMarkerWidget.h>
 #include <vtkPolyDataMapper.h>
-#include <vtkPropAssembly.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
@@ -5019,7 +5018,6 @@ int main()
 }
 
 #endif // TEST39
-
 
 #ifdef TEST41
 
