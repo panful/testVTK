@@ -33,11 +33,11 @@
 32.
 33.vtkCaptionWidget 标注某一个点，标注类：vtkTextWidget,vtkScalarBarWidget,vtkOrientationMarkerWidget,vtkBalloonWidget
 34.vtkElevationFilter 沿指定方向生成Scalars https://kitware.github.io/vtk-examples/site/Cxx/Visualization/ProjectSphere/
-35 
+35
 36.vtkLODProp3D 对于绘制大型网格可以提高渲染效率
 37.vtkLODActor 加载大型网格  vtkSelectPolyData 多边形剪切
 38.vtkDataSet 和 vtkPolyData
-39.vtkPolyData设置不同图元（poly line...)
+39.vtkPolyData设置多种单元(line poly...)，获取单元返回的顺序，设置单元的标量
 40.
 41.vtk序列化反序列化 https://vtk.org/doc/nightly/html/classvtkDataWriter.html
 42.表面重建 vtkSurfaceReconstructionFilter TEST30 三角剖分
@@ -4910,6 +4910,9 @@ int main(int, char* [])
 #include <vtkCamera.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkFloatArray.h>
+#include <vtkCellData.h>
+#include <vtkLookupTable.h>
 
 #include <array>
 #include <iostream>
@@ -4965,6 +4968,8 @@ int main()
     vtkNew<vtkCellArray> cellsTriangles;
     vtkNew<vtkCellArray> cellsLines;
 
+    vtkNew<vtkFloatArray> scalars;
+
     for (size_t i = 0; i < vertices.size(); i += 3)
     {
         points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
@@ -4978,13 +4983,47 @@ int main()
         cellsTriangles->InsertNextCell({ triangleIndices[i],triangleIndices[i + 1] ,triangleIndices[i + 2] });
     }
 
+    scalars->SetNumberOfValues(9);
+    for (size_t i = 0; i < 3; i++)
+    {
+        scalars->SetValue(i, i);
+        scalars->SetValue(2 * i + 3, i);
+        scalars->SetValue(2 * i + 3 + 1, i);
+    }
+
     polyData->SetPoints(points);
-    polyData->SetLines(cellsLines);
     polyData->SetPolys(cellsTriangles);
+    polyData->SetLines(cellsLines);
+
+    // 单元的索引和设置（SetLines,SetPolys...)的顺序无关
+    // 固定顺序依次为：Verts Lines Polys Strips
+    for (size_t i = 0; i < polyData->GetNumberOfCells(); i++)
+    {
+        const vtkIdType* pts;
+        vtkIdType npts = 0;
+        polyData->GetCellPoints(i, npts, pts);
+        std::cout << "Cell " << i << "\tpoints: ";
+        for (size_t j = 0; j < npts; j++)
+        {
+            std::cout << pts[j] << '\t';
+        }
+        std::cout << '\n';
+    }
+
+    polyData->GetCellData()->SetScalars(scalars);
+
+    // lookupTable
+    vtkNew<vtkLookupTable> lut;
+    lut->SetRange(scalars->GetRange());
+    lut->SetHueRange(0.67, 0.);
+    lut->Build();
 
     //mapper
     vtkNew<vtkPolyDataMapper> mapper;
     mapper->SetInputData(polyData);
+    mapper->SetScalarRange(scalars->GetRange());
+    mapper->SetLookupTable(lut);
+    mapper->ScalarVisibilityOn();
 
     //actor
     vtkNew<vtkActor> actor;
