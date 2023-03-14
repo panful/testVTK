@@ -6,6 +6,7 @@
 * 62 vtkInteractorStyleRubberBandPick 框选拾取
 * 19 单元拾取 cellpick
 * 35 拾取并标记
+* 39.拾取actor并找出距离拾取点最近的顶点
 * 40 拾取vtkAssembly vtkActor装配器
 *  多图层拾取
 */
@@ -1205,6 +1206,231 @@ int main()
 
 #endif // TEST30
 
+#ifdef TEST39
+
+#include <vtkPolyData.h>
+#include <vtkPoints.h>
+#include <vtkCellArray.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkProperty.h>
+#include <vtkCamera.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkFloatArray.h>
+#include <vtkCellData.h>
+#include <vtkLookupTable.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkPropPicker.h>
+#include <vtkCellLocator.h>
+#include <vtkGenericCell.h>
+#include <vtkCoordinate.h>
+
+#include <array>
+#include <iostream>
+
+namespace
+{
+    std::array<float, 6 * 3 * 3> vertices{
+        0.0f,0.0f,0.0f,  // 0
+        0.0f,1.0f,0.0f,
+        -.1f,0.9f,-.1f,
+        -.1f,0.9f,0.1f,
+        0.1f,0.9f,-.1f,
+        0.1f,0.9f,0.1f,  // 5
+
+        1.0f,0.0f,0.0f,  // 6
+        1.0f,1.0f,0.0f,
+        0.9f,0.9f,-.1f,
+        0.9f,0.9f,0.1f,
+        1.1f,0.9f,-.1f,
+        1.1f,0.9f,0.1f,  // 11
+
+        2.0f,0.0f,0.0f,  // 12
+        2.0f,1.0f,0.0f,
+        1.9f,0.9f,-.1f,
+        1.9f,0.9f,0.1f,
+        2.1f,0.9f,-.1f,
+        2.1f,0.9f,0.1f,  // 17
+    };
+
+    // 一个箭头由两个三角形和一条线段构成
+    std::array<long long, 3 * 2> linesIndices{
+        0,1,
+        6,7,
+        12,13,
+    };
+
+    std::array<long long, 3 * 6> triangleIndices{
+        1,2,3,
+        1,4,5,
+
+        7,8,9,
+        7,10,11,
+
+        13,14,15,
+        13,16,17
+    };
+
+    class MyInteractorStyle : public vtkInteractorStyleRubberBand3D
+    {
+    public:
+        static MyInteractorStyle* New();
+        vtkTypeMacro(MyInteractorStyle, vtkInteractorStyleRubberBand3D);
+
+        virtual void OnLeftButtonUp() override
+        {
+            std::cout << "------------------------------------\n";
+
+            if (this->Interactor)
+            {
+                auto posX = this->Interactor->GetEventPosition()[0];
+                auto posY = this->Interactor->GetEventPosition()[1];
+                std::cout << "mouse X : " << posX << "\tY : " << posY << '\n';
+
+                vtkNew<vtkPropPicker> propPicker;
+                this->Interactor->SetPicker(propPicker);
+
+                if (propPicker->Pick(posX, posY, 0, this->CurrentRenderer) != 0)
+                {
+                    auto pickPosition = propPicker->GetPickPosition();
+                    auto pickActor = propPicker->GetActor();
+                    std::cout << "pickPostion : " << pickPosition[0] << '\t' << pickPosition[1] << '\t' << pickPosition[2] << '\n';
+
+                    auto dataSet = pickActor->GetMapper()->GetInput();
+
+                    std::array<double, 3> tempPt;
+                    double tempDis{ 0. };
+                    int tempSubId{ 0 };
+                    vtkIdType tempCellId{ 0 };
+
+                    vtkNew<vtkGenericCell> genericCell;
+                    vtkNew<vtkCellLocator> cellLocator;
+                    cellLocator->SetDataSet(dataSet);
+                    cellLocator->BuildLocator();
+
+                    // 查找距离点pickPosition距离最近的单元
+                    cellLocator->FindClosestPoint(pickPosition, tempPt.data(), tempCellId, tempSubId, tempDis);
+                    std::cout << tempCellId << '\t' << tempSubId << '\t' << tempDis << '\n';
+
+                    // 使用vtkGenericCell要比不使用速度快
+                    cellLocator->FindClosestPoint(pickPosition, tempPt.data(), genericCell, tempCellId, tempSubId, tempDis);
+                    std::cout << tempCellId << '\t' << tempSubId << '\t' << tempDis << '\n';
+
+                    // 获取构成该单元的所有顶点
+                    vtkNew<vtkIdList> pts;
+                    dataSet->GetCellPoints(tempCellId, pts);
+                    double distance{ VTK_DOUBLE_MAX };
+                    int pointID{ -1 };
+
+                    for (auto i = 0; i < pts->GetNumberOfIds(); ++i)
+                    {
+                        double pt[3]{ 0. };
+                        dataSet->GetPoint(pts->GetId(i), pt);
+
+                        auto _distance_ = std::hypot(pt[0] - pickPosition[0], pt[1] - pickPosition[1], pt[2] - pickPosition[2]);
+                        if (_distance_ < distance)
+                        {
+                            // 距离pickPosition最近的顶点
+                            distance = _distance_;
+                            pointID = pts->GetId(i);
+                        }
+                    }
+                    std::cout << "point id: " << pointID << '\n';
+                }
+
+            }
+
+            this->Interactor->Render();
+            Superclass::OnLeftButtonUp();
+        }
+
+    };
+    vtkStandardNewMacro(MyInteractorStyle);
+}
+
+int main()
+{
+    vtkNew<vtkPolyData> polyData;
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cellsTriangles;
+    vtkNew<vtkCellArray> cellsLines;
+
+    vtkNew<vtkFloatArray> scalars;
+
+    for (size_t i = 0; i < vertices.size(); i += 3)
+    {
+        points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
+    }
+    for (size_t i = 0; i < linesIndices.size(); i += 2)
+    {
+        cellsLines->InsertNextCell({ linesIndices[i],linesIndices[i + 1] });
+    }
+    for (size_t i = 0; i < triangleIndices.size(); i += 3)
+    {
+        cellsTriangles->InsertNextCell({ triangleIndices[i],triangleIndices[i + 1] ,triangleIndices[i + 2] });
+    }
+
+    scalars->SetNumberOfValues(9);
+    for (size_t i = 0; i < 3; i++)
+    {
+        scalars->SetValue(i, i);
+        scalars->SetValue(2 * i + 3, i);
+        scalars->SetValue(2 * i + 3 + 1, i);
+    }
+
+    polyData->SetPoints(points);
+    polyData->SetPolys(cellsTriangles);
+    polyData->SetLines(cellsLines);
+    polyData->GetCellData()->SetScalars(scalars);
+
+    // lookupTable
+    vtkNew<vtkLookupTable> lut;
+    lut->SetRange(scalars->GetRange());
+    lut->SetHueRange(0.67, 0.);
+    lut->Build();
+
+    //mapper
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+    mapper->SetScalarRange(scalars->GetRange());
+    mapper->SetLookupTable(lut);
+    mapper->ScalarVisibilityOn();
+
+    //actor
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    //renderer
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    //RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(600, 600);
+
+    //RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    // interactor syle
+    vtkNew<MyInteractorStyle> style;
+    iren->SetInteractorStyle(style);
+
+    //数据交互
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST39
+
 #ifdef TEST40
 
 #include <vtkActor.h>
@@ -1767,7 +1993,6 @@ int main(int, char* [])
 }
 
 #endif // TEST19
-
 
 #ifdef TEST35
 
