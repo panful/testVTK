@@ -8,10 +8,14 @@
 * 35 拾取并标记
 * 39.拾取actor并找出距离拾取点最近的顶点
 * 40 拾取vtkAssembly vtkActor装配器
-*  多图层拾取
+*  
+* 33 拾取 vtkAxesActor  PickPropFrom()
+* 34 拾取 vtkOrientationMarkerWidget 中的 vtkAxesActor
+* 36 拾取 vtkOrientationMarkerWidget 中的 vtkAxesActor，鼠标在坐标轴区域按下时坐标轴一直旋转，定时器的使用
+* 多图层拾取 01_03_TEST45
 */
 
-#define TEST40
+#define TEST36
 
 #ifdef TEST27
 
@@ -2272,4 +2276,551 @@ int main()
     return EXIT_SUCCESS;
 }
 #endif // TEST35
+
+#ifdef TEST33
+
+#include <vtkActor.h>
+#include <vtkAxesActor.h>
+#include <vtkCamera.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkOrientationMarkerWidget.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkPropAssembly.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+#include <vtkCallbackCommand.h>
+#include <vtkActor2D.h>
+#include <vtkPickingManager.h>
+#include <vtkPropPicker.h>
+#include <vtkCellPicker.h>
+#include <vtkAssemblyPath.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkSphereSource.h>
+
+namespace
+{
+    vtkNew<vtkAxesActor> axes;
+
+    class MyStyle : public vtkInteractorStyleRubberBand3D
+    {
+    public:
+        static MyStyle* New();
+        vtkTypeMacro(MyStyle, vtkInteractorStyleRubberBand3D);
+
+        void OnChar() override
+        {
+            Superclass::OnChar();
+        }
+
+        void OnLeftButtonDown() override
+        {
+            int X = this->Interactor->GetEventPosition()[0];
+            int Y = this->Interactor->GetEventPosition()[1];
+
+            std::cout << "------------------------------------------\n";
+            std::cout << X << '\t' << Y << '\n';
+
+            this->FindPokedRenderer(X, Y);
+
+            vtkNew<vtkPropCollection> props;
+            axes->GetActors(props);
+
+            // 使用vtkPropPicker vtkCellPicker都拾取不到三个轴
+            // vtkPropPicker只能拾取到整个坐标轴
+            // 不能使用PickProp(X,Y)，拾取不到vtkProp
+            if (auto path = this->CurrentRenderer->PickPropFrom(X, Y, props))
+            {
+                printf("numOfItems\t%d\t", path->GetNumberOfItems());
+                if (auto actor = vtkActor::SafeDownCast(path->GetLastNode()->GetViewProp()))
+                {
+                    printf("picked\t%p\n", actor);
+                }
+            }
+
+            Superclass::OnLeftButtonDown();
+            this->Interactor->Render();
+        }
+    };
+
+    vtkStandardNewMacro(MyStyle);
+}
+
+int main(int, char* [])
+{
+    vtkNew<vtkNamedColors> colors;
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetWindowName("DisplayCoordinateAxes");
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<MyStyle> style;
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    axes->SetTipTypeToCone();
+    axes->SetShaftTypeToCylinder();
+    axes->SetConeRadius(.5);
+    axes->SetCylinderRadius(0.05);
+
+    // 打印axes的信息
+    printf("%p\n", axes.GetPointer());
+    vtkNew<vtkPropCollection> props;
+    axes->GetActors(props);
+    props->InitTraversal();
+    while (auto prop = props->GetNextProp())
+    {
+        printf("%p\n", prop);
+    }
+
+    renderer->AddActor(axes);
+    renderer->ResetCamera();
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST33
+
+#ifdef TEST34
+
+#include <vtkActor.h>
+#include <vtkAxesActor.h>
+#include <vtkCamera.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkOrientationMarkerWidget.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkPropAssembly.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+#include <vtkCallbackCommand.h>
+#include <vtkActor2D.h>
+#include <vtkPickingManager.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkPropPicker.h>
+#include <vtkCellPicker.h>
+#include <vtkAssemblyPath.h>
+
+namespace
+{
+    class MyWidget :public vtkOrientationMarkerWidget
+    {
+    public:
+        static MyWidget* New();
+        vtkTypeMacro(MyWidget, vtkOrientationMarkerWidget);
+
+    protected:
+
+        void OnLeftButtonDown() override
+        {
+            int X = this->Interactor->GetEventPosition()[0];
+            int Y = this->Interactor->GetEventPosition()[1];
+
+            std::cout << "------------------------------------------\n";
+            std::cout << X << '\t' << Y << '\n';
+
+            // vtkOrientationMarkerWidget内部会创建一个vtkRenderer，它的图层被设置为1，即始终在最上面
+            // this->CurrentRenderer是原始的renderer
+            // this->Renderer才是vtkOrientationMarkerWidget内部创建的renderer
+            printf("widget current render: %p\n", this->CurrentRenderer);
+            printf("widget render: %p\n", this->Renderer);
+
+            vtkNew<vtkPropCollection> props;
+            this->GetOrientationMarker()->GetActors(props);
+
+            if (auto path = this->Renderer->PickPropFrom(X, Y, props))
+            {
+                printf("numOfItems\t%d\t", path->GetNumberOfItems());
+                if (auto actor = vtkActor::SafeDownCast(path->GetLastNode()->GetViewProp()))
+                {
+                    printf("picked\t%p\n", actor);
+                }
+            }
+
+            Superclass::OnLeftButtonDown();
+        }
+
+    };
+
+    vtkStandardNewMacro(MyWidget);
+}
+
+int main(int, char* [])
+{
+    vtkNew<vtkSphereSource> sphereSource;
+    sphereSource->SetCenter(0.0, 0.0, 0.0);
+    sphereSource->SetRadius(1.0);
+    sphereSource->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(sphereSource->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(1, 0, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+    renderer->SetLayer(0);
+    renderer->AddActor(actor);
+    printf("default render: %p\n", renderer.GetPointer());
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetNumberOfLayers(2);
+    renderWindow->SetWindowName("DisplayCoordinateAxes");
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkInteractorStyleRubberBand3D> style;
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    vtkNew<vtkAxesActor> axes;
+    printf("exes: %p\n", axes.GetPointer());
+
+    vtkNew<vtkPropCollection> props;
+    axes->GetActors(props);
+    props->InitTraversal();
+    while (auto prop = props->GetNextProp())
+    {
+        // 打印坐标轴的三条轴和三个圆锥
+        printf("axes: %p\n", prop);
+    }
+
+    vtkNew<MyWidget> widget;
+    widget->SetOutlineColor(0, 0, 1);
+    widget->SetOrientationMarker(axes);
+    widget->SetInteractor(renderWindowInteractor);
+    widget->SetViewport(0.0, 0.0, 0.4, 0.4);
+    widget->SetEnabled(1);
+    widget->InteractiveOn();
+
+    renderer->GetActiveCamera()->Azimuth(50);
+    renderer->GetActiveCamera()->Elevation(-30);
+    renderer->ResetCamera();
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST34
+
+#ifdef TEST36
+
+#include <vtkActor.h>
+#include <vtkAxesActor.h>
+#include <vtkCamera.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkOrientationMarkerWidget.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkPropAssembly.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+#include <vtkCallbackCommand.h>
+#include <vtkActor2D.h>
+#include <vtkPickingManager.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkPropPicker.h>
+#include <vtkCellPicker.h>
+#include <vtkAssemblyPath.h>
+#include <vtkInteractorStyleJoystickCamera.h>
+
+namespace
+{
+    class MyWidget :public vtkOrientationMarkerWidget
+    {
+    public:
+        static MyWidget* New();
+        vtkTypeMacro(MyWidget, vtkOrientationMarkerWidget);
+
+        // 鼠标是否处于widget内部
+        bool GetPosInWidget(int X, int Y) const
+        {
+            double vp[4];
+            this->Renderer->GetViewport(vp);
+
+            // compute display bounds of the widget to see if we are inside or outside
+            this->Renderer->NormalizedDisplayToDisplay(vp[0], vp[1]);
+            this->Renderer->NormalizedDisplayToDisplay(vp[2], vp[3]);
+
+            int pos1[2] = { static_cast<int>(vp[0]), static_cast<int>(vp[1]) };
+            int pos2[2] = { static_cast<int>(vp[2]), static_cast<int>(vp[3]) };
+
+            if (X < (pos1[0] - this->Tolerance) || (pos2[0] + this->Tolerance) < X ||
+                Y < (pos1[1] - this->Tolerance) || (pos2[1] + this->Tolerance) < Y)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        // 获取widget的中心
+        std::array<double, 2> GetCenter() const
+        {
+            auto center = this->Renderer->GetCenter();
+            return { center[0],center[1] };
+        }
+
+        // 拾取坐标轴
+        bool PickAxis(int X, int Y)
+        {
+            vtkNew<vtkPropCollection> props;
+            this->GetOrientationMarker()->GetActors(props);
+
+            if (auto path = this->Renderer->PickPropFrom(X, Y, props))
+            {
+                printf("numOfItems\t%d\t", path->GetNumberOfItems());
+                if (auto actor = vtkActor::SafeDownCast(path->GetLastNode()->GetViewProp()))
+                {
+                    printf("picked\t%p\n", actor);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+    protected:
+        MyWidget()
+        {
+            this->SetOutlineColor(1, 0, 0);
+            this->OutlineActor->VisibilityOn();
+        }
+
+        // 屏蔽鼠标左键对widget的响应
+        void OnLeftButtonDown() override
+        {
+            this->Interactor->Render();
+        }
+
+        virtual void OnLeftButtonUp() override
+        {
+            this->Interactor->Render();
+        }
+
+        virtual void OnMouseMove() override
+        {
+            this->Interactor->Render();
+        }
+    };
+
+    vtkStandardNewMacro(MyWidget);
+
+    class MyStyle : public vtkInteractorStyleRubberBand3D
+    {
+    public:
+        static MyStyle* New();
+        vtkTypeMacro(MyStyle, vtkInteractorStyleRubberBand3D);
+
+        void SetWidget(const vtkSmartPointer<MyWidget>& w)
+        {
+            m_widget = w;
+        }
+
+    protected:
+        MyStyle()
+        {
+            // 开启定时器
+            // 鼠标左键按下旋转的时候通过定时器调用
+            this->UseTimers = 1;
+        }
+        void OnLeftButtonDown() override
+        {
+            int X = this->Interactor->GetEventPosition()[0];
+            int Y = this->Interactor->GetEventPosition()[1];
+
+            if (m_widget && m_widget->GetPosInWidget(X, Y))
+            {
+                if (m_widget->PickAxis(X, Y))
+                {
+                    // do some thing
+                }
+                else
+                {
+                    // 鼠标处于坐标轴所在区域则开始旋转
+                    MyRotateAxesStart();
+                }
+                this->Interactor->Render();
+                return;
+            }
+            else
+            {
+                Superclass::OnLeftButtonDown();
+            }
+        }
+
+        void OnLeftButtonUp() override
+        {
+            MyRotateAxesStop();
+            Superclass::OnLeftButtonUp();
+        }
+        void Rotate() override
+        {
+            int X = this->Interactor->GetEventPosition()[0];
+            int Y = this->Interactor->GetEventPosition()[1];
+
+            // 鼠标移出坐标轴区域则停止旋转
+            if (!m_widget || !m_widget->GetPosInWidget(X, Y))
+            {
+                std::cout << "return\n";
+                return;
+            }
+
+            if (this->CurrentRenderer == nullptr)
+            {
+                std::cout << "nullptr\n";
+                return;
+            }
+
+            std::cout << "rotate\n";
+
+            vtkRenderWindowInteractor* rwi = this->Interactor;
+
+            auto center = m_widget->GetCenter();
+
+            double dx = rwi->GetEventPosition()[0] - center[0];
+            double dy = rwi->GetEventPosition()[1] - center[1];
+
+            double* vp = this->CurrentRenderer->GetViewport();
+            const int* size = rwi->GetSize();
+
+            double delta_elevation = -20.0 / ((vp[3] - vp[1]) * size[1]);
+            double delta_azimuth = -20.0 / ((vp[2] - vp[0]) * size[0]);
+
+            double rxf = dx * delta_azimuth;
+            double ryf = dy * delta_elevation;
+
+            vtkCamera* camera = this->CurrentRenderer->GetActiveCamera();
+            camera->Azimuth(rxf);
+            camera->Elevation(ryf);
+            camera->OrthogonalizeViewUp();
+
+            if (this->AutoAdjustCameraClippingRange)
+            {
+                this->CurrentRenderer->ResetCameraClippingRange();
+            }
+
+            if (rwi->GetLightFollowCamera())
+            {
+                this->CurrentRenderer->UpdateLightsGeometryToFollowCamera();
+            }
+
+            rwi->Render();
+        }
+
+    private:
+        void MyRotateAxesStart()
+        {
+            auto pos = this->Interactor->GetEventPosition();
+            this->FindPokedRenderer(pos[0], pos[1]);
+            this->StartRotate();
+        }
+        void MyRotateAxesStop()
+        {
+            this->EndRotate();
+        }
+
+    private:
+        vtkSmartPointer<MyWidget> m_widget{ nullptr };
+    };
+
+    vtkStandardNewMacro(MyStyle);
+}
+
+int main(int, char* [])
+{
+    vtkNew<vtkSphereSource> sphereSource;
+    sphereSource->SetCenter(0.0, 0.0, 0.0);
+    sphereSource->SetRadius(1.0);
+    sphereSource->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(sphereSource->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(1, 0, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+    renderer->SetLayer(0);
+    renderer->AddActor(actor);
+    printf("default render: %p\n", renderer.GetPointer());
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetNumberOfLayers(2);
+    renderWindow->SetWindowName("DisplayCoordinateAxes");
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<MyStyle> style;
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    vtkNew<vtkAxesActor> axes;
+    printf("exes: %p\n", axes.GetPointer());
+
+    vtkNew<vtkPropCollection> props;
+    axes->GetActors(props);
+    props->InitTraversal();
+    while (auto prop = props->GetNextProp())
+    {
+        // 打印坐标轴的三条轴和三个圆锥
+        printf("axes: %p\n", prop);
+    }
+
+    vtkNew<MyWidget> widget;
+    widget->SetOutlineColor(0, 0, 1);
+    widget->SetOrientationMarker(axes);
+    widget->SetInteractor(renderWindowInteractor);
+    widget->SetViewport(0.0, 0.0, 0.4, 0.4);
+    widget->SetEnabled(1);
+    widget->InteractiveOn();
+
+    style->SetWidget(widget);
+
+    renderer->GetActiveCamera()->Azimuth(50);
+    renderer->GetActiveCamera()->Elevation(-30);
+    renderer->ResetCamera();
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST36
+
 

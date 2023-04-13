@@ -10,18 +10,18 @@ find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
 
 find_package(VTK 
     COMPONENTS
-        vtkCommonColor
-        vtkCommonCore
-        vtkFiltersSources
-        vtkInteractionStyle
-        vtkInteractionWidgets
-        vtkRenderingContextOpenGL2
-        vtkRenderingCore
-        vtkRenderingFreeType
-        vtkRenderingGL2PSOpenGL2
-        vtkRenderingOpenGL2
-        vtkGUISupportQt
-        vtkRenderingQt
+        CommonColor
+        CommonCore
+        FiltersSources
+        InteractionStyle
+        InteractionWidgets
+        RenderingContextOpenGL2
+        RenderingCore
+        RenderingFreeType
+        RenderingGL2PSOpenGL2
+        RenderingOpenGL2
+        GUISupportQt
+        RenderingQt
     REQUIRED
 )
 
