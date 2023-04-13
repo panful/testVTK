@@ -9,4 +9,4 @@ add_subdirectory ("04_cameraTransform")
 add_subdirectory ("05_colorMap")
 add_subdirectory ("06_parallelProcess")
 add_subdirectory ("07_pick")
-
+add_subdirectory ("08_interactor")
