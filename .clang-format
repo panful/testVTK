@@ -1,0 +1,27 @@
+﻿
+BasedOnStyle: WebKit
+Language: Cpp
+
+# 不使用制表符
+UseTab: Never
+
+# 缩进宽度
+IndentWidth: 4
+
+BreakBeforeBraces: Custom
+# 大括号换行，只有当BreakBeforeBraces设置为Custom时才有效
+BraceWrapping:
+  AfterControlStatement:    true
+  AfterFunction:            true
+  AfterClass:               true
+  AfterStruct:              true
+  AfterEnum:                true
+  BeforeCatch:              true  # catch 新起一行
+  BeforeElse:               true  # else  新起一行
+  AfterCaseLabel:           true  # case  新起一行
+
+# 尾随的注释对齐
+AlignTrailingComments: true
+
+# AlignConsecutiveAssignments: true  # 对齐连续的多行赋值
+# PointerAlignment: Right # 指针的*紧靠变量名
