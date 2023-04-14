@@ -1,56 +1,54 @@
 ﻿/*
-* 1. 使用vtk自带模型
-* 2. 自定义vtkPolyData
-*/
-
+ * 1. 使用vtk自带模型
+ * 2. 自定义vtkPolyData
+ */
 
 #define TEST2
 
 #ifdef TEST1
 
-#include <vtkCubeSource.h>
-#include <vtkSmartPointer.h>
-#include <vtkPolyDataMapper.h>
 #include <vtkActor.h>
 #include <vtkCamera.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkPolyDataMapper.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
 #include <vtkRenderWindowInteractor.h>
-#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkCubeSource> source;
     source->Update();
 
-    //mapper
+    // mapper
     vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputConnection(source->GetOutputPort());
-    //cubeMapper->SetInputData(cube->GetOutput()); // 使用vtkPolyData方式，必须对Source进行Update()
+    mapper->SetInputData(source->GetOutput());
 
-    //actor
+    // actor
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
     actor->GetProperty()->SetColor(0, 1, 0);
 
-    //camera
+    // camera
     vtkNew<vtkCamera> camera;
-    camera->SetPosition(1, 1, 1);//设置相机位置
-    camera->SetFocalPoint(0, 0, 0);//设置相机焦点
+    camera->SetPosition(1, 1, 1);
+    camera->SetFocalPoint(0, 0, 0);
 
-    //renderer
+    // renderer
     vtkNew<vtkRenderer> renderer;
     renderer->AddActor(actor);
     renderer->SetActiveCamera(camera);
     renderer->ResetCamera();
 
-    //RenderWindow
+    // RenderWindow
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
-    renWin->SetSize(600, 600);//设置window大小
+    renWin->SetSize(600, 600);
 
-    //RenderWindowInteractor
+    // RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
 
@@ -58,7 +56,7 @@ int main(int, char* [])
     vtkNew<vtkInteractorStyleRubberBand3D> style;
     iren->SetInteractorStyle(style);
 
-    //数据交互
+    // render
     renWin->Render();
     iren->Start();
 
@@ -69,37 +67,36 @@ int main(int, char* [])
 
 #ifdef TEST2
 
-#include <vtkPolyData.h>
-#include <vtkPoints.h>
-#include <vtkCellArray.h>
-#include <vtkPolyDataMapper.h>
 #include <vtkActor.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindow.h>
-#include <vtkProperty.h>
 #include <vtkCamera.h>
-#include <vtkRenderWindowInteractor.h>
+#include <vtkCellArray.h>
 #include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
 
 #include <array>
 #include <iostream>
 
 // 四条线段组成一个正方形
-namespace
-{
-    std::array<float, 4 * 3> vertices{
-        0,0,0,
-        1,0,0,
-        1,1,0,
-        0,1,0
-    };
+namespace {
+std::array<float, 4 * 3> vertices {
+    0, 0, 0,
+    1, 0, 0,
+    1, 1, 0,
+    0, 1, 0
+};
 
-    std::array<long long, 4 * 2> indices{
-        0,1,
-        1,2,
-        2,3,
-        3,0
-    };
+std::array<long long, 4 * 2> indices {
+    0, 1,
+    1, 2,
+    2, 3,
+    3, 0
+};
 }
 
 int main()
@@ -114,32 +111,32 @@ int main()
     }
     for (size_t i = 0; i < indices.size(); i += 2)
     {
-        cells->InsertNextCell({ indices[i],indices[i + 1] });
+        cells->InsertNextCell({ indices[i], indices[i + 1] });
     }
 
     polyData->SetPoints(points);
     polyData->SetLines(cells);
 
-    //mapper
+    // mapper
     vtkNew<vtkPolyDataMapper> mapper;
     mapper->SetInputData(polyData);
 
-    //actor
+    // actor
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
     actor->GetProperty()->SetColor(0, 1, 0);
 
-    //renderer
+    // renderer
     vtkNew<vtkRenderer> renderer;
     renderer->AddActor(actor);
     renderer->ResetCamera();
 
-    //RenderWindow
+    // RenderWindow
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
     renWin->SetSize(600, 600);
 
-    //RenderWindowInteractor
+    // RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
 
@@ -147,7 +144,7 @@ int main()
     vtkNew<vtkInteractorStyleRubberBand3D> style;
     iren->SetInteractorStyle(style);
 
-    //数据交互
+    // 数据交互
     renWin->Render();
     iren->Start();
 
@@ -155,4 +152,3 @@ int main()
 }
 
 #endif // TEST2
-
