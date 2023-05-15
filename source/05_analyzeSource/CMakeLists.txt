@@ -1,4 +1,4 @@
-﻿set(target_name "01_00_Test")
+﻿set(target_name "05_analyzeSource")
 
 find_package(VTK
     COMPONENTS
@@ -6,7 +6,6 @@ find_package(VTK
         CommonDataModel
         FiltersSources
         InteractionStyle
-        InteractionWidgets          # vtkOrientationMarkerWidget
         RenderingContextOpenGL2
         RenderingCore
         RenderingFreeType
