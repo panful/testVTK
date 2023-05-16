@@ -1,10 +1,4 @@
-﻿set(target_name "02_01_Template")
-
-set(CMAKE_AUTOMOC ON)  # Meta-Object Compiler
-set(CMAKE_AUTORCC OFF) # Resource Compiler
-set(CMAKE_AUTOUIC OFF) # User Interface Compiler
-
-find_package(Qt6 COMPONENTS Widgets)
+﻿set(target_name "01_09_image")
 
 find_package(VTK
     COMPONENTS
@@ -15,7 +9,9 @@ find_package(VTK
         RenderingOpenGL2
         loguru
         ParallelMPI
-        GUISupportQt
+        IOImage         # vtkPostScriptWriter
+        IOExport        # vtkExporter
+        ImagingColor    # vtkImageLuminance
     QUIET
 )
 
@@ -24,7 +20,7 @@ if (NOT VTK_FOUND)
 endif()
 
 add_executable(${target_name} "main.cpp")
-target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES} Qt6::Widgets)
+target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES} )
 
 # 初始化vtk模块
 vtk_module_autoinit(
@@ -49,7 +45,7 @@ foreach(_full_name _name IN ZIP_LISTS _FULL_NAME_ _NAME_)
     
     # 拷贝DLL到生成目录
     add_custom_command(TARGET ${target_name}
-    PRE_BUILD
+    POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E
         copy_if_different ${_full_name} $<TARGET_FILE_DIR:${target_name}>/${_name}
     )

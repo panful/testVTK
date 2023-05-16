@@ -3,13 +3,9 @@
 find_package(VTK
     COMPONENTS
         CommonCore
-        CommonDataModel
         FiltersSources
         InteractionStyle
-        RenderingContextOpenGL2
         RenderingCore
-        RenderingFreeType
-        RenderingGL2PSOpenGL2
         RenderingOpenGL2
         loguru
         ParallelMPI

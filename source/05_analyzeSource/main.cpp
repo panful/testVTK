@@ -6,7 +6,7 @@
  * 6. 交叉图形的混合透明度
  */
 
-#define TEST1
+#define TEST2
 
 #ifdef TEST1
 
@@ -33,8 +33,8 @@
  vtkOpenGLVertexBufferObjectGroup.cxx   [322]   BuildAllVBOs()
  vtkOpenGLBufferObject.cxx              [137]   UploadInternal()  glBufferData
 
- vtkOpenGLPolyDataMapper.cxx            [4002]  BuildIBO()
 根据vtkPolyData的Cell类型创建IBO
+ vtkOpenGLPolyDataMapper.cxx            [4002]  BuildIBO()
  vtkOpenGLIndexBufferObject.cxx                 CreateTriangleIndexBuffer()
                                                 CreatePointIndexBuffer()
                                                 CreateTriangleLineIndexBuffer
@@ -48,6 +48,9 @@
 
 离屏渲染
  vtkOpenGLQuadHelper.cxx                [109]   glDrawArrays() 将渲染的结果（FBO）绘制到屏幕上
+
+shader文件
+ .../Rendering/OpenGL2/glsl
 */
 
 int main()
@@ -100,6 +103,78 @@ int main()
 }
 
 #endif // TEST1
+
+#ifdef TEST2
+
+#include <vtkActor.h>
+#include <vtkCellArray.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+#include <iostream>
+
+/*
+
+*/
+
+int main()
+{
+    vtkNew<vtkPolyData> polyData;
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cells;
+
+    points->InsertNextPoint(0., 0., 0.);
+    points->InsertNextPoint(10., 0., 0.);
+    points->InsertNextPoint(5., 10., 0.);
+
+    cells->InsertNextCell({ 0, 1, 2 });
+
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+
+    // mapper
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+
+    // actor
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(1, 0, 0);
+
+    // renderer
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    // RenderWindow
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    // RenderWindowInteractor
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    // interactor syle
+    vtkNew<vtkInteractorStyleRubberBand3D> style;
+    iren->SetInteractorStyle(style);
+
+    // render
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST2
 
 #ifdef TEST3
 
