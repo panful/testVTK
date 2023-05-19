@@ -9,10 +9,11 @@
  * 55.logowidget  vtkImageCanvasSource2D
  * 56.vtkImageBlend vtkImageCanvasSource2D 将多张图片叠加在一起，可以实现截图框选中为原图颜色，没选中的加阴影
  * 57.图片铺满整个窗口 图片占满(充满整个屏幕) https://kitware.github.io/vtk-examples/site/Cxx/Images/FillWindow/
- * 63.vtkImageData 转 QImage
+ * 63.vtkImageData 转 QImage并保存为tiff 官方示例
+ * 64.自定义像素转换方法
  */
 
-#define TEST47
+#define TEST64
 
 #ifdef TEST47
 
@@ -99,11 +100,17 @@ int main(int, char*[])
     // jpg->SetFileName("test1.jpg");
     // jpg->Write();
 
-    //// tiff
-    // vtkNew<vtkTIFFWriter> tiff;
-    // tiff->SetInputData(img->GetOutput());
-    // tiff->SetFileName("test.tiff");
-    // tiff->Write();
+    // tiff 中文路径会保存失败 vtk 9.1
+    // 底层使用CreateFileA创建文件并不是CreateFileW
+    vtkNew<vtkTIFFWriter> tiff;
+    tiff->SetInputData(img->GetOutput());
+    tiff->SetFileName("中文/test.tiff");
+    tiff->Write();
+
+    vtkNew<vtkTIFFWriter> tiff2;
+    tiff2->SetInputData(img->GetOutput());
+    tiff2->SetFileName("中文.tiff");
+    tiff2->Write();
 
     // vtkNew<vtkTIFFWriter> tiff1;
     // tiff1->SetInputData(luminance->GetOutput());
@@ -1518,10 +1525,8 @@ int main(int, char*[])
 
 #ifdef TEST63
 
-#define vtk_official
-
-#ifdef vtk_official
 // https://kitware.github.io/vtk-examples/site/Cxx/Qt/ImageDataToQImage/
+
 #include <vtkImageData.h>
 #include <vtkNew.h>
 #include <vtkSmartPointer.h>
@@ -1534,7 +1539,7 @@ int main(int, char*[])
 vtkSmartPointer<vtkImageData> createDemoImageData()
 {
     vtkNew<vtkImageData> image;
-    image->SetDimensions(50, 50, 1);
+    image->SetDimensions(500, 500, 1);
     image->AllocateScalars(VTK_UNSIGNED_CHAR, 3);
 
     int width  = image->GetDimensions()[0];
@@ -1545,9 +1550,25 @@ vtkSmartPointer<vtkImageData> createDemoImageData()
         for (int x = 0; x < width; x++)
         {
             unsigned char* pixel = static_cast<unsigned char*>(image->GetScalarPointer(x, y, 0));
-            pixel[0]             = 0;
-            pixel[1]             = 255;
-            pixel[2]             = 0;
+            if (x < 300 && x > 200 && y < 300 && y > 200)
+            {
+                pixel[0] = 255;
+                pixel[1] = 0;
+                pixel[2] = 0;
+            }
+
+            else if (x < 400 && x > 100 && y < 400 && y > 100)
+            {
+                pixel[0] = 0;
+                pixel[1] = 255;
+                pixel[2] = 0;
+            }
+            else
+            {
+                pixel[0] = 0;
+                pixel[1] = 0;
+                pixel[2] = 255;
+            }
         }
     }
 
@@ -1590,14 +1611,26 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
 
     QImage qimage = vtkImageDataToQImage(createDemoImageData());
-    qimage.save("qimage.png");
+
+    // 必须在当前程序下存在"./中文"文件夹才可以保存
+    if (qimage.save("./中文/qim中文age.TIFF"))
+    {
+        qDebug() << "Image file saved successfully";
+    }
+    else
+    {
+        qDebug() << "Failed to save Image file";
+    }
 
     return EXIT_SUCCESS;
 }
 
-#else
+#endif // TEST63
+
+#ifdef TEST64
 
 // https://tieba.baidu.com/p/4297027534?red_tag=3118028977
+
 #include <QImage>
 #include <vtkDataArray.h>
 #include <vtkImageData.h>
@@ -1606,6 +1639,7 @@ int main(int argc, char* argv[])
 #include <vtkUnsignedCharArray.h>
 
 #include <string>
+
 QImage createQImage1(int width, int height, vtkUnsignedCharArray* scalars);
 QImage createQImage2(int width, int height, vtkUnsignedCharArray* scalars);
 QImage createQImage3(int width, int height, vtkUnsignedCharArray* scalars);
@@ -1746,6 +1780,5 @@ QImage createQImage(vtkImageData* imageData)
 
     return QImage();
 }
-#endif // vtk_official
 
-#endif // TEST63
+#endif // TEST64
