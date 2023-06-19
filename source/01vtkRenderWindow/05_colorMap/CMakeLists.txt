@@ -14,6 +14,9 @@ find_package(VTK
         loguru
         ParallelMPI
         RenderingAnnotation # vtkScalarBarActor
+        InteractionWidgets  # vtkCameraOrientationWidget
+        FiltersModeling     # vtkBandedPolyDataContourFilter
+        CommonColor         # vtkColorSeries
     QUIET
 )
 
