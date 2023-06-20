@@ -1,8 +1,10 @@
 ﻿
 /*
  * 1. vbo ibo DrawCall
- * 2.
+ * 2. shader源码的生成、编译、修改
  * 3. 调试vtk源码
+ * 4. 
+ * 5.
  * 6. 交叉图形的混合透明度
  */
 
@@ -38,7 +40,7 @@
  vtkOpenGLIndexBufferObject.cxx                 CreateTriangleIndexBuffer()
                                                 CreatePointIndexBuffer()
                                                 CreateTriangleLineIndexBuffer
-                                                CreateLineIndexBuffer CreateStripIndexBuffer 
+                                                CreateLineIndexBuffer CreateStripIndexBuffer
                                                 CreateVertexIndexBuffer
                                                 CreateEdgeFlagIndexBuffer
  vtkOpenGLBufferObject.cxx              [137]   UploadInternal()  glBufferData
@@ -47,7 +49,9 @@
  vtkOpenGLPolyDataMapper.cxx            [3444]  RenderPieceDraw()   glDrawRangeElements() 绘制点、线、三角面
 
 离屏渲染
- vtkOpenGLQuadHelper.cxx                [109]   glDrawArrays() 将渲染的结果（FBO）绘制到屏幕上
+ vtkRenderWindow.cxx                    [547]   CopyResultFrame()
+ vtkOpenGLRenderWindow.cxx              [1110]  Frame() 将渲染的结果（FBO）提交给窗口FBO对应的着色器
+ vtkOpenGLQuadHelper.cxx                [109]   glDrawArrays() 将渲染的结果（铺满屏幕的quad）绘制到屏幕上
 
 shader文件
  .../Rendering/OpenGL2/glsl
@@ -108,7 +112,11 @@ int main()
 
 #include <vtkActor.h>
 #include <vtkCellArray.h>
+#include <vtkImageData.h>
 #include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkOpenGLFramebufferObject.h>
+#include <vtkOpenGLRenderWindow.h>
+#include <vtkPixelBufferObject.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
@@ -116,12 +124,33 @@ int main()
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
+#include <vtkShaderProperty.h>
 
 #include <iostream>
 
-/*
+namespace {
 
-*/
+class MyStyle : public vtkInteractorStyleRubberBand3D
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleRubberBand3D);
+
+    void OnLeftButtonUp() override
+    {
+        Superclass::OnLeftButtonUp();
+    }
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+/*
+ * 生成shader vtkOpenGLPolyDataMapper.cxx [350] vtkOpenGLPolyDataMapper::BuildShaders
+ * 根据vtkActor的属性生成指定的shader vtkOpenGLPolyDataMapper.cxx [2461] vtkOpenGLPolyDataMapper::ReplaceShaderValues
+ * 编译shader vtkShader.cxx [43] vtkShader::Compile()
+ * 设置uniform vtkShaderProgram.cxx
+ */
 
 int main()
 {
@@ -145,12 +174,20 @@ int main()
     // actor
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
-    actor->GetProperty()->SetColor(0, 1, 0);
-    actor->GetProperty()->EdgeVisibilityOn();
-    actor->GetProperty()->SetEdgeColor(1, 0, 0);
+    actor->GetProperty()->SetColor(0., 1., 0.);
+
+    // 将片段着色器的输出设置为指定值，只是在光照后边将默认的输出覆盖掉，具体怎么设置输出还不太清楚
+    // 将shader模板文件的"//VTK::Light::Impl"替换为 "//VTK::Light::Impl\nfragOutput0 = vec4(1.0, 0.0, 0.0, 1.0);\n"
+     auto sp = actor->GetShaderProperty();
+     sp->AddFragmentShaderReplacement("//VTK::Light::Impl", true,
+         "//VTK::Light::Impl\n"
+         "  fragOutput0 = vec4(1.0, 0.0, 0.0, 1.0);\n",
+         false);
 
     // renderer
     vtkNew<vtkRenderer> renderer;
+    renderer->LightFollowCameraOff();
+    renderer->RemoveAllLights();
     renderer->AddActor(actor);
     renderer->ResetCamera();
 
@@ -164,7 +201,7 @@ int main()
     iren->SetRenderWindow(renWin);
 
     // interactor syle
-    vtkNew<vtkInteractorStyleRubberBand3D> style;
+    vtkNew<MyStyle> style;
     iren->SetInteractorStyle(style);
 
     // render
@@ -275,6 +312,7 @@ int main()
 }
 
 #endif // TEST3
+
 
 #ifdef TEST6
 
