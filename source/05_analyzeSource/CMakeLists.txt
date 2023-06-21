@@ -11,6 +11,7 @@ find_package(VTK
         RenderingFreeType
         RenderingGL2PSOpenGL2
         RenderingOpenGL2
+        RenderingAnnotation
         loguru
         ParallelMPI
     QUIET

@@ -1,14 +1,14 @@
 ﻿
 /*
- * 1. vbo ibo DrawCall
- * 2. shader源码的生成、编译、修改
- * 3. 调试vtk源码
- * 4. 
+ * 1. 整个渲染的流程 生成vbo和ibo DrawCall
+ * 2. shader源码的生成、修改、编译、uniform的设置
+ * 3.
+ * 4.
  * 5.
  * 6. 交叉图形的混合透明度
  */
 
-#define TEST2
+#define TEST3
 
 #ifdef TEST1
 
@@ -31,7 +31,7 @@
  vtkOpenGLRenderer.cxx                  [298]   UpdateGeometry()
  vtkOpenGLPolyDataMapper.cxx            [3845]  BuildBufferObjects()
 
-创建VBO IBO
+创建VBO IBO，加载顶点、拓扑数据
  vtkOpenGLVertexBufferObjectGroup.cxx   [322]   BuildAllVBOs()
  vtkOpenGLBufferObject.cxx              [137]   UploadInternal()  glBufferData
 
@@ -52,6 +52,9 @@
  vtkRenderWindow.cxx                    [547]   CopyResultFrame()
  vtkOpenGLRenderWindow.cxx              [1110]  Frame() 将渲染的结果（FBO）提交给窗口FBO对应的着色器
  vtkOpenGLQuadHelper.cxx                [109]   glDrawArrays() 将渲染的结果（铺满屏幕的quad）绘制到屏幕上
+
+设置状态，点的大小，线的粗细，开启关闭深度测试、开启关闭混合等
+ vtkOpenGLState.cxx
 
 shader文件
  .../Rendering/OpenGL2/glsl
@@ -178,11 +181,11 @@ int main()
 
     // 将片段着色器的输出设置为指定值，只是在光照后边将默认的输出覆盖掉，具体怎么设置输出还不太清楚
     // 将shader模板文件的"//VTK::Light::Impl"替换为 "//VTK::Light::Impl\nfragOutput0 = vec4(1.0, 0.0, 0.0, 1.0);\n"
-     auto sp = actor->GetShaderProperty();
-     sp->AddFragmentShaderReplacement("//VTK::Light::Impl", true,
-         "//VTK::Light::Impl\n"
-         "  fragOutput0 = vec4(1.0, 0.0, 0.0, 1.0);\n",
-         false);
+    auto sp = actor->GetShaderProperty();
+    sp->AddFragmentShaderReplacement("//VTK::Light::Impl", true,
+        "//VTK::Light::Impl\n"
+        "  fragOutput0 = vec4(1.0, 0.0, 0.0, 1.0);\n",
+        false);
 
     // renderer
     vtkNew<vtkRenderer> renderer;
@@ -213,105 +216,6 @@ int main()
 
 #endif // TEST2
 
-#ifdef TEST3
-
-#include <vtkActor.h>
-#include <vtkCamera.h>
-#include <vtkCellArray.h>
-#include <vtkFloatArray.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPointData.h>
-#include <vtkPoints.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-
-#include <array>
-
-// 加载顶点拓扑数据等
-// vtkOpenGLBufferObject.cxx bool vtkOpenGLBufferObject::UploadInternal()
-
-// 设置状态，点的大小，线的粗细，深度测试等等
-// vtkOpenGLState.cxx
-
-// 设置uniform等
-// vtkShaderProgram.cxx
-
-// 编译shader
-// vtkShader.cxx
-
-// FBO
-// vtkOpenGLFrameBufferObject.cxx
-
-int main()
-{
-    vtkNew<vtkNamedColors> colors;
-
-    std::array<std::array<float, 3>, 8> pts = { { { { 0, 0, 0 } }, { { 1, 0, 0 } }, { { 1, 1, 0 } }, { { 0, 1, 0 } }, { { 0, 0, 1 } },
-        { { 1, 0, 1 } }, { { 1, 1, 1 } }, { { 0, 1, 1 } } } };
-    // The ordering of the corner points on each face.
-    std::array<std::array<vtkIdType, 4>, 6> ordering
-        = { { { { 0, 1, 2, 3 } }, { { 4, 5, 6, 7 } }, { { 0, 1, 5, 4 } }, { { 1, 2, 6, 5 } }, { { 2, 3, 7, 6 } }, { { 3, 0, 4, 7 } } } };
-
-    // We'll create the building blocks of polydata including data attributes.
-    vtkNew<vtkPolyData> cube;
-    vtkNew<vtkPoints> points;
-    vtkNew<vtkCellArray> polys;
-    vtkNew<vtkFloatArray> scalars;
-
-    // Load the point, cell, and data attributes.
-    for (auto i = 0ul; i < pts.size(); ++i)
-    {
-        points->InsertPoint(i, pts[i].data());
-        scalars->InsertTuple1(i, i);
-    }
-    for (auto&& i : ordering)
-    {
-        polys->InsertNextCell(vtkIdType(i.size()), i.data());
-    }
-
-    // We now assign the pieces to the vtkPolyData.
-    cube->SetPoints(points);
-    cube->SetPolys(polys);
-    cube->GetPointData()->SetScalars(scalars);
-
-    // Now we'll look at it.
-    vtkNew<vtkPolyDataMapper> cubeMapper;
-    cubeMapper->SetInputData(cube);
-    cubeMapper->SetScalarRange(cube->GetScalarRange());
-    vtkNew<vtkActor> cubeActor;
-    cubeActor->SetMapper(cubeMapper);
-
-    // The usual rendering stuff.
-    // vtkNew<vtkCamera> camera;
-    // camera->SetPosition(1, 1, 1);
-    // camera->SetFocalPoint(0, 0, 0);
-
-    vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkRenderWindow> renWin;
-    renWin->AddRenderer(renderer);
-
-    vtkNew<vtkRenderWindowInteractor> iren;
-    iren->SetRenderWindow(renWin);
-
-    renderer->AddActor(cubeActor);
-    // renderer->SetActiveCamera(camera);
-    renderer->ResetCamera();
-    renderer->SetBackground(colors->GetColor3d("Cornsilk").GetData());
-
-    renWin->SetSize(600, 600);
-
-    // interact with data
-    renWin->Render();
-    iren->Start();
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST3
 
 
 #ifdef TEST6
