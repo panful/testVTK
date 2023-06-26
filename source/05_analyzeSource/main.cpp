@@ -4,11 +4,11 @@
  * 2. shader源码的生成、修改、编译、uniform的设置
  * 3.
  * 4.
- * 5.
+ * 5. 使用颜色映射表设置图元颜色，纹理坐标的生成，纹理的生成
  * 6. 交叉图形的混合透明度
  */
 
-#define TEST3
+#define TEST5
 
 #ifdef TEST1
 
@@ -216,7 +216,187 @@ int main()
 
 #endif // TEST2
 
+#ifdef TEST5
 
+#include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkFloatArray.h>
+#include <vtkImageData.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+namespace {
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnLeftButtonUp() override
+    {
+        if (auto coords = m_mapper->GetColorCoordinates())
+        {
+            auto numCom = coords->GetNumberOfComponents();
+            auto numVal = coords->GetNumberOfValues();
+            auto numTup = coords->GetNumberOfTuples();
+            std::cout << "components: " << numCom << "\tvalues: " << numVal << "\ttuples: " << numTup << '\n';
+
+            // 打印生成的纹理坐标
+            // 纹理坐标的u不是从0开始，也不是到1结束，因为纹理的最开始和最末尾各有一个边界颜色
+            for (vtkIdType i = 0; i < numTup; ++i)
+            {
+                // 40个顶点，40个纹理坐标(uv)
+                auto val = coords->GetTuple2(i);
+                std::cout << "point: " << i << "\t: " << val[0] << '\t' << val[1] << '\n';
+            }
+        }
+
+        std::cout << "--------------------------------------\n";
+
+        if (auto imageData = m_mapper->GetColorTextureMap())
+        {
+            // 获取图像的维度，x的维度等于颜色查找表的颜色个数加2，多余的两个是边界的颜色
+            int* dimensions = imageData->GetDimensions();
+
+            // 获取像素数据的指针
+            unsigned char* scalarPointer = static_cast<unsigned char*>(imageData->GetScalarPointer());
+
+            // 获取像素数据的组件数（通道数）
+            int numComponents = imageData->GetNumberOfScalarComponents();
+
+            std::cout << "dimensions: " << dimensions[0] << ", " << dimensions[1] << ", " << dimensions[2] << "\tnumComponents: " << numComponents
+                      << '\n';
+
+            // 遍历每个像素
+            for (int z = 0; z < dimensions[2]; z++)
+            {
+                for (int y = 0; y < 1 /*dimensions[1]*/; y++)
+                {
+                    for (int x = 0; x < dimensions[0]; x++)
+                    {
+                        // 计算像素在指针中的偏移量
+                        int offset = (x + y * dimensions[0] + z * dimensions[0] * dimensions[1]) * numComponents;
+
+                        // 通过指针获取每个通道的值
+                        unsigned char redValue   = scalarPointer[offset + 0];
+                        unsigned char greenValue = scalarPointer[offset + 1];
+                        unsigned char blueValue  = scalarPointer[offset + 2];
+                        unsigned char alphaValue = scalarPointer[offset + 3];
+
+                        std::cout << "Pixel at (" << x << ", " << y << ", " << z << "):\t"
+                                  << "R: " << static_cast<int>(redValue) << ",\t"
+                                  << "G: " << static_cast<int>(greenValue) << ",\t"
+                                  << "B: " << static_cast<int>(blueValue) << ",\t"
+                                  << "A: " << static_cast<int>(alphaValue) << '\n';
+                    }
+                }
+            }
+        }
+
+        return Superclass::OnLeftButtonUp();
+    }
+
+    void SetMapper(const vtkSmartPointer<vtkPolyDataMapper>& m)
+    {
+        m_mapper = m;
+    }
+
+private:
+    vtkSmartPointer<vtkPolyDataMapper> m_mapper;
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+// 将Scalars转换为纹理坐标UV
+// [830]  void vtkMapper::MapScalarsToTexture(vtkAbstractArray* scalars, double alpha)
+
+// 创建纹理
+// [3360] void vtkOpenGLPolyDataMapper::RenderPieceStart(vtkRenderer* ren, vtkActor* actor)
+// [129]  void vtkOpenGLTexture::Load(vtkRenderer* ren)
+// [1451] bool vtkTextureObject::Create2DFromRaw
+
+// 设置纹理环绕方式为ClampToEdge或ClampToBorder(根据OpenGL版本设置)
+// [3868] void vtkOpenGLPolyDataMapper::BuildBufferObjects
+
+int main(int, char*[])
+{
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cells;
+    vtkNew<vtkFloatArray> scalars;
+
+    for (size_t i = 0; i < 10; ++i)
+    {
+        points->InsertNextPoint(static_cast<double>(i), 0.0, 0.0);
+        points->InsertNextPoint(static_cast<double>(i), 1.0, 0.0);
+
+        scalars->InsertNextValue(static_cast<float>(i));
+        scalars->InsertNextValue(static_cast<float>(i));
+    }
+
+    for (vtkIdType i = 0; i < 17; i += 2)
+    {
+        cells->InsertNextCell({ i + 0, i + 1, i + 3, i + 2 });
+    }
+
+    // 多边形，格点数据
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+    polyData->GetPointData()->SetScalars(scalars);
+
+    // 创建颜色查找表
+    vtkNew<vtkLookupTable> hueLut;
+    hueLut->SetNumberOfColors(20);
+    hueLut->SetHueRange(0.67, 0.0);
+    hueLut->SetRange(scalars->GetRange()[0], scalars->GetRange()[1] / 2.0);
+    hueLut->UseBelowRangeColorOn();
+    hueLut->SetBelowRangeColor(0.5, 0.5, 0.5, 0.5);
+    hueLut->UseAboveRangeColorOn();
+    hueLut->SetAboveRangeColor(0.5, 0.5, 0.5, 0.5);
+    hueLut->Build();
+
+    // mapper
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+    mapper->SetLookupTable(hueLut);
+    mapper->UseLookupTableScalarRangeOn();
+    mapper->ScalarVisibilityOn();
+    mapper->InterpolateScalarsBeforeMappingOn();
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(1, 1, 1);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+
+    vtkNew<vtkRenderWindow> window;
+    window->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(window);
+
+    vtkNew<MyStyle> style;
+    style->SetMapper(mapper);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    window->SetSize(800, 600);
+    window->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST5
 
 #ifdef TEST6
 

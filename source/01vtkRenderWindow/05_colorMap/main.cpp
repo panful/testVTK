@@ -2,6 +2,7 @@
 * 100 上下左右四视图，格点、格心数据，线框、面显示模式的区别
 * 101 色卡 vtkScalarBarActor 颜色查找表 vtkLookupTable
 * 102 vtkScalarBarWidget 拖动色卡，获取色卡色带部分的具体位置，用来标记某一个颜色条
+* 103 scalars范围超出lookuptable的范围时，超出部分不显示或指定颜色
 *
 * 201 云图 stl文件
 * 202 vtkStreamTracer 流线图 展示流体流动的轨迹和流动方向 有点像线框式的云图 vtkOpenFOAMReader
@@ -23,7 +24,7 @@
 * 42 vtkCellCenters 获取单元中心即格心，并用球体标注格心(矢量图）
 */
 
-#define TEST309
+#define TEST103
 
 #ifdef TEST100
 
@@ -661,6 +662,89 @@ int main(int, char*[])
 
 #endif // TEST102
 
+#ifdef TEST103
+
+#include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkFloatArray.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkFloatArray> scalars;
+    for (size_t i = 0; i < 10; ++i)
+    {
+        points->InsertNextPoint(static_cast<double>(i), 0.0, 0.0);
+        points->InsertNextPoint(static_cast<double>(i), 1.0, 0.0);
+
+        scalars->InsertNextValue(static_cast<float>(i));
+        scalars->InsertNextValue(static_cast<float>(i));
+    }
+
+    vtkNew<vtkCellArray> cells;
+    for (vtkIdType i = 0; i < 17; i += 2)
+    {
+        cells->InsertNextCell({ i + 0, i + 1, i + 3, i + 2 });
+    }
+
+    // polyData
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+    polyData->GetPointData()->SetScalars(scalars);
+
+    // lookup table
+    vtkNew<vtkLookupTable> hueLut;
+    hueLut->SetHueRange(0.67, 0.0);
+    hueLut->SetRange(scalars->GetRange()[0], scalars->GetRange()[1] / 2.0);
+
+    // 设置超出部分的颜色，将alpha设置为0.0就可以实现超出部分不显示
+    hueLut->UseBelowRangeColorOn();
+    hueLut->SetBelowRangeColor(1., 1., 1., 1.);
+    hueLut->UseAboveRangeColorOn();
+    hueLut->SetAboveRangeColor(1., 1., 1., 1.);
+
+    hueLut->Build();
+
+    // mapper
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+    mapper->SetLookupTable(hueLut);
+    mapper->SetScalarRange(scalars->GetRange()[0], scalars->GetRange()[1] / 2.0);
+    mapper->ScalarVisibilityOn();
+    mapper->InterpolateScalarsBeforeMappingOn();
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(1, 1, 1);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+
+    vtkNew<vtkRenderWindow> window;
+    window->AddRenderer(renderer);
+    window->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(window);
+
+    window->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST103
+
 //---------------------------------------------------
 
 #ifdef TEST201
@@ -768,8 +852,8 @@ int main()
     vtkSmartPointer<vtkOpenFOAMReader> openFOAMReader = vtkSmartPointer<vtkOpenFOAMReader>::New();
     openFOAMReader->SetFileName("04vtk\\resource\\test.foam"); // 设置读取文件路径
     openFOAMReader->SetCreateCellToPoint(1);
-    openFOAMReader->SetSkipZeroTime(1);                        // 开启跳过0时刻
-    openFOAMReader->SetTimeValue(298.0);                       // 设置需要读取的时刻
+    openFOAMReader->SetSkipZeroTime(1);  // 开启跳过0时刻
+    openFOAMReader->SetTimeValue(298.0); // 设置需要读取的时刻
     openFOAMReader->Update();
 
     vtkUnstructuredGrid* block0 = vtkUnstructuredGrid::SafeDownCast(openFOAMReader->GetOutput()->GetBlock(0));
@@ -1696,8 +1780,8 @@ int main(int, char*[])
     glyph->SetInputData(polydata);             // 顶点数据，即矢量图每一个图案的位置
     glyph->SetSourceData(source->GetOutput()); // 资源数据，即矢量图的图案
 
-    glyph->SetScaleFactor(1.);                 // 缩放比例
-    glyph->SetClamping(true);                  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
+    glyph->SetScaleFactor(1.); // 缩放比例
+    glyph->SetClamping(true);  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
     glyph->SetRange(0, 5); // 箭头大小映射表，因为大小由向量决定，所以这里的范围应该为{0,所有点的向量模长最大值}，向量模长始终不小于0
 
     // 颜色
@@ -1877,8 +1961,8 @@ int main(int, char*[])
     glyph->SetInputData(polydata);             // 顶点数据，即矢量图每一个图案的位置
     glyph->SetSourceData(source->GetOutput()); // 资源数据，即矢量图的图案
 
-    glyph->SetScaleFactor(1.);                 // 缩放比例
-    glyph->SetClamping(true);                  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
+    glyph->SetScaleFactor(1.); // 缩放比例
+    glyph->SetClamping(true);  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
     glyph->SetRange(0, 5); // 箭头大小映射表，因为大小由向量决定，所以这里的范围应该为{0,所有点的向量模长最大值}，向量模长始终不小于0
 
     // 颜色
@@ -2056,9 +2140,9 @@ void MakeGlyphs(vtkPolyData* src, double size, vtkGlyph3D* glyph)
 
 #ifdef TEST309
 
-#include <vtkArrowSource.h>
 #include <vtkActor.h>
 #include <vtkAlgorithmOutput.h>
+#include <vtkArrowSource.h>
 #include <vtkCellArray.h>
 #include <vtkCellCenters.h>
 #include <vtkCellData.h>
