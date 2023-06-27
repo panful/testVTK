@@ -2,13 +2,13 @@
 /*
  * 1. 整个渲染的流程 生成vbo和ibo DrawCall
  * 2. shader源码的生成、修改、编译、uniform的设置
- * 3.
- * 4.
- * 5. 使用颜色映射表设置图元颜色，纹理坐标的生成，纹理的生成
+ * 3. 渐变背景色
+ * 4. 设置每个单元的颜色
+ * 5. 使用颜色映射表设置图元（顶点）颜色，纹理坐标的生成，纹理的生成
  * 6. 交叉图形的混合透明度
  */
 
-#define TEST5
+#define TEST4
 
 #ifdef TEST1
 
@@ -216,6 +216,158 @@ int main()
 
 #endif // TEST2
 
+#ifdef TEST3
+
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkSmartPointer.h>
+
+// 通过生成一个纹理，将这个纹理绘制到最下面就是背景
+// [473] int vtkRenderer::UpdateCamera()
+// [634] void vtkOpenGLRenderer::Clear()
+// [51]  int vtkTexturedActor2D::RenderOverlay(vtkViewport* viewport)
+// [575] void vtkOpenGLPolyDataMapper2D::RenderOverlay(vtkViewport* viewport, vtkActor2D* actor)
+
+int main()
+{
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> window;
+    vtkNew<vtkRenderWindowInteractor> interactor;
+
+    renderer->GradientBackgroundOn();
+    renderer->SetBackground(0.1, 0.1, 0.1);
+    renderer->SetBackground2(0.9, 0.9, 0.9);
+
+    window->AddRenderer(renderer);
+    window->SetSize(800, 600);
+
+    interactor->SetRenderWindow(window);
+
+    window->Render();
+    interactor->Start();
+
+    return 0;
+}
+
+#endif // TEST3
+
+#ifdef TEST4
+
+#include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkFloatArray.h>
+#include <vtkImageData.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+namespace {
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnLeftButtonUp() override
+    {
+        return Superclass::OnLeftButtonUp();
+    }
+
+    void SetMapper(const vtkSmartPointer<vtkPolyDataMapper>& m)
+    {
+        m_mapper = m;
+    }
+
+private:
+    vtkSmartPointer<vtkPolyDataMapper> m_mapper;
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+// 片段着色器使用 gl_PrimitiveID 和 texelFetch 从samplerBuffer查找每一个单元的颜色
+// gl_PrimitiveID是当前片段的单元ID
+// samplerBuffer 是绑定到纹理的 TBO GL_TEXTURE_BUFFER
+// texelFetch 可以通过一个索引返回第N个像素的值
+
+int main(int, char*[])
+{
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cells;
+    vtkNew<vtkFloatArray> scalars;
+
+    for (size_t i = 0; i < 10; ++i)
+    {
+        points->InsertNextPoint(static_cast<double>(i), 0.0, 0.0);
+        points->InsertNextPoint(static_cast<double>(i), 1.0, 0.0);
+    }
+
+    for (vtkIdType i = 0; i < 17; i += 2)
+    {
+        cells->InsertNextCell({ i + 0, i + 1, i + 3, i + 2 });
+    }
+
+    for (size_t i = 0; i < 9; ++i)
+    {
+        // 9个单元，每个单元设置一个scalar
+        scalars->InsertNextValue(static_cast<float>(i));
+    }
+
+    // 多边形，格点数据
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+    polyData->GetCellData()->SetScalars(scalars);
+
+    // 创建颜色查找表
+    vtkNew<vtkLookupTable> hueLut;
+    hueLut->SetNumberOfColors(20);
+    hueLut->SetHueRange(0.67, 0.0);
+    hueLut->SetRange(scalars->GetRange());
+    hueLut->Build();
+
+    // mapper
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+    mapper->SetLookupTable(hueLut);
+    mapper->UseLookupTableScalarRangeOn();
+    mapper->ScalarVisibilityOn();
+    mapper->InterpolateScalarsBeforeMappingOn();
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    //actor->GetProperty()->EdgeVisibilityOn();
+    //actor->GetProperty()->SetEdgeColor(1, 1, 1);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+
+    vtkNew<vtkRenderWindow> window;
+    window->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(window);
+
+    vtkNew<MyStyle> style;
+    style->SetMapper(mapper);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    window->SetSize(800, 600);
+    window->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST4
+
 #ifdef TEST5
 
 #include <vtkActor.h>
@@ -316,6 +468,7 @@ vtkStandardNewMacro(MyStyle);
 } // namespace
 
 // 将Scalars转换为纹理坐标UV
+// [3860] vtkUnsignedCharArray* vtkMapper::MapScalars(double alpha)
 // [830]  void vtkMapper::MapScalarsToTexture(vtkAbstractArray* scalars, double alpha)
 
 // 创建纹理
