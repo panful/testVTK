@@ -3,7 +3,8 @@
 * 101 色卡 vtkScalarBarActor 颜色查找表 vtkLookupTable
 * 102 vtkScalarBarWidget 拖动色卡，获取色卡色带部分的具体位置，用来标记某一个颜色条
 * 103 scalars范围超出lookuptable的范围时，超出部分不显示或指定颜色
-*
+* 104 自定义色卡的标签，解决因为double的精度导致标签计算错误
+* 
 * 201 云图 stl文件
 * 202 vtkStreamTracer 流线图 展示流体流动的轨迹和流动方向 有点像线框式的云图 vtkOpenFOAMReader
 * 203 vtkContourFilter  等值面
@@ -24,7 +25,7 @@
 * 42 vtkCellCenters 获取单元中心即格心，并用球体标注格心(矢量图）
 */
 
-#define TEST103
+#define TEST104
 
 #ifdef TEST100
 
@@ -744,6 +745,85 @@ int main(int, char*[])
 }
 
 #endif // TEST103
+
+#ifdef TEST104
+
+#include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkCommand.h>
+#include <vtkFloatArray.h>
+#include <vtkImageMapToColors.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkScalarBarActor.h>
+#include <vtkScalarBarWidget.h>
+#include <vtkSmartPointer.h>
+#include <vtkTextProperty.h>
+#include <vtkViewport.h>
+
+#include <numbers>
+
+int main(int, char*[])
+{
+    vtkNew<vtkLookupTable> hueLut;
+    hueLut->SetNumberOfColors(10);
+    hueLut->SetHueRange(0.67, 0.0);
+    hueLut->SetRange(-1.e20, 100.0);
+    hueLut->Build();
+
+    // Double类型变量的精度是保留15-17位小数，因为Double类型的表示方式为1个符号位、11位指数位和52位精度（即尾数）位。
+    // 所以双精度浮点数一共有53个二进制位。其中，最高位是符号位，0表示正数，1表示负数，接着11位是指数位，
+    // 也就是可存储的数据范围，剩余的52位是精度位，也就是小数部分的数据精度。
+
+    vtkNew<vtkScalarBarActor> scalarBar;
+    scalarBar->SetLookupTable(hueLut);
+    scalarBar->SetPosition(.1, .1);  // 设置位置，左下角
+    scalarBar->SetPosition2(.8, .8); // 右上角，是相对最下角的位置，不是实际位置，还包括Title的大小
+    // scalarBar->SetLabelFormat("%.3e");
+    scalarBar->SetLabelFormat("%.3f");
+
+    // 自定义标签
+    // 标签的值需要保证在颜色映射表的Range中，且位置会根据Range自动计算
+    vtkNew<vtkDoubleArray> labels;
+    labels->InsertNextValue(-1.e20);
+    labels->InsertNextValue(-8.e19);
+    labels->InsertNextValue(-6.e19);
+    labels->InsertNextValue(-4.e19);
+    labels->InsertNextValue(-2.e19);
+    labels->InsertNextValue(100.0);
+
+    scalarBar->UseCustomLabelsOn();
+    scalarBar->SetCustomLabels(labels);
+
+    //---------------------------------------------------------
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor2D(scalarBar);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST104
 
 //---------------------------------------------------
 
