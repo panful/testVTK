@@ -6,12 +6,13 @@
  * 4. 设置每个单元的颜色
  * 5. 使用颜色映射表设置图元（顶点）颜色，纹理坐标的生成，纹理的生成
  * 6. 多边形的边框
+ * 7. 只有一个图层，有多个vtkRenderer
+ * 8. 多个vtkRenderer，多个图层，让后面的vtkRenderer始终在之前的上面
  * 
- *
  * 66. 交叉图形的混合透明度
  */
 
-#define TEST6
+#define TEST8
 
 #ifdef TEST1
 
@@ -63,6 +64,14 @@ shader文件
  .../Rendering/OpenGL2/glsl
 */
 
+/*
+    vtkOpenGLRenderer.cxx [295]
+
+    this->UpdateCamera();           glViewport glClear
+    this->UpdateLightGeometry();    LightFollowCamera
+    this->UpdateLights();
+    this->UpdateGeometry();         vbo ibo => drawCall
+*/
 int main()
 {
     vtkNew<vtkPolyData> polyData;
@@ -647,6 +656,192 @@ int main(int, char*[])
 }
 
 #endif // TEST6
+
+#ifdef TEST7
+
+#include <vtkActor.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+
+// [472] int vtkRenderer::UpdateCamera()
+// [47]  void vtkOpenGLCamera::Render(vtkRenderer* ren)
+// glViewport glEnable(GL_SCISSOR_TEST) glScissor
+
+int main(int, char*[])
+{
+    vtkNew<vtkCubeSource> cube;
+    cube->Update();
+    vtkNew<vtkSphereSource> sphere;
+    sphere->Update();
+
+    vtkNew<vtkPolyDataMapper> mapperCube;
+    mapperCube->SetInputData(cube->GetOutput());
+    vtkNew<vtkPolyDataMapper> mapperSphere;
+    mapperSphere->SetInputData(sphere->GetOutput());
+
+    vtkNew<vtkActor> actorCube;
+    vtkNew<vtkActor> actorSphere;
+    actorCube->SetMapper(mapperCube);
+    actorSphere->SetMapper(mapperSphere);
+
+    vtkNew<vtkRenderer> leftRenderer;
+    vtkNew<vtkRenderer> rightRenderer;
+
+    leftRenderer->AddActor(actorCube);
+    leftRenderer->SetBackground(.1, .2, .3);
+    leftRenderer->SetViewport(0.05, 0.05, 0.45, 0.45);
+
+    rightRenderer->AddActor(actorSphere);
+    rightRenderer->SetBackground(.3, .2, .1);
+    rightRenderer->SetViewport(0.55, 0.55, 0.95, 0.95);
+
+    vtkNew<vtkRenderWindow> window;
+    window->SetSize(800, 600);
+    window->AddRenderer(leftRenderer);
+    window->AddRenderer(rightRenderer);
+
+    std::cout << "number of layers: " << window->GetNumberOfLayers() << '\n';
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(window);
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    window->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST7
+
+#ifdef TEST8
+
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkConeSource.h>
+#include <vtkCoordinate.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPicker.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkPropPicker.h>
+#include <vtkProperty.h>
+#include <vtkRegularPolygonSource.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+
+#include <array>
+#include <iostream>
+
+// 下面的vtkRenderer将GL_COLOR_BUFFER_BIT和GL_DEPTH_BUFFER_BIT都清除
+// 上面的vtkRenderer只清除GL_DEPTH_BUFFER_BIT
+// 前面绘制的颜色缓存一直保留，后面绘制的就会覆盖在之前的renderer上面
+// 将深度缓存清除，就可以让后面绘制的renderer一直在最上面
+// [24]  void vtkRendererCollection::Render()
+// [634] void vtkOpenGLRenderer::Clear()
+
+int main()
+{
+    vtkNew<vtkRenderer> renderer1;
+    vtkNew<vtkRenderer> renderer2;
+
+    // renderer1（底下的图层）添加一个红色的矩形
+    {
+        vtkNew<vtkPoints> points;
+        points->InsertNextPoint(-1.f, -1.f, 0.f);
+        points->InsertNextPoint(1.f, -1.f, 0.f);
+        points->InsertNextPoint(1.f, 1.f, 0.f);
+        points->InsertNextPoint(-1.f, 1.f, 0.f);
+
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0, 1, 2, 3 });
+
+        vtkNew<vtkPolyData> polyData;
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(1, 0, 0);
+        renderer1->AddActor(actor);
+    }
+
+    // renderer2（上层的图层）添加一个绿色的三角形
+    {
+        vtkNew<vtkPoints> points;
+        points->InsertNextPoint(-1.f, -1.f, 0.1f);
+        points->InsertNextPoint(1.f, -1.f, 0.1f);
+        points->InsertNextPoint(0.f, 1.f, 0.1f);
+
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0, 1, 2 });
+
+        vtkNew<vtkPolyData> polyData;
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(0, 1, 0);
+        renderer2->AddActor(actor);
+    }
+
+    renderer1->SetBackground(.5, .5, .0);
+    renderer1->ResetCamera();
+    renderer1->SetLayer(0);
+
+    renderer2->SetBackground(0., .5, .5);
+    renderer2->SetActiveCamera(renderer1->GetActiveCamera()); // renderer2和renderer1使用同一个camera
+    renderer2->SetLayer(1);                                   // renderer2始终在上面
+
+    // 开启关闭交互
+    renderer1->InteractiveOn();
+    renderer2->InteractiveOff();
+
+
+    std::cout << std::boolalpha;
+    std::cout << "below renderer: " << (bool)renderer1->GetInteractive() << '\n';
+    std::cout << "above renderer: " << (bool)renderer2->GetInteractive() << '\n';
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(600, 600);
+    renderWindow->SetNumberOfLayers(2);
+
+    // 如果当前有多个renderer都开起了交互，则鼠标交互响应的最后添加的renderer
+    // 如果当前只有一个renderer开启了交互，则鼠标交互响应的是开启交互的renderer
+    renderWindow->AddRenderer(renderer2);
+    renderWindow->AddRenderer(renderer1);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST8
 
 #ifdef TEST66
 
