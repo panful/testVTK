@@ -8,11 +8,14 @@
  * 6. 多边形的边框
  * 7. 只有一个图层，有多个vtkRenderer
  * 8. 多个vtkRenderer，多个图层，让后面的vtkRenderer始终在之前的上面
+ * 9. vtk自定义的始终在最上层的图元
  * 
+ *
+ *
  * 66. 交叉图形的混合透明度
  */
 
-#define TEST8
+#define TEST9
 
 #ifdef TEST1
 
@@ -815,7 +818,6 @@ int main()
     renderer1->InteractiveOn();
     renderer2->InteractiveOff();
 
-
     std::cout << std::boolalpha;
     std::cout << "below renderer: " << (bool)renderer1->GetInteractive() << '\n';
     std::cout << "above renderer: " << (bool)renderer2->GetInteractive() << '\n';
@@ -842,6 +844,53 @@ int main()
 }
 
 #endif // TEST8
+
+#ifdef TEST9
+
+#include <vtkAxesActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkOrientationMarkerWidget.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+// 增加一个图层 vtkOrientationMarkerWidget
+// 通过判断光标位置来决定当前光标的显示形状，Widget的边框是否显示等
+
+int main(int, char*[])
+{
+    vtkNew<vtkRenderer> ren;
+    vtkNew<vtkRenderWindow> renWin;
+
+    renWin->AddRenderer(ren);
+    renWin->SetSize(800, 800);
+
+    vtkNew<vtkRenderWindowInteractor> iRen;
+    iRen->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iRen->SetInteractorStyle(style);
+
+    vtkNew<vtkAxesActor> axes;
+
+    vtkNew<vtkOrientationMarkerWidget> omw;
+    omw->SetOrientationMarker(axes);
+    omw->SetInteractor(iRen);
+    omw->SetViewport(0.5, 0.5, 0.75, 0.75);
+    omw->EnabledOn();
+    omw->InteractiveOn();
+
+    ren->SetBackground(.1, .2, .3);
+    ren->ResetCamera();
+
+    renWin->Render();
+    iRen->Start();
+
+    return 0;
+}
+
+#endif // TEST9
 
 #ifdef TEST66
 

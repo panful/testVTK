@@ -11,7 +11,8 @@ find_package(VTK
         RenderingFreeType
         RenderingGL2PSOpenGL2
         RenderingOpenGL2
-        RenderingAnnotation
+        RenderingAnnotation # vtkAxesActor
+        InteractionWidgets  # vtkOrientationMarkerWidget
         loguru
         ParallelMPI
     QUIET
