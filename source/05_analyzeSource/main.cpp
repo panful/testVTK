@@ -5,10 +5,13 @@
  * 3. 渐变背景色
  * 4. 设置每个单元的颜色
  * 5. 使用颜色映射表设置图元（顶点）颜色，纹理坐标的生成，纹理的生成
- * 6. 交叉图形的混合透明度
+ * 6. 多边形的边框
+ * 
+ *
+ * 66. 交叉图形的混合透明度
  */
 
-#define TEST4
+#define TEST6
 
 #ifdef TEST1
 
@@ -218,9 +221,9 @@ int main()
 
 #ifdef TEST3
 
-#include <vtkRenderer.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
 
 // 通过生成一个纹理，将这个纹理绘制到最下面就是背景
@@ -343,8 +346,8 @@ int main(int, char*[])
 
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
-    //actor->GetProperty()->EdgeVisibilityOn();
-    //actor->GetProperty()->SetEdgeColor(1, 1, 1);
+    // actor->GetProperty()->EdgeVisibilityOn();
+    // actor->GetProperty()->SetEdgeColor(1, 1, 1);
 
     vtkNew<vtkRenderer> renderer;
     renderer->AddActor(actor);
@@ -554,6 +557,100 @@ int main(int, char*[])
 #ifdef TEST6
 
 #include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+namespace {
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnLeftButtonUp() override
+    {
+        return Superclass::OnLeftButtonUp();
+    }
+
+    void SetMapper(const vtkSmartPointer<vtkPolyDataMapper>& m)
+    {
+        m_mapper = m;
+    }
+
+private:
+    vtkSmartPointer<vtkPolyDataMapper> m_mapper;
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+// 实体的边框
+// 几何着色器中生成一个【三角形的边缘方程】
+// 然后通过一个纹理获取三角形的三个边是不是多边形的边框（用二进制0B000表示三条边）
+// 片段着色器判断当前片段是边框还是实体，然后设置不同的颜色
+
+int main(int, char*[])
+{
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cells;
+
+    points->InsertNextPoint(0.0, 0.0, 0.0);
+    points->InsertNextPoint(1.0, 0.0, 0.0);
+    points->InsertNextPoint(2.0, 0.0, 0.0);
+    points->InsertNextPoint(2.0, 1.0, 0.0);
+    points->InsertNextPoint(1.0, 1.0, 0.0);
+    points->InsertNextPoint(0.0, 1.0, 0.0);
+
+    cells->InsertNextCell({ 0, 1, 4, 5 });
+    cells->InsertNextCell({ 1, 2, 3, 4 });
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->LightingOff();
+    actor->GetProperty()->SetColor(1.0, 0.0, 0.0);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(0.0, 1.0, 0.0);
+    actor->GetProperty()->SetLineWidth(5);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+
+    vtkNew<vtkRenderWindow> window;
+    window->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(window);
+
+    vtkNew<MyStyle> style;
+    style->SetMapper(mapper);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    window->SetSize(800, 600);
+    window->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST6
+
+#ifdef TEST66
+
+#include <vtkActor.h>
 #include <vtkCamera.h>
 #include <vtkCellArray.h>
 #include <vtkInteractorStyleRubberBand3D.h>
@@ -740,4 +837,4 @@ int main()
     return 0;
 }
 
-#endif // TEST6
+#endif // TEST66
