@@ -9,13 +9,13 @@
  * 7. 只有一个图层，有多个vtkRenderer
  * 8. 多个vtkRenderer，多个图层，让后面的vtkRenderer始终在之前的上面
  * 9. vtk自定义的始终在最上层的图元
- * 
+ * 10.拾取vtkProp vtkPropPicker
  *
  *
  * 66. 交叉图形的混合透明度
  */
 
-#define TEST9
+#define TEST10
 
 #ifdef TEST1
 
@@ -891,6 +891,111 @@ int main(int, char*[])
 }
 
 #endif // TEST9
+
+#ifdef TEST10
+
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkMinimalStandardRandomSequence.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkObjectFactory.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkPropPicker.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+
+#include <map>
+#include <string>
+
+namespace {
+std::map<vtkSmartPointer<vtkActor>, std::string> theActors;
+
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnLeftButtonDown() override
+    {
+        int* clickPos = this->GetInteractor()->GetEventPosition();
+
+        vtkNew<vtkPropPicker> picker;
+        picker->Pick(clickPos[0], clickPos[1], 0, this->GetDefaultRenderer());
+
+        if (auto actor = picker->GetActor())
+        {
+            std::cout << "picked actor:\t" << theActors[actor] << '\n';
+        }
+
+        vtkInteractorStyleTrackballCamera::OnLeftButtonDown();
+    }
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+// [1859] vtkAssemblyPath* vtkRenderer::PickProp
+// [263]  bool vtkHardwareSelector::CaptureBuffers()
+// [260]  void vtkRenderWindow::Render() 将所有的图元在一个新的FBO上绘制一遍，背景色设置为0，一些拾取用不到的属性都跳过
+// 片段着色器 fragOutput0 = vec4(mapperIndex,1.0); // 将图元的颜色设置为 ID
+// [385]  void vtkHardwareSelector::SavePixelBuffer(int passNo) 将拾取的颜色保存起来
+// [887]  vtkOpenGLRenderWindow.cxx => glReadPixels
+// [666]  vtkHardwareSelector::GetPixelInformation 将拾取到的颜色转换为vtkProp以及ID
+// [416]  void vtkSelection::SetNode(const std::string& name, vtkSelectionNode* node) // 将拾取到的vtkProp保存起来
+
+int main(int argc, char* argv[])
+{
+
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<MyStyle> style;
+    style->SetDefaultRenderer(renderer);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    size_t nRow = 3;
+    size_t nCol = 3;
+
+    for (size_t row = 0; row < nRow; ++row)
+    {
+        for (size_t col = 0; col < nCol; ++col)
+        {
+            vtkNew<vtkSphereSource> source;
+            source->SetCenter((double)row, (double)col, 0.0);
+            source->Update();
+
+            vtkNew<vtkPolyDataMapper> mapper;
+            mapper->SetInputData(source->GetOutput());
+
+            vtkNew<vtkActor> actor;
+            actor->SetMapper(mapper);
+            actor->GetProperty()->SetColor(1, 1, 1);
+
+            renderer->AddActor(actor);
+
+            theActors.try_emplace(actor, '(' + std::to_string(row) + ", " + std::to_string(col) + ')');
+        }
+    }
+
+    renderer->SetBackground(.1, .2, .3);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST10
 
 #ifdef TEST66
 
