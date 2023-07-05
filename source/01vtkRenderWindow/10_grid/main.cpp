@@ -1,4 +1,4 @@
-//
+﻿//
 // cgns文件下载地址：https://cgns.github.io/CGNSFiles.html
 //
 
@@ -32,7 +32,7 @@
 int main(int argc, char* argv[])
 {
     vtkNew<vtkDataSetMapper> mapper;
-    std::string fileName("yf17final.cgns");
+    std::string fileName("../resources/yf17final.cgns");
 
     std::cout << "Opening " << fileName.c_str() << endl;
     vtkNew<vtkCGNSReader> mixedReader;

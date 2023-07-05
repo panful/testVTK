@@ -25,7 +25,7 @@
 * 42 vtkCellCenters 获取单元中心即格心，并用球体标注格心(矢量图）
 */
 
-#define TEST104
+#define TEST202
 
 #ifdef TEST100
 
@@ -930,7 +930,7 @@ int main(int, char*[])
 int main()
 {
     vtkSmartPointer<vtkOpenFOAMReader> openFOAMReader = vtkSmartPointer<vtkOpenFOAMReader>::New();
-    openFOAMReader->SetFileName("04vtk\\resource\\test.foam"); // 设置读取文件路径
+    openFOAMReader->SetFileName("../resource/test.foam"); // 设置读取文件路径
     openFOAMReader->SetCreateCellToPoint(1);
     openFOAMReader->SetSkipZeroTime(1);  // 开启跳过0时刻
     openFOAMReader->SetTimeValue(298.0); // 设置需要读取的时刻

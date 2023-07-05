@@ -15,6 +15,7 @@ find_package(VTK
         RenderingOpenGL2
         loguru
         ParallelMPI
+        RenderingAnnotation # vtkScalarBarActor
     QUIET
 )
 

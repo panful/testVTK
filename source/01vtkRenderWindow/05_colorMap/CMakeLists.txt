@@ -17,6 +17,8 @@ find_package(VTK
         InteractionWidgets  # vtkCameraOrientationWidget
         FiltersModeling     # vtkBandedPolyDataContourFilter
         CommonColor         # vtkColorSeries
+        IOGeometry          # vtkOpenFOAMReader
+        FiltersFlowPaths    # vtkStreamTracer
     QUIET
 )
 

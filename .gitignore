@@ -1,5 +1,7 @@
-/.vs
+﻿/.vs
 /out
-/target
+/target_debug
+/target_release
+/install
 /build
 /.vscode
