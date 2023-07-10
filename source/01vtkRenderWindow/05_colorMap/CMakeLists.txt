@@ -19,6 +19,9 @@ find_package(VTK
         CommonColor         # vtkColorSeries
         IOGeometry          # vtkOpenFOAMReader
         FiltersFlowPaths    # vtkStreamTracer
+        FiltersGeometry     # vtkStructuredGridGeometryFilter
+        IOParallel          # vtkMultiBlockPLOT3DReader
+        ImagingHybrid       # vtkSampleFunction
     QUIET
 )
 

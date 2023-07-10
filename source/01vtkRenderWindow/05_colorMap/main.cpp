@@ -4,10 +4,8 @@
 * 102 vtkScalarBarWidget 拖动色卡，获取色卡色带部分的具体位置，用来标记某一个颜色条
 * 103 scalars范围超出lookuptable的范围时，超出部分不显示或指定颜色
 * 104 自定义色卡的标签，解决因为double的精度导致标签计算错误
-* 
+*
 * 201 云图 stl文件
-* 202 vtkStreamTracer 流线图 展示流体流动的轨迹和流动方向 有点像线框式的云图 vtkOpenFOAMReader
-* 203 vtkContourFilter  等值面
 *
 * 300 vtkGlyph3D 官方示例 矢量图(箭头)
 * 301 vtkGlyph2D 官方示例 vtkGlyph2D继承自vtkGlyph3D
@@ -23,9 +21,17 @@
 * 40 vtkCellDataToPointData 单元标量数据转顶点数据，等值线vtkContourFilter
 * 41 vtkPointDataToCellData vtkCellCenters 顶点标量数据转单元数据
 * 42 vtkCellCenters 获取单元中心即格心，并用球体标注格心(矢量图）
+*
+* 501 拉格朗日粒子追踪
+*
+* 600 OpenFOAM 文件读取
+* 601 vtkStreamTracer 流线图 展示流体流动的轨迹和流动方向
+* 602 流线、流管、流面
+*
+* 701 vtkContourFilter 等值面 vtkSampleFunction使用采样函数提取等值面
 */
 
-#define TEST202
+#define TEST501
 
 #ifdef TEST100
 
@@ -846,7 +852,7 @@ int main(int, char*[])
 {
     // 加载一个STL模型
     vtkSmartPointer<vtkSTLReader> source = vtkSmartPointer<vtkSTLReader>::New();
-    source->SetFileName("test1.stl");
+    source->SetFileName("../resources/test1.stl");
     source->Update();
 
     int numPts                             = source->GetOutput()->GetPoints()->GetNumberOfPoints(); // 获取模型的顶点数量
@@ -900,304 +906,6 @@ int main(int, char*[])
 }
 
 #endif // TEST201
-
-#ifdef TEST202
-
-// https://blog.csdn.net/muye2356/article/details/115144581
-
-#include <vtkActor.h>
-#include <vtkAppendPolyData.h>
-#include <vtkArrayCalculator.h>
-#include <vtkDataSetMapper.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkLineSource.h>
-#include <vtkLookupTable.h>
-#include <vtkMultiBlockDataSet.h>
-#include <vtkOpenFOAMReader.h>
-#include <vtkPointData.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkScalarBarActor.h>
-#include <vtkSmartPointer.h>
-#include <vtkStreamTracer.h>
-#include <vtkTextProperty.h>
-#include <vtkUnstructuredGrid.h>
-
-int main()
-{
-    vtkSmartPointer<vtkOpenFOAMReader> openFOAMReader = vtkSmartPointer<vtkOpenFOAMReader>::New();
-    openFOAMReader->SetFileName("../resource/test.foam"); // 设置读取文件路径
-    openFOAMReader->SetCreateCellToPoint(1);
-    openFOAMReader->SetSkipZeroTime(1);  // 开启跳过0时刻
-    openFOAMReader->SetTimeValue(298.0); // 设置需要读取的时刻
-    openFOAMReader->Update();
-
-    vtkUnstructuredGrid* block0 = vtkUnstructuredGrid::SafeDownCast(openFOAMReader->GetOutput()->GetBlock(0));
-
-    // 设置生成流线的位置
-    vtkSmartPointer<vtkLineSource> line1 = vtkSmartPointer<vtkLineSource>::New();
-    line1->SetPoint1(-0.019, 0.0254, 0.0005);
-    line1->SetPoint2(-0.0206, 0, 0.0005);
-    line1->SetResolution(10);
-    line1->Update();
-
-    vtkSmartPointer<vtkStreamTracer> streamline = vtkSmartPointer<vtkStreamTracer>::New();
-    streamline->SetSourceConnection(line1->GetOutputPort());
-    streamline->SetInputData(block0);
-    streamline->SetIntegratorTypeToRungeKutta45(); // 设置流线的积分类型
-    streamline->SetMaximumPropagation(5000);       // 设置流线长度
-    streamline->SetIntegrationStepUnit(2);         // 设置流线积分步长单位
-    streamline->SetInitialIntegrationStep(0.2);    // 设置流线积分初始步长
-    streamline->SetMinimumIntegrationStep(0.01);   // 设置流线积分最小步长
-    streamline->SetMaximumIntegrationStep(0.5);    // 设置流线积分最大步长
-    streamline->SetMaximumNumberOfSteps(2000);     // 设置流线积分最大步数
-    streamline->SetIntegrationDirectionToBoth();   // 设置流线积分方向
-    streamline->SetTerminalSpeed(1e-12);           // 设置流线积分终止速度
-    streamline->SetMaximumError(1e-6);
-    streamline->Update();
-
-    // 计算速度的模
-    vtkSmartPointer<vtkArrayCalculator> calc = vtkSmartPointer<vtkArrayCalculator>::New();
-    calc->SetInputConnection(streamline->GetOutputPort());
-    calc->AddVectorArrayName("U");
-    calc->SetFunction("mag(U)");
-    calc->SetResultArrayName("u_mag");
-    calc->Update();
-
-    vtkPolyData* streamlinedata = vtkPolyData::SafeDownCast(calc->GetOutput());
-    streamlinedata->GetPointData()->SetActiveScalars("u_mag");
-
-    // 计算速度范围
-    double scalarRange[2] { 0.0, 1.0 };
-    if (auto sxalars_ = streamlinedata->GetPointData()->GetScalars())
-    {
-        scalarRange[0] = sxalars_->GetRange()[0];
-        scalarRange[1] = sxalars_->GetRange()[1];
-    }
-
-    vtkSmartPointer<vtkScalarBarActor> scalarBar = vtkSmartPointer<vtkScalarBarActor>::New();
-    vtkSmartPointer<vtkLookupTable> pColorTable  = vtkSmartPointer<vtkLookupTable>::New();
-    pColorTable->SetNumberOfTableValues(31);
-    pColorTable->SetHueRange(0.67, 0); // 标量条颜色范围，从蓝到红
-    pColorTable->SetAlphaRange(1.0, 1.0);
-    pColorTable->SetValueRange(1, 1);
-    pColorTable->SetSaturationRange(1, 1);
-    pColorTable->SetRange(scalarRange);
-    pColorTable->Build();
-
-    scalarBar->SetTitle("U (m/s)");
-    scalarBar->GetTitleTextProperty()->SetColor(0, 0, 0);
-    scalarBar->GetTitleTextProperty()->SetFontFamilyToArial();
-    scalarBar->GetTitleTextProperty()->SetFontSize(20);
-    scalarBar->GetLabelTextProperty()->SetColor(0, 0, 0);
-    scalarBar->SetLabelFormat("%5.3f");
-    scalarBar->GetLabelTextProperty()->SetFontFamilyToArial();
-    scalarBar->GetLabelTextProperty()->SetFontSize(20);
-    scalarBar->SetNumberOfLabels(7);
-    scalarBar->SetUnconstrainedFontSize(1);
-    scalarBar->SetMaximumWidthInPixels(80);
-    scalarBar->SetMaximumHeightInPixels(900);
-    scalarBar->SetLookupTable(pColorTable);
-
-    vtkSmartPointer<vtkPolyDataMapper> streamlinemappper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    streamlinemappper->SetInputData(streamlinedata);
-    streamlinemappper->SetLookupTable(pColorTable);
-    streamlinemappper->SetScalarRange(scalarRange);
-
-    vtkSmartPointer<vtkActor> streamlineactor = vtkSmartPointer<vtkActor>::New();
-    streamlineactor->SetMapper(streamlinemappper);
-
-    vtkSmartPointer<vtkRenderer> ren = vtkSmartPointer<vtkRenderer>::New();
-    ren->AddActor(streamlineactor);
-    ren->AddActor(scalarBar);
-    ren->SetBackground(1, 1, 1); // 设置背景色为白色
-    ren->ResetCamera();
-
-    vtkSmartPointer<vtkRenderWindow> renWin = vtkSmartPointer<vtkRenderWindow>::New();
-
-    vtkSmartPointer<vtkRenderWindowInteractor> iren = vtkSmartPointer<vtkRenderWindowInteractor>::New();
-    iren->SetRenderWindow(renWin);
-
-    vtkSmartPointer<vtkInteractorStyleTrackballCamera> TrackballCamera = vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
-    iren->SetInteractorStyle(TrackballCamera);
-
-    renWin->AddRenderer(ren.GetPointer());
-    renWin->SetSize(500, 500);
-    renWin->Render();
-
-    iren->Initialize();
-    iren->Start();
-
-    return 0;
-}
-
-#endif // TEST202
-
-#ifdef TEST203
-// https://kitware.github.io/vtk-examples/site/Cxx/VisualizationAlgorithms/FilledContours/
-#include <vtkActor.h>
-#include <vtkAppendPolyData.h>
-#include <vtkCellData.h>
-#include <vtkCleanPolyData.h>
-#include <vtkClipPolyData.h>
-#include <vtkContourFilter.h>
-#include <vtkCubeSource.h>
-#include <vtkFloatArray.h>
-#include <vtkLookupTable.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPointData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkScalarsToColors.h>
-#include <vtkSmartPointer.h>
-#include <vtkXMLPolyDataReader.h>
-
-#include <vector>
-
-int main(int argc, char* argv[])
-{
-    // if (argc < 3)
-    //{
-    //     std::cerr
-    //         << "Usage: " << argv[0]
-    //         << " InputPolyDataFile(.vtp) NumberOfContours e.g filledContours.vtp 10"
-    //         << std::endl;
-    //     return EXIT_FAILURE;
-    // }
-
-    vtkNew<vtkCubeSource> cube;
-
-    vtkNew<vtkNamedColors> colors;
-
-    // Read the file
-    // vtkNew<vtkXMLPolyDataReader> reader;
-
-    // reader->SetFileName(argv[1]);
-    // reader->Update(); // Update so that we can get the scalar range
-
-    vtkNew<vtkFloatArray> scalars;
-
-    // Load the point, cell, and data attributes.
-    for (auto i = 0ul; i < cube->GetOutput()->GetPointData()->GetNumberOfTuples(); ++i)
-    {
-        scalars->InsertTuple1(i, i);
-    }
-
-    cube->GetOutput()->GetPointData()->SetScalars(scalars);
-
-    double scalarRange[2];
-    // reader->GetOutput()->GetPointData()->GetScalars()->GetRange(scalarRange);
-    cube->GetOutput()->GetPointData()->GetScalars()->GetRange(scalarRange);
-
-    vtkNew<vtkAppendPolyData> appendFilledContours;
-
-    // int numberOfContours = atoi(argv[2]);
-    int numberOfContours = 5;
-
-    double delta = (scalarRange[1] - scalarRange[0]) / static_cast<double>(numberOfContours - 1);
-
-    // Keep the clippers alive
-    std::vector<vtkSmartPointer<vtkClipPolyData>> clippersLo;
-    std::vector<vtkSmartPointer<vtkClipPolyData>> clippersHi;
-
-    for (int i = 0; i < numberOfContours; i++)
-    {
-        double valueLo = scalarRange[0] + static_cast<double>(i) * delta;
-        double valueHi = scalarRange[0] + static_cast<double>(i + 1) * delta;
-        clippersLo.push_back(vtkSmartPointer<vtkClipPolyData>::New());
-        clippersLo[i]->SetValue(valueLo);
-        if (i == 0)
-        {
-            // clippersLo[i]->SetInputConnection(reader->GetOutputPort());
-            clippersLo[i]->SetInputConnection(cube->GetOutputPort());
-        }
-        else
-        {
-            clippersLo[i]->SetInputConnection(clippersHi[i - 1]->GetOutputPort(1));
-        }
-        clippersLo[i]->InsideOutOff();
-        clippersLo[i]->Update();
-
-        clippersHi.push_back(vtkSmartPointer<vtkClipPolyData>::New());
-        clippersHi[i]->SetValue(valueHi);
-        clippersHi[i]->SetInputConnection(clippersLo[i]->GetOutputPort());
-        clippersHi[i]->GenerateClippedOutputOn();
-        clippersHi[i]->InsideOutOn();
-        clippersHi[i]->Update();
-        if (clippersHi[i]->GetOutput()->GetNumberOfCells() == 0)
-        {
-            continue;
-        }
-
-        vtkNew<vtkFloatArray> cd;
-        cd->SetNumberOfComponents(1);
-        cd->SetNumberOfTuples(clippersHi[i]->GetOutput()->GetNumberOfCells());
-        cd->FillComponent(0, valueLo);
-
-        clippersHi[i]->GetOutput()->GetCellData()->SetScalars(cd);
-        appendFilledContours->AddInputConnection(clippersHi[i]->GetOutputPort());
-    }
-
-    vtkNew<vtkCleanPolyData> filledContours;
-    filledContours->SetInputConnection(appendFilledContours->GetOutputPort());
-
-    vtkNew<vtkLookupTable> lut;
-    lut->SetNumberOfTableValues(numberOfContours + 1);
-    lut->Build();
-    vtkNew<vtkPolyDataMapper> contourMapper;
-    contourMapper->SetInputConnection(filledContours->GetOutputPort());
-    contourMapper->SetScalarRange(scalarRange[0], scalarRange[1]);
-    contourMapper->SetScalarModeToUseCellData();
-    contourMapper->SetLookupTable(lut);
-
-    vtkNew<vtkActor> contourActor;
-    contourActor->SetMapper(contourMapper);
-    contourActor->GetProperty()->SetInterpolationToFlat();
-
-    vtkNew<vtkContourFilter> contours;
-    contours->SetInputConnection(filledContours->GetOutputPort());
-    contours->GenerateValues(numberOfContours, scalarRange[0], scalarRange[1]);
-
-    vtkNew<vtkPolyDataMapper> contourLineMapperer;
-    contourLineMapperer->SetInputConnection(contours->GetOutputPort());
-    contourLineMapperer->SetScalarRange(scalarRange[0], scalarRange[1]);
-    contourLineMapperer->ScalarVisibilityOff();
-
-    vtkNew<vtkActor> contourLineActor;
-    contourLineActor->SetMapper(contourLineMapperer);
-    contourLineActor->GetProperty()->SetLineWidth(2);
-
-    // The usual renderer, render window and interactor
-    vtkNew<vtkRenderer> ren1;
-    vtkNew<vtkRenderWindow> renWin;
-    vtkNew<vtkRenderWindowInteractor> iren;
-
-    renWin->AddRenderer(ren1);
-    renWin->SetWindowName("FilledContours");
-
-    iren->SetRenderWindow(renWin);
-
-    // Add the actors
-    ren1->AddActor(contourActor);
-    ren1->AddActor(contourLineActor);
-    ren1->SetBackground(colors->GetColor3d("MidnightBlue").GetData());
-
-    // Begin interaction
-    renWin->Render();
-    iren->Start();
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST203
 
 //---------------------------------------------------
 
@@ -3026,3 +2734,858 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 #endif // TEST42
+
+#ifdef TEST501
+
+// https://gitlab.kitware.com/vtk/vtk/-/blob/v9.2.0/Filters/FlowPaths/Testing/Cxx/TestLagrangianParticleTracker.cxx
+
+#include "vtkLagrangianMatidaIntegrationModel.h"
+
+#include "vtkActor.h"
+#include "vtkCamera.h"
+#include "vtkCellData.h"
+#include "vtkDataSetMapper.h"
+#include "vtkDataSetSurfaceFilter.h"
+#include "vtkDoubleArray.h"
+#include "vtkGlyph3D.h"
+#include "vtkImageData.h"
+#include "vtkImageDataToPointSet.h"
+#include "vtkLagrangianParticleTracker.h"
+#include "vtkMath.h"
+#include "vtkMultiBlockDataGroupFilter.h"
+#include "vtkMultiBlockDataSet.h"
+#include "vtkNew.h"
+#include "vtkPlaneSource.h"
+#include "vtkPointData.h"
+#include "vtkPointSource.h"
+#include "vtkPolyDataMapper.h"
+#include "vtkRTAnalyticSource.h"
+#include "vtkRenderWindow.h"
+#include "vtkRenderWindowInteractor.h"
+#include "vtkRenderer.h"
+#include "vtkRungeKutta2.h"
+#include "vtkSphereSource.h"
+#include "vtkInteractorStyleTrackballCamera.h"
+
+int main(int, char*[])
+{
+    // Create a point source
+    vtkNew<vtkPointSource> seeds;
+    seeds->SetNumberOfPoints(10);
+    seeds->SetRadius(4);
+    seeds->Update();
+    vtkPolyData* seedPD    = seeds->GetOutput();
+    vtkPointData* seedData = seedPD->GetPointData();
+
+    // Create seed data
+    vtkNew<vtkDoubleArray> partVel;
+    partVel->SetNumberOfComponents(3);
+    partVel->SetNumberOfTuples(seedPD->GetNumberOfPoints());
+    partVel->SetName("InitialVelocity");
+
+    vtkNew<vtkDoubleArray> partDens;
+    partDens->SetNumberOfComponents(1);
+    partDens->SetNumberOfTuples(seedPD->GetNumberOfPoints());
+    partDens->SetName("ParticleDensity");
+
+    vtkNew<vtkDoubleArray> partDiam;
+    partDiam->SetNumberOfComponents(1);
+    partDiam->SetNumberOfTuples(seedPD->GetNumberOfPoints());
+    partDiam->SetName("ParticleDiameter");
+
+    partVel->FillComponent(0, 2);
+    partVel->FillComponent(1, 5);
+    partVel->FillComponent(2, 1);
+    partDens->FillComponent(0, 1920);
+    partDiam->FillComponent(0, 0.1);
+
+    seedData->AddArray(partVel);
+    seedData->AddArray(partDens);
+    seedData->AddArray(partDiam);
+
+    // Create a wavelet
+    vtkNew<vtkRTAnalyticSource> wavelet;
+    wavelet->Update();
+    vtkImageData* waveletImg = wavelet->GetOutput();
+
+    vtkCellData* cd = waveletImg->GetCellData();
+
+    // Create flow data
+    vtkNew<vtkDoubleArray> flowVel;
+    flowVel->SetNumberOfComponents(3);
+    flowVel->SetNumberOfTuples(waveletImg->GetNumberOfCells());
+    flowVel->SetName("FlowVelocity");
+
+    vtkNew<vtkDoubleArray> flowDens;
+    flowDens->SetNumberOfComponents(1);
+    flowDens->SetNumberOfTuples(waveletImg->GetNumberOfCells());
+    flowDens->SetName("FlowDensity");
+
+    vtkNew<vtkDoubleArray> flowDynVisc;
+    flowDynVisc->SetNumberOfComponents(1);
+    flowDynVisc->SetNumberOfTuples(waveletImg->GetNumberOfCells());
+    flowDynVisc->SetName("FlowDynamicViscosity");
+
+    flowVel->FillComponent(0, -0.3);
+    flowVel->FillComponent(1, -0.3);
+    flowVel->FillComponent(2, -0.3);
+    flowDens->FillComponent(0, 1000);
+    flowDynVisc->FillComponent(0, 0.894);
+
+    cd->AddArray(flowVel);
+    cd->AddArray(flowDens);
+    cd->AddArray(flowDynVisc);
+
+    // Create surface
+    vtkNew<vtkDataSetSurfaceFilter> surface;
+    surface->SetInputConnection(wavelet->GetOutputPort());
+    surface->Update();
+    vtkPolyData* surfacePd = surface->GetOutput();
+
+    // Create Surface data
+    vtkNew<vtkDoubleArray> surfaceTypeTerm;
+    surfaceTypeTerm->SetNumberOfComponents(1);
+    surfaceTypeTerm->SetName("SurfaceType");
+    surfaceTypeTerm->SetNumberOfTuples(surfacePd->GetNumberOfCells());
+    surfaceTypeTerm->FillComponent(0, vtkLagrangianBasicIntegrationModel::SURFACE_TYPE_TERM);
+    surfacePd->GetCellData()->AddArray(surfaceTypeTerm);
+
+    // Create plane passThrough
+    vtkNew<vtkPlaneSource> surfacePass;
+    surfacePass->SetOrigin(-10, -10, 0);
+    surfacePass->SetPoint1(10, -10, 0);
+    surfacePass->SetPoint2(-10, 10, 0);
+    surfacePass->Update();
+    vtkPolyData* passPd = surfacePass->GetOutput();
+
+    // Create Surface data
+    vtkNew<vtkDoubleArray> surfaceTypePass;
+    surfaceTypePass->SetNumberOfComponents(1);
+    surfaceTypePass->SetName("SurfaceType");
+    surfaceTypePass->SetNumberOfTuples(passPd->GetNumberOfCells());
+    surfaceTypePass->FillComponent(0, vtkLagrangianBasicIntegrationModel::SURFACE_TYPE_PASS);
+    passPd->GetCellData()->AddArray(surfaceTypePass);
+
+    // Create plane passThrough
+    vtkNew<vtkPlaneSource> surfaceBounce;
+    surfaceBounce->SetOrigin(-2, -2, -2);
+    surfaceBounce->SetPoint1(5, -2, -2);
+    surfaceBounce->SetPoint2(-2, 5, -2);
+    surfaceBounce->Update();
+    vtkPolyData* bouncePd = surfaceBounce->GetOutput();
+
+    // Create Surface data
+    vtkNew<vtkDoubleArray> surfaceTypeBounce;
+    surfaceTypeBounce->SetNumberOfComponents(1);
+    surfaceTypeBounce->SetName("SurfaceType");
+    surfaceTypeBounce->SetNumberOfTuples(bouncePd->GetNumberOfCells());
+    surfaceTypeBounce->FillComponent(0, vtkLagrangianBasicIntegrationModel::SURFACE_TYPE_BOUNCE);
+    bouncePd->GetCellData()->AddArray(surfaceTypeBounce);
+
+    vtkNew<vtkMultiBlockDataGroupFilter> groupSurface;
+    groupSurface->AddInputDataObject(surfacePd);
+    groupSurface->AddInputDataObject(passPd);
+    groupSurface->AddInputDataObject(bouncePd);
+
+    vtkNew<vtkMultiBlockDataGroupFilter> groupFlow;
+    groupFlow->AddInputDataObject(waveletImg);
+
+    vtkNew<vtkImageDataToPointSet> ugFlow;
+    ugFlow->AddInputData(waveletImg);
+
+    vtkNew<vtkMultiBlockDataGroupFilter> groupSeed;
+    groupSeed->AddInputDataObject(seedPD);
+
+    // Create Integrator
+    vtkNew<vtkRungeKutta2> integrator;
+
+    // Create Integration Model
+    vtkNew<vtkLagrangianMatidaIntegrationModel> integrationModel;
+    integrationModel->SetInputArrayToProcess(0, 1, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "InitialVelocity");
+    integrationModel->SetInputArrayToProcess(2, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "SurfaceType");
+    integrationModel->SetInputArrayToProcess(3, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "FlowVelocity");
+    integrationModel->SetInputArrayToProcess(4, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "FlowDensity");
+    integrationModel->SetInputArrayToProcess(5, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "FlowDynamicViscosity");
+    integrationModel->SetInputArrayToProcess(6, 1, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "ParticleDiameter");
+    integrationModel->SetInputArrayToProcess(7, 1, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "ParticleDensity");
+    integrationModel->SetNumberOfTrackedUserData(13);
+
+    // Put in tracker
+    vtkNew<vtkLagrangianParticleTracker> tracker;
+    tracker->SetIntegrator(nullptr);
+    tracker->SetIntegrationModel(nullptr);
+    tracker->Print(cout);
+    if (tracker->GetSource() != nullptr || tracker->GetSurface() != nullptr)
+    {
+        std::cerr << "Incorrect Input Initialization" << std::endl;
+        return EXIT_FAILURE;
+    }
+    tracker->SetIntegrator(integrator);
+    if (tracker->GetIntegrator() != integrator)
+    {
+        std::cerr << "Incorrect Integrator" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    tracker->SetIntegrationModel(integrationModel);
+    if (tracker->GetIntegrationModel() != integrationModel)
+    {
+        std::cerr << "Incorrect Integration Model" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    tracker->SetInputConnection(groupFlow->GetOutputPort());
+    tracker->SetStepFactor(0.1);
+    tracker->SetStepFactorMin(0.1);
+    tracker->SetStepFactorMax(0.1);
+    tracker->SetMaximumNumberOfSteps(150);
+    tracker->SetSourceConnection(groupSeed->GetOutputPort());
+    tracker->SetSurfaceData(surfacePd);
+    tracker->SetCellLengthComputationMode(vtkLagrangianParticleTracker::STEP_CUR_CELL_VEL_DIR);
+    tracker->AdaptiveStepReintegrationOn();
+    tracker->GenerateParticlePathsOutputOff();
+    tracker->Update();
+    tracker->GenerateParticlePathsOutputOn();
+    tracker->SetInputConnection(ugFlow->GetOutputPort());
+    tracker->SetMaximumNumberOfSteps(30);
+    tracker->SetCellLengthComputationMode(vtkLagrangianParticleTracker::STEP_CUR_CELL_DIV_THEO);
+    tracker->Update();
+    tracker->SetMaximumNumberOfSteps(-1);
+    tracker->SetMaximumIntegrationTime(10.0);
+    tracker->Update();
+    tracker->SetInputData(waveletImg);
+    tracker->SetSourceData(seedPD);
+    tracker->SetMaximumNumberOfSteps(300);
+    tracker->SetMaximumIntegrationTime(-1.0);
+    tracker->SetSurfaceConnection(groupSurface->GetOutputPort());
+    tracker->SetCellLengthComputationMode(vtkLagrangianParticleTracker::STEP_CUR_CELL_VEL_DIR);
+    tracker->AdaptiveStepReintegrationOff();
+    tracker->Update();
+    if (tracker->GetStepFactor() != 0.1)
+    {
+        std::cerr << "Incorrect StepFactor" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (tracker->GetStepFactorMin() != 0.1)
+    {
+        std::cerr << "Incorrect StepFactorMin" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (tracker->GetStepFactorMax() != 0.1)
+    {
+        std::cerr << "Incorrect StepFactorMax" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (tracker->GetMaximumNumberOfSteps() != 300)
+    {
+        std::cerr << "Incorrect MaximumNumberOfSteps" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (tracker->GetMaximumIntegrationTime() != -1.0)
+    {
+        std::cerr << "Incorrect MaximumIntegrationTime" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (tracker->GetCellLengthComputationMode() != vtkLagrangianParticleTracker::STEP_CUR_CELL_VEL_DIR)
+    {
+        std::cerr << "Incorrect CellLengthComputationMode" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (tracker->GetAdaptiveStepReintegration())
+    {
+        std::cerr << "Incorrect AdaptiveStepReintegration" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (!tracker->GetGenerateParticlePathsOutput())
+    {
+        std::cerr << "Incorrect GenerateParticlePathsOutput" << std::endl;
+        return EXIT_FAILURE;
+    }
+    tracker->Print(cout);
+    if (tracker->GetSource() != seedPD)
+    {
+        std::cerr << "Incorrect Source" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (tracker->GetSurface() != groupSurface->GetOutput())
+    {
+        std::cerr << "Incorrect Surface" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    // Glyph for interaction points
+    vtkNew<vtkSphereSource> sphereGlyph;
+    sphereGlyph->SetRadius(0.1);
+
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0, 0, 0);
+    points->InsertNextPoint(1, 1, 1);
+    points->InsertNextPoint(2, 2, 2);
+    vtkNew<vtkPolyData> polydata;
+    polydata->SetPoints(points);
+
+    vtkNew<vtkGlyph3D> glyph;
+    glyph->SetSourceConnection(sphereGlyph->GetOutputPort());
+    vtkMultiBlockDataSet* mbInter = vtkMultiBlockDataSet::SafeDownCast(tracker->GetOutput(1));
+    glyph->SetInputData(mbInter->GetBlock(1));
+
+    // Setup actor and mapper
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(vtkPolyData::SafeDownCast(tracker->GetOutput()));
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkPolyDataMapper> surfaceMapper;
+    surfaceMapper->SetInputConnection(surfaceBounce->GetOutputPort());
+    vtkNew<vtkActor> surfaceActor;
+    surfaceActor->SetMapper(surfaceMapper);
+    vtkNew<vtkPolyDataMapper> surfaceMapper2;
+    surfaceMapper2->SetInputConnection(surfacePass->GetOutputPort());
+    vtkNew<vtkActor> surfaceActor2;
+    surfaceActor2->SetMapper(surfaceMapper2);
+
+    vtkNew<vtkPolyDataMapper> glyphMapper;
+    glyphMapper->SetInputConnection(glyph->GetOutputPort());
+    vtkNew<vtkActor> glyphActor;
+    glyphActor->SetMapper(glyphMapper);
+
+    // Setup camera
+    vtkNew<vtkCamera> camera;
+    camera->SetFocalPoint(0, 0, -1);
+    camera->SetViewUp(0, 0, 1);
+    camera->SetPosition(0, -40, 0);
+
+    // Setup render window, renderer, and interactor
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetActiveCamera(camera);
+    renderer->AddActor(actor);
+    renderer->AddActor(surfaceActor);
+    renderer->AddActor(surfaceActor2);
+    renderer->AddActor(glyphActor);
+    renderer->SetBackground(0.1, .5, 1);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST501
+
+#ifdef TEST600
+
+#include <vtkActor.h>
+#include <vtkAppendPolyData.h>
+#include <vtkArrayCalculator.h>
+#include <vtkDataSetMapper.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLineSource.h>
+#include <vtkLookupTable.h>
+#include <vtkMultiBlockDataSet.h>
+#include <vtkOpenFOAMReader.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkScalarBarActor.h>
+#include <vtkSmartPointer.h>
+#include <vtkStreamTracer.h>
+#include <vtkTextProperty.h>
+#include <vtkUnstructuredGrid.h>
+
+int main()
+{
+    vtkNew<vtkOpenFOAMReader> openFOAMReader;
+    openFOAMReader->SetFileName("../resources/cavity/cavity.foam"); // 设置读取文件路径
+    openFOAMReader->SetCreateCellToPoint(1);
+    openFOAMReader->SetSkipZeroTime(1); // 开启跳过0时刻
+    openFOAMReader->SetTimeValue(2.0);  // 设置需要读取的时刻
+    openFOAMReader->Update();
+
+    auto numOfBlocks = openFOAMReader->GetOutput()->GetNumberOfBlocks();
+    std::cout << "Number of blocks:\t" << numOfBlocks << '\n';
+
+    vtkUnstructuredGrid* block0 = vtkUnstructuredGrid::SafeDownCast(openFOAMReader->GetOutput()->GetBlock(0));
+    double bounds[6] { 0.0 };
+    block0->GetBounds(bounds);
+    std::cout << "bound x:\t" << bounds[0] << '\t' << bounds[1] << "\nbound y:\t" << bounds[2] << '\t' << bounds[3] << "\nbound z:\t" << bounds[4]
+              << '\t' << bounds[5] << '\n';
+
+    std::cout << "Number of cells:\t" << block0->GetNumberOfCells() << '\n';
+    std::cout << "Number of points:\t" << block0->GetNumberOfPoints() << '\n';
+
+    double scalarRange[2] { 0.0 };
+    block0->GetScalarRange(scalarRange);
+    std::cout << "scalar range:\t" << scalarRange[0] << '\t' << scalarRange[1] << '\n';
+
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(block0);
+    mapper->SetScalarRange(block0->GetScalarRange());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkRenderer> ren;
+    ren->AddActor(actor);
+    ren->SetBackground(1, 1, 1); // 设置背景色为白色
+    ren->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(ren);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> TrackballCamera;
+    iren->SetInteractorStyle(TrackballCamera);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST600
+
+#ifdef TEST601
+
+#include <vtkActor.h>
+#include <vtkAppendPolyData.h>
+#include <vtkArrayCalculator.h>
+#include <vtkDataSetMapper.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLineSource.h>
+#include <vtkLookupTable.h>
+#include <vtkMultiBlockDataSet.h>
+#include <vtkOpenFOAMReader.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkScalarBarActor.h>
+#include <vtkSmartPointer.h>
+#include <vtkStreamTracer.h>
+#include <vtkTextProperty.h>
+#include <vtkUnstructuredGrid.h>
+
+int main()
+{
+    vtkNew<vtkOpenFOAMReader> openFOAMReader;
+    openFOAMReader->SetFileName("../resources/cavity/cavity.foam"); // 设置读取文件路径
+    openFOAMReader->SetCreateCellToPoint(1);
+    openFOAMReader->SetSkipZeroTime(1); // 开启跳过0时刻
+    openFOAMReader->SetTimeValue(1.5);  // 设置需要读取的时刻
+    openFOAMReader->Update();
+
+    vtkUnstructuredGrid* block0 = vtkUnstructuredGrid::SafeDownCast(openFOAMReader->GetOutput()->GetBlock(0));
+
+    // 设置生成流线的位置
+    vtkNew<vtkLineSource> line;
+    line->SetPoint1(0.01, 0.01, 0.001);
+    line->SetPoint2(0.02, 0.02, 0.002);
+    line->SetResolution(10);
+    line->Update();
+
+    vtkNew<vtkStreamTracer> streamline;
+    streamline->SetSourceConnection(line->GetOutputPort());
+    streamline->SetInputData(block0);
+    streamline->SetIntegratorTypeToRungeKutta45(); // 设置流线的积分类型
+    streamline->SetMaximumPropagation(5000);       // 设置流线长度
+    streamline->SetIntegrationStepUnit(2);         // 设置流线积分步长单位
+    streamline->SetInitialIntegrationStep(0.2);    // 设置流线积分初始步长
+    streamline->SetMinimumIntegrationStep(0.01);   // 设置流线积分最小步长
+    streamline->SetMaximumIntegrationStep(0.5);    // 设置流线积分最大步长
+    streamline->SetMaximumNumberOfSteps(2000);     // 设置流线积分最大步数
+    streamline->SetIntegrationDirectionToBoth();   // 设置流线积分方向
+    streamline->SetTerminalSpeed(1e-12);           // 设置流线积分终止速度
+    streamline->SetMaximumError(1e-6);
+    streamline->Update();
+
+    // 计算速度的模
+    vtkNew<vtkArrayCalculator> calc;
+    calc->SetInputConnection(streamline->GetOutputPort());
+    calc->AddVectorArrayName("U");
+    calc->SetFunction("mag(U)");
+    calc->SetResultArrayName("u_mag");
+    calc->Update();
+
+    vtkPolyData* streamlinedata = vtkPolyData::SafeDownCast(calc->GetOutput());
+    streamlinedata->GetPointData()->SetActiveScalars("u_mag");
+
+    // 计算速度范围
+    double scalarRange[2] { 0.0 };
+    streamlinedata->GetPointData()->GetScalars()->GetRange(scalarRange);
+    std::cout << "scalar range:\t" << scalarRange[0] << '\t' << scalarRange[1] << '\n';
+
+    vtkNew<vtkScalarBarActor> scalarBar;
+    vtkNew<vtkLookupTable> pColorTable;
+    pColorTable->SetNumberOfTableValues(31);
+    pColorTable->SetHueRange(0.67, 0); // 标量条颜色范围，从蓝到红
+    pColorTable->SetAlphaRange(1.0, 1.0);
+    pColorTable->SetValueRange(1, 1);
+    pColorTable->SetSaturationRange(1, 1);
+    pColorTable->SetRange(scalarRange);
+    pColorTable->Build();
+
+    scalarBar->SetLookupTable(pColorTable);
+
+    vtkNew<vtkPolyDataMapper> streamlinemappper;
+    streamlinemappper->SetInputData(streamlinedata);
+    streamlinemappper->SetLookupTable(pColorTable);
+    streamlinemappper->SetScalarRange(scalarRange);
+
+    vtkNew<vtkActor> streamlineactor;
+    streamlineactor->SetMapper(streamlinemappper);
+
+    vtkNew<vtkRenderer> ren;
+    ren->AddActor(streamlineactor);
+    ren->AddActor(scalarBar);
+    ren->SetBackground(1, 1, 1); // 设置背景色为白色
+    ren->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(ren);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> TrackballCamera;
+    iren->SetInteractorStyle(TrackballCamera);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST601
+
+#ifdef TEST602
+
+#include <vtkActor.h>
+#include <vtkCallbackCommand.h>
+#include <vtkCamera.h>
+#include <vtkDataSetMapper.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLineSource.h>
+#include <vtkLineWidget.h>
+#include <vtkMultiBlockDataSet.h>
+#include <vtkMultiBlockPLOT3DReader.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkRibbonFilter.h>
+#include <vtkRuledSurfaceFilter.h>
+#include <vtkRungeKutta4.h>
+#include <vtkStreamTracer.h>
+#include <vtkStructuredGrid.h>
+#include <vtkStructuredGridOutlineFilter.h>
+#include <vtkTubeFilter.h>
+
+int main(int argc, char* argv[])
+{
+    auto numOfStreamLines = 25;
+    auto illustration     = false;
+    std::string fileName1 = "../resources/combxyz.bin";
+    std::string fileName2 = "../resources/combq.bin";
+
+    vtkNew<vtkMultiBlockPLOT3DReader> pl3d;
+    pl3d->SetXYZFileName(fileName1.c_str());
+    pl3d->SetQFileName(fileName2.c_str());
+    pl3d->SetScalarFunctionNumber(100); // Density
+    pl3d->SetVectorFunctionNumber(202); // Momentum
+    pl3d->Update();
+
+    vtkStructuredGrid* pl3d_output = dynamic_cast<vtkStructuredGrid*>(pl3d->GetOutput()->GetBlock(0));
+
+    double bounds[6] { 0.0 };
+    pl3d_output->GetBounds(bounds);
+    std::cout << "bound x:\t" << bounds[0] << '\t' << bounds[1] << "\nbound y:\t" << bounds[2] << '\t' << bounds[3] << "\nbound z:\t" << bounds[4]
+              << '\t' << bounds[5] << '\n';
+
+    std::cout << "Number of cells:\t" << pl3d_output->GetNumberOfCells() << '\n';
+    std::cout << "Number of points:\t" << pl3d_output->GetNumberOfPoints() << '\n';
+
+    double scalarRange[2] { 0.0 };
+    pl3d_output->GetScalarRange(scalarRange);
+    std::cout << "scalar range:\t" << scalarRange[0] << '\t' << scalarRange[1] << '\n';
+
+    vtkNew<vtkRenderer> renderer;
+
+    //----------------------------------------------------------------
+    // 显示整个网格
+    // vtkNew<vtkDataSetMapper> mapper;
+    // mapper->SetInputData(pl3d_output);
+
+    // vtkNew<vtkActor> actor;
+    // actor->SetMapper(mapper);
+    // actor->GetProperty()->SetRepresentationToWireframe();
+    // renderer->AddActor(actor);
+
+    //----------------------------------------------------------------
+    // 提取轮廓线
+    vtkNew<vtkStructuredGridOutlineFilter> outLine;
+    outLine->SetInputData(pl3d_output);
+    outLine->Update();
+
+    vtkNew<vtkPolyDataMapper> outLineMapper;
+    outLineMapper->SetInputData(outLine->GetOutput());
+
+    vtkNew<vtkActor> outLineActor;
+    outLineActor->SetMapper(outLineMapper);
+    renderer->AddActor(outLineActor);
+
+    //----------------------------------------------------------------
+    // 流线
+    vtkNew<vtkRungeKutta4> integ;
+    vtkNew<vtkStreamTracer> streamer;
+    streamer->SetIntegrator(integ);                // 设置求解器
+    streamer->SetInputData(pl3d_output);           // 输入数据
+    streamer->SetStartPosition(15, 5, 32);         // 设置初始点，从哪个点开始计算流线，一条流线
+    streamer->SetMaximumPropagation(100);          // 设置迭代次数
+    streamer->SetInitialIntegrationStep(0.1);      // 设置迭代步长
+    streamer->SetIntegrationDirectionToBackward(); // 设置方向，向前向后
+    streamer->Update();
+
+    // 流管，将流线生成为流管（圆柱的管子）
+    vtkNew<vtkTubeFilter> streamTube;
+    streamTube->SetInputData(streamer->GetOutput());
+    streamTube->SetRadius(0.05);      // 半径
+    streamTube->SetNumberOfSides(10); // 面的数量，圆柱面
+    streamTube->Update();
+
+    vtkNew<vtkPolyDataMapper> streamMapper;
+    streamMapper->SetInputData(streamTube->GetOutput());
+    streamMapper->SetScalarRange(pl3d_output->GetPointData()->GetScalars()->GetRange());
+
+    vtkNew<vtkActor> streamActor;
+    streamActor->SetMapper(streamMapper);
+    renderer->AddActor(streamActor);
+
+    // 使用种子点生成多个流线的起始点
+    vtkNew<vtkLineSource> seeds;
+    seeds->SetPoint1(15, -5, 32); // 设置端点1
+    seeds->SetPoint2(15, 5, 32);  // 设置端点2
+    seeds->SetResolution(20);     // 在这条线上生成几个点
+    seeds->Update();
+
+    vtkNew<vtkStreamTracer> streamer2;
+    streamer2->SetIntegrator(integ);
+    streamer2->SetInputData(pl3d_output);
+    streamer2->SetMaximumPropagation(100);
+    streamer2->SetInitialIntegrationStep(0.1);
+    streamer2->SetIntegrationDirectionToBackward();
+    streamer2->SetSourceConnection(seeds->GetOutputPort()); // 为流线设置多个起始种子点，多条流线
+    streamer2->Update();
+
+    vtkNew<vtkPolyDataMapper> stream2Mapper;
+    stream2Mapper->SetInputData(streamer2->GetOutput());
+    stream2Mapper->SetScalarRange(pl3d_output->GetPointData()->GetScalars()->GetRange());
+
+    vtkNew<vtkActor> stream2Actor;
+    stream2Actor->SetMapper(stream2Mapper);
+    renderer->AddActor(stream2Actor);
+
+    //----------------------------------------------------------------
+    // 流面，将流线生成为面
+    vtkNew<vtkRuledSurfaceFilter> streamSurface;
+    streamSurface->SetInputData(streamer2->GetOutput());
+    streamSurface->SetRuledModeToPointWalk(); // 设置生成方法
+    // streamSurface->SetRuledModeToResample();
+    streamSurface->Update();
+
+    vtkNew<vtkPolyDataMapper> streamSurfaceMapper;
+    streamSurfaceMapper->SetInputData(streamSurface->GetOutput());
+    streamSurfaceMapper->SetScalarRange(pl3d_output->GetPointData()->GetScalars()->GetRange());
+
+    vtkNew<vtkActor> streamSurfaceActor;
+    streamSurfaceActor->SetMapper(streamSurfaceMapper);
+    renderer->AddActor(streamSurfaceActor);
+
+    //-----------------------------------------------------------------
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST602
+
+#ifdef TEST701
+
+#include <vtkActor.h>
+#include <vtkContourFilter.h>
+#include <vtkDataSetMapper.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkMultiBlockDataSet.h>
+#include <vtkMultiBlockPLOT3DReader.h>
+#include <vtkNew.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkQuadric.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSampleFunction.h>
+#include <vtkStructuredGrid.h>
+#include <vtkStructuredGridGeometryFilter.h>
+#include <vtkStructuredGridOutlineFilter.h>
+
+int main(int argc, char* argv[])
+{
+    auto numOfStreamLines = 25;
+    auto illustration     = false;
+    std::string fileName1 = "../resources/combxyz.bin";
+    std::string fileName2 = "../resources/combq.bin";
+
+    vtkNew<vtkMultiBlockPLOT3DReader> pl3d;
+    pl3d->SetXYZFileName(fileName1.c_str());
+    pl3d->SetQFileName(fileName2.c_str());
+    pl3d->SetScalarFunctionNumber(100); // Density
+    pl3d->SetVectorFunctionNumber(202); // Momentum
+    pl3d->Update();
+
+    vtkStructuredGrid* pl3d_output = dynamic_cast<vtkStructuredGrid*>(pl3d->GetOutput()->GetBlock(0));
+
+    double bounds[6] { 0.0 };
+    pl3d_output->GetBounds(bounds);
+    std::cout << "bound x:\t" << bounds[0] << '\t' << bounds[1] << "\nbound y:\t" << bounds[2] << '\t' << bounds[3] << "\nbound z:\t" << bounds[4]
+              << '\t' << bounds[5] << '\n';
+
+    std::cout << "Number of cells:\t" << pl3d_output->GetNumberOfCells() << '\n';
+    std::cout << "Number of points:\t" << pl3d_output->GetNumberOfPoints() << '\n';
+
+    double scalarRange[2] { 0.0 };
+    pl3d_output->GetScalarRange(scalarRange);
+    std::cout << "scalar range:\t" << scalarRange[0] << '\t' << scalarRange[1] << '\n';
+
+    vtkNew<vtkRenderer> renderer;
+
+    //----------------------------------------------------------------
+    // 显示整个网格
+    // vtkNew<vtkDataSetMapper> mapper;
+    // mapper->SetInputData(pl3d_output);
+
+    // vtkNew<vtkActor> actor;
+    // actor->SetMapper(mapper);
+    // actor->GetProperty()->SetRepresentationToWireframe();
+    // renderer->AddActor(actor);
+
+    //----------------------------------------------------------------
+    // 提取轮廓线
+    vtkNew<vtkStructuredGridOutlineFilter> outLine;
+    outLine->SetInputData(pl3d_output);
+    outLine->Update();
+
+    vtkNew<vtkPolyDataMapper> outLineMapper;
+    outLineMapper->SetInputData(outLine->GetOutput());
+
+    vtkNew<vtkActor> outLineActor;
+    outLineActor->SetMapper(outLineMapper);
+    renderer->AddActor(outLineActor);
+
+    //----------------------------------------------------------------
+    // 等值面
+    vtkNew<vtkContourFilter> contour;
+    contour->SetInputData(pl3d_output);
+    contour->GenerateValues(5, scalarRange); // 设置在scalarRange范围内提取5个等值面
+    contour->Update();
+
+    vtkNew<vtkPolyDataMapper> contourMapper;
+    contourMapper->SetInputData(contour->GetOutput());
+
+    vtkNew<vtkActor> contourActor;
+    contourActor->SetMapper(contourMapper);
+    renderer->AddActor(contourActor);
+
+    //----------------------------------------------------------------
+    // 使用函数提取等值面
+    vtkNew<vtkQuadric> quadric;
+    quadric->SetCoefficients(.5, 1., .2, 0., .1, 0., 0., .2, 0., 0.); // 设置二次函数的9个参数
+
+    vtkNew<vtkSampleFunction> sampler;        // 采样函数
+    sampler->SetSampleDimensions(30, 30, 30); // 设置精度
+    sampler->SetImplicitFunction(quadric);
+    sampler->Update();
+
+    vtkNew<vtkContourFilter> contourFunction;
+    contourFunction->SetInputConnection(sampler->GetOutputPort());
+    contourFunction->GenerateValues(3, scalarRange); // 设置在scalarRange范围内提取3个等值面
+    contourFunction->Update();
+
+    vtkNew<vtkPolyDataMapper> contourFunctionMapper;
+    contourFunctionMapper->SetInputData(contourFunction->GetOutput());
+
+    vtkNew<vtkActor> contourFunctionActor;
+    contourFunctionActor->SetMapper(contourFunctionMapper);
+    // renderer->AddActor(contourFunctionActor);
+
+    //----------------------------------------------------------------
+    // 提取平面
+    vtkNew<vtkStructuredGridGeometryFilter> plane;
+    plane->SetInputData(pl3d_output);
+    plane->SetExtent(1, 100, 1, 100, 7, 7); // 提取一个2维平面，xyz的范围分别为x[1,100] y[1,100] z = 7
+    plane->Update();
+
+    vtkNew<vtkPolyDataMapper> planeMapper;
+    planeMapper->SetInputData(plane->GetOutput());
+
+    vtkNew<vtkActor> planeActor;
+    planeActor->SetMapper(planeMapper);
+    // renderer->AddActor(planeActor);
+
+    //-----------------------------------------------------------------
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST701
