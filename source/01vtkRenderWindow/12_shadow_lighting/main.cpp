@@ -2,9 +2,10 @@
 /*
  * 1. 阴影和光照 https://examples.vtk.org/site/Cxx/Visualization/ShadowsLightsDemo/
  * 2. 关闭默认的光照，让颜色的对比度看起来更明显
+ * 3. 光线投射raycast
  */
 
-#define TEST2
+#define TEST3
 
 #ifdef TEST1
 
@@ -366,3 +367,105 @@ int main(int, char*[])
 }
 
 #endif // TEST2
+
+#ifdef TEST3
+
+#include <vtkCamera.h>
+#include <vtkColorTransferFunction.h>
+#include <vtkFixedPointVolumeRayCastMapper.h>
+#include <vtkImageGaussianSmooth.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLight.h>
+#include <vtkNIFTIImageReader.h>
+#include <vtkNew.h>
+#include <vtkOpenGLGPUVolumeRayCastMapper.h>
+#include <vtkPiecewiseFunction.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkVolume.h>
+#include <vtkVolumeProperty.h>
+
+int main()
+{
+    vtkNew<vtkNIFTIImageReader> reader;
+    // reader->SetFileName("../resources/filtered_func_data.nii.gz");
+    reader->SetFileName("../resources/avg152T1_RL_nifti.nii.gz");
+    reader->Update();
+
+    vtkNew<vtkOpenGLGPUVolumeRayCastMapper> mapper;
+    mapper->SetAutoAdjustSampleDistances(0);
+    mapper->SetSampleDistance(0.5);
+    mapper->UseJitteringOn();
+    mapper->SetInputData(reader->GetOutput());
+    // mapper->SetGlobalIlluminationReach(0.75);
+    // mapper->SetVolumetricScatteringBlending(1.0);
+
+    vtkNew<vtkVolume> volume;
+    volume->SetMapper(mapper);
+
+    vtkNew<vtkVolumeProperty> volumeProperty;
+    volumeProperty->SetInterpolationTypeToLinear();
+    volumeProperty->ShadeOn(); // 打开或者关闭阴影测试
+    volumeProperty->SetAmbient(0.55);
+    volumeProperty->SetDiffuse(0.85);     // 漫反射
+    volumeProperty->SetSpecular(0.54);    // 镜面反射
+    volumeProperty->SetSpecularPower(69); // 镜面反射
+
+    // 设置不透明度
+    vtkNew<vtkPiecewiseFunction> compositeOpacity;
+    compositeOpacity->AddPoint(-1000, 0.00);
+    compositeOpacity->AddPoint(100, 0.00);
+    compositeOpacity->AddPoint(300, 0.879);
+    compositeOpacity->AddPoint(478, 0.879);
+    compositeOpacity->AddPoint(1500, 0.901);
+    volumeProperty->SetScalarOpacity(compositeOpacity); // 设置不透明度传输函数
+
+    vtkNew<vtkColorTransferFunction> color;
+    color->AddRGBPoint(-1000, 0.00, 0.00, 0.00);
+    color->AddRGBPoint(100, 220 / 255., 21 / 255., 3 / 255.);
+    color->AddRGBPoint(300, 250 / 255., 1.00, 189 / 255.);
+    color->AddRGBPoint(478, 224 / 255., 1, 249 / 255.);
+    color->AddRGBPoint(1500, 1, 1, 1);
+    volumeProperty->SetColor(color);
+
+    volume->SetProperty(volumeProperty);
+
+    vtkNew<vtkRenderer> ren;
+    ren->AddActor(volume);
+    ren->SetBackground(0, 0, 0);
+    ren->ResetCamera();
+    vtkCamera* camera = ren->GetActiveCamera();
+    camera->Elevation(-70);
+
+    ren->ClearLights();
+    ren->RemoveAllLights();
+
+    double* lightPosition    = camera->GetPosition();
+    double lightPositions[3] = { lightPosition[0], lightPosition[1], lightPosition[2] - 100 };
+    vtkNew<vtkLight> light;
+    light->SetLightTypeToSceneLight();
+    light->SetPosition(lightPositions);
+    light->SetPositional(true);
+    light->SetAmbientColor(0.3, 0.2, 0.1);
+    light->SetConeAngle(60);
+    light->SetFocalPoint(camera->GetFocalPoint());
+    light->SetIntensity(1.2);
+    ren->AddLight(light);
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(ren);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetRenderWindow(renWin);
+    iren->SetInteractorStyle(style);
+    renWin->SetSize(1024, 768);
+    renWin->Render();
+
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST3

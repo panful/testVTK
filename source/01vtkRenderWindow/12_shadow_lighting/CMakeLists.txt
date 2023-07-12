@@ -15,7 +15,10 @@ find_package(VTK
         RenderingOpenGL2
         loguru
         ParallelMPI
-        RenderingAnnotation # vtkScalarBarActor
+        RenderingAnnotation     # vtkScalarBarActor
+        IOImage                 # vtkNIFTIImageReader
+        RenderingVolume         # vtkGPUVolumeRayCastMapper
+        RenderingVolumeOpenGL2  # vtkOpenGLGPUVolumeRayCastMapper
     QUIET
 )
 
