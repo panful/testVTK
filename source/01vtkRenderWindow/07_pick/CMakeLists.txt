@@ -15,6 +15,7 @@ find_package(VTK
         ParallelMPI
         RenderingAnnotation # vtkAxesActor
         InteractionWidgets  # vtkOrientationMarkerWidget
+        FiltersExtraction   # vtkExtractPolyDataGeometry
     QUIET
 )
 

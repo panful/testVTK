@@ -70,7 +70,7 @@
 
 */
 
-#define TEST20
+#define TEST64
 
 //在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 //#include <vtkAutoInit.h>
@@ -4861,7 +4861,7 @@ public:
 int main()
 {
     vtkSmartPointer<vtkDICOMImageReader> reader = vtkSmartPointer<vtkDICOMImageReader>::New();
-    reader->SetDirectoryName("file\\dicom_testdata");
+    reader->SetDirectoryName("../resources/dicom");
     reader->Update();
 
     /*vtkSmartPointer<vtkOutlineFilter> outline = vtkSmartPointer<vtkOutlineFilter>::New();

@@ -31,7 +31,7 @@
 * 701 vtkContourFilter 等值面 vtkSampleFunction使用采样函数提取等值面
 */
 
-#define TEST501
+#define TEST601
 
 #ifdef TEST100
 

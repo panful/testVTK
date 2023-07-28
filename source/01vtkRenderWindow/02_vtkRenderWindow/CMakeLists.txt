@@ -16,6 +16,7 @@ find_package(VTK
         ParallelMPI
         RenderingAnnotation # vtkCaptionActor2D
         InteractionWidgets  # vtkOrientationMarkerWidget
+        IOImage             # vtkDICOMImageReader
     QUIET
 )
 

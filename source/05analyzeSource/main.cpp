@@ -932,6 +932,18 @@ public:
             std::cout << "picked actor:\t" << theActors[actor] << '\n';
         }
 
+        // 世界坐标
+        if (auto pos = picker->GetPickPosition())
+        {
+            std::cout << "pick position:\t" << pos[0] << '\t' << pos[1] << '\t' << pos[2] << '\n';
+        }
+
+        // 屏幕坐标
+        if (auto point = picker->GetSelectionPoint())
+        {
+            std::cout << "selection point:\t" << point[0] << '\t' << point[1] << '\t' << point[2] << '\n';
+        }
+
         vtkInteractorStyleTrackballCamera::OnLeftButtonDown();
     }
 };
@@ -950,7 +962,6 @@ vtkStandardNewMacro(MyStyle);
 
 int main(int argc, char* argv[])
 {
-
     vtkNew<vtkRenderer> renderer;
     vtkNew<vtkRenderWindow> renderWindow;
     renderWindow->SetSize(800, 600);
