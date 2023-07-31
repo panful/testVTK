@@ -15,6 +15,8 @@ find_package(VTK
         InteractionWidgets  # vtkOrientationMarkerWidget
         loguru
         ParallelMPI
+        FiltersExtraction   # vtkExtractGeometry
+        FiltersGeometry     # vtkDataSetSurfaceFilter
     QUIET
 )
 

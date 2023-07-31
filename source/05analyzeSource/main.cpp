@@ -933,6 +933,7 @@ public:
         }
 
         // 世界坐标
+        // 通过 vtkWorldPointPicker 获取世界坐标，实际就是对相机属性的一些转换
         if (auto pos = picker->GetPickPosition())
         {
             std::cout << "pick position:\t" << pos[0] << '\t' << pos[1] << '\t' << pos[2] << '\n';
@@ -1007,6 +1008,8 @@ int main(int argc, char* argv[])
 }
 
 #endif // TEST10
+
+
 
 #ifdef TEST66
 

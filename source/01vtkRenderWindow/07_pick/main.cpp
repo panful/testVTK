@@ -1,5 +1,7 @@
 ﻿/*
- * 27.框选拾取 vtk拾取相关的类 https://blog.csdn.net/lovelanjuan/article/details/7301773
+ * vtk拾取相关的类 https://blog.csdn.net/lovelanjuan/article/details/7301773
+ *
+ * 11.框选拾取 vtkAreaPicker
  * 28.actor拾取 vtkPropPicker 基于硬件拾取
  * 29.vtk拾取汇总，框选拾取，范围拾取，点拾取，单元拾取
  * 30.范围拾取 vtkAreaPicker 点到actor的最短距离 vtkCellLocator
@@ -17,13 +19,11 @@
  * 多图层拾取 01_03_TEST45
  */
 
-#define TEST37
+#define TEST19
 
-#ifdef TEST27
+#ifdef TEST11
 
 // https://kitware.github.io/vtk-examples/site/Cxx/Picking/HighlightSelectedPoints/
-
-// 按下R开始框选拾取
 
 #include <vtkActor.h>
 #include <vtkAreaPicker.h>
@@ -33,7 +33,6 @@
 #include <vtkIdFilter.h>
 #include <vtkIdTypeArray.h>
 #include <vtkInteractorStyleRubberBandPick.h>
-#include <vtkNamedColors.h>
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
 #include <vtkPlanes.h>
@@ -51,19 +50,14 @@
 #include <vtkVersion.h>
 #include <vtkVertexGlyphFilter.h>
 
-#if VTK_VERSION_NUMBER >= 89000000000ULL
-#define VTK890 1
-#endif
-
 namespace {
-// Define interaction style
-class InteractorStyle : public vtkInteractorStyleRubberBandPick
+class MyStyle : public vtkInteractorStyleRubberBandPick
 {
 public:
-    static InteractorStyle* New();
-    vtkTypeMacro(InteractorStyle, vtkInteractorStyleRubberBandPick);
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleRubberBandPick);
 
-    InteractorStyle()
+    MyStyle()
     {
         this->SelectedMapper = vtkSmartPointer<vtkDataSetMapper>::New();
         this->SelectedActor  = vtkSmartPointer<vtkActor>::New();
@@ -72,8 +66,6 @@ public:
 
     virtual void OnLeftButtonUp() override
     {
-        vtkNew<vtkNamedColors> colors;
-
         // Forward events
         vtkInteractorStyleRubberBandPick::OnLeftButtonUp();
 
@@ -100,7 +92,7 @@ public:
             std::cout << "Id " << i << " : " << ids->GetValue(i) << std::endl;
         }
 
-        this->SelectedActor->GetProperty()->SetColor(colors->GetColor3d("Red").GetData());
+        this->SelectedActor->GetProperty()->SetColor(1., 0., 0.);
         this->SelectedActor->GetProperty()->SetPointSize(5);
 
         this->CurrentRenderer->AddActor(SelectedActor);
@@ -119,25 +111,24 @@ private:
     vtkSmartPointer<vtkDataSetMapper> SelectedMapper;
 };
 
-vtkStandardNewMacro(InteractorStyle);
+vtkStandardNewMacro(MyStyle);
 } // namespace
+
+/*
+ * 按下R开始框选拾取
+ * 通过构建一个视锥体，然后用这个视锥体对需要拾取的几何体进行提取操作
+ */
 
 int main(int, char*[])
 {
-    vtkNew<vtkNamedColors> colors;
-
     vtkNew<vtkPointSource> pointSource;
     pointSource->SetNumberOfPoints(20);
     pointSource->Update();
 
     vtkNew<vtkIdFilter> idFilter;
     idFilter->SetInputConnection(pointSource->GetOutputPort());
-#if VTK890
     idFilter->SetCellIdsArrayName("OriginalIds");
     idFilter->SetPointIdsArrayName("OriginalIds");
-#else
-    idFilter->SetIdsArrayName("OriginalIds");
-#endif
     idFilter->Update();
 
     vtkNew<vtkDataSetSurfaceFilter> surfaceFilter;
@@ -146,7 +137,7 @@ int main(int, char*[])
 
     vtkPolyData* input = surfaceFilter->GetOutput();
 
-    // Create a mapper and actor
+    //--------------------------------------------------------------------
     vtkNew<vtkPolyDataMapper> mapper;
     mapper->SetInputData(input);
     mapper->ScalarVisibilityOff();
@@ -154,34 +145,32 @@ int main(int, char*[])
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
     actor->GetProperty()->SetPointSize(5);
-    actor->GetProperty()->SetColor(colors->GetColor3d("Green").GetData());
+    actor->GetProperty()->SetColor(0., 1., 0.);
 
-    // Visualize
     vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+
     vtkNew<vtkRenderWindow> renderWindow;
     renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("HighlightSelectedPoints");
+    renderWindow->SetSize(800, 600);
 
     vtkNew<vtkAreaPicker> areaPicker;
     vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
     renderWindowInteractor->SetPicker(areaPicker);
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
-    renderer->AddActor(actor);
-    renderer->SetBackground(colors->GetColor3d("DarkSlateGray").GetData());
-
-    renderWindow->Render();
-
-    vtkNew<InteractorStyle> style;
+    vtkNew<MyStyle> style;
     style->SetPoints(input);
     renderWindowInteractor->SetInteractorStyle(style);
 
+    renderWindow->Render();
     renderWindowInteractor->Start();
 
     return EXIT_SUCCESS;
 }
 
-#endif // TEST27
+#endif // TEST11
 
 #ifdef TEST28
 
@@ -1782,15 +1771,7 @@ int main(int, char*[])
 #include <vtkActor.h>
 #include <vtkCellArray.h>
 #include <vtkCellPicker.h>
-#include <vtkCommand.h>
-#include <vtkDataSetMapper.h>
-#include <vtkExtractSelection.h>
-#include <vtkIdTypeArray.h>
 #include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkObjectFactory.h>
-#include <vtkPlaneSource.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
@@ -1801,9 +1782,6 @@ int main(int, char*[])
 #include <vtkRendererCollection.h>
 #include <vtkSelection.h>
 #include <vtkSelectionNode.h>
-#include <vtkSmartPointer.h>
-#include <vtkTriangleFilter.h>
-#include <vtkUnstructuredGrid.h>
 
 namespace {
 
@@ -1813,72 +1791,24 @@ class MouseInteractorStyle : public vtkInteractorStyleTrackballCamera
 public:
     static MouseInteractorStyle* New();
 
-    MouseInteractorStyle()
-    {
-        selectedMapper = vtkSmartPointer<vtkDataSetMapper>::New();
-        selectedActor  = vtkSmartPointer<vtkActor>::New();
-    }
-
     virtual void OnLeftButtonDown() override
     {
-        vtkNew<vtkNamedColors> colors;
-
-        // Get the location of the click (in window coordinates)
         int* pos = this->GetInteractor()->GetEventPosition();
 
         vtkNew<vtkCellPicker> picker;
-        picker->SetTolerance(0.0005);
+        picker->SetTolerance(0.005); // 误差范围
 
-        // Pick from this location.
-        picker->Pick(pos[0], pos[1], 0, this->GetDefaultRenderer());
+        // cpu拾取
+        auto picked = picker->Pick(pos[0], pos[1], 0, this->GetDefaultRenderer());
 
         double* worldPosition = picker->GetPickPosition();
         std::cout << "Cell id is: " << picker->GetCellId() << std::endl;
 
+        // -1表示没有拾取到
         if (picker->GetCellId() != -1)
         {
-
-            std::cout << "Pick position is: (" << worldPosition[0] << ", " << worldPosition[1] << ", " << worldPosition[2] << ")" << endl;
-
-            vtkNew<vtkIdTypeArray> ids;
-            ids->SetNumberOfComponents(1);
-            ids->InsertNextValue(picker->GetCellId());
-
-            vtkNew<vtkSelectionNode> selectionNode;
-            selectionNode->SetFieldType(vtkSelectionNode::CELL);
-            selectionNode->SetContentType(vtkSelectionNode::INDICES);
-            selectionNode->SetSelectionList(ids);
-
-            vtkNew<vtkSelection> selection;
-            selection->AddNode(selectionNode);
-
-            vtkNew<vtkExtractSelection> extractSelection;
-            extractSelection->SetInputData(0, this->Data);
-            extractSelection->SetInputData(1, selection);
-            extractSelection->Update();
-
-            // In selection
-            vtkNew<vtkUnstructuredGrid> selected;
-            selected->ShallowCopy(extractSelection->GetOutput());
-
-            std::cout << "Number of points in the selection: " << selected->GetNumberOfPoints() << std::endl;
-            std::cout << "Number of cells in the selection : " << selected->GetNumberOfCells() << std::endl;
-            selectedMapper->SetInputData(selected);
-            selectedActor->SetMapper(selectedMapper);
-            selectedActor->GetProperty()->EdgeVisibilityOn();
-            selectedActor->GetProperty()->SetColor(0., 1., 0.);
-
-            selectedActor->GetProperty()->SetLineWidth(3);
-
-            this->Interactor->GetRenderWindow()->GetRenderers()->GetFirstRenderer()->AddActor(selectedActor);
         }
-        // Forward events
-        vtkInteractorStyleTrackballCamera::OnLeftButtonDown();
     }
-
-    vtkSmartPointer<vtkPolyData> Data;
-    vtkSmartPointer<vtkDataSetMapper> selectedMapper;
-    vtkSmartPointer<vtkActor> selectedActor;
 };
 
 vtkStandardNewMacro(MouseInteractorStyle);
@@ -1887,42 +1817,57 @@ vtkStandardNewMacro(MouseInteractorStyle);
 
 int main(int, char*[])
 {
-    vtkNew<vtkNamedColors> colors;
+    vtkNew<vtkPolyData> polyData;
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cells;
 
-    vtkNew<vtkPlaneSource> planeSource;
-    planeSource->Update();
+    constexpr int col = 5;
+    constexpr int row = 5;
 
-    vtkNew<vtkTriangleFilter> triangleFilter;
-    triangleFilter->SetInputConnection(planeSource->GetOutputPort());
-    triangleFilter->Update();
+    points->InsertNextPoint(0.0, 0.0, 0.0);
+    points->InsertNextPoint(1.0, 0.0, 0.0);
+    points->InsertNextPoint(2.0, 0.0, 0.0);
+
+    points->InsertNextPoint(0.0, 1.0, 0.0);
+    points->InsertNextPoint(1.0, 1.0, 0.0);
+    points->InsertNextPoint(2.0, 1.0, 0.0);
+
+    points->InsertNextPoint(0.0, 2.0, 0.0);
+    points->InsertNextPoint(1.0, 2.0, 0.0);
+    points->InsertNextPoint(2.0, 2.0, 0.0);
+
+    cells->InsertNextCell({ 0, 1, 4, 3 });
+    cells->InsertNextCell({ 1, 2, 5, 4 });
+    cells->InsertNextCell({ 3, 4, 7, 6 });
+    cells->InsertNextCell({ 4, 5, 8, 7 });
+
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
 
     vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputConnection(triangleFilter->GetOutputPort());
+    mapper->SetInputData(polyData);
 
     vtkNew<vtkActor> actor;
-    actor->GetProperty()->SetColor(colors->GetColor3d("SeaGreen").GetData());
+    actor->GetProperty()->SetColor(0, 1, 0);
+    actor->GetProperty()->EdgeVisibilityOn();
     actor->SetMapper(mapper);
 
     vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+    renderer->SetBackground(.1, .2, .3);
+
     vtkNew<vtkRenderWindow> renderWindow;
     renderWindow->AddRenderer(renderer);
     renderWindow->SetWindowName("CellPicking");
+    renderWindow->SetSize(800, 600);
 
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-    renderWindowInteractor->Initialize();
-
-    // Set the custom stype to use for interaction.
     vtkNew<MouseInteractorStyle> style;
     style->SetDefaultRenderer(renderer);
-    style->Data = triangleFilter->GetOutput();
-
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
     renderWindowInteractor->SetInteractorStyle(style);
-
-    renderer->AddActor(actor);
-    renderer->ResetCamera();
-
-    renderer->SetBackground(colors->GetColor3d("PaleTurquoise").GetData());
+    renderWindowInteractor->Initialize();
 
     renderWindow->Render();
     renderWindowInteractor->Start();

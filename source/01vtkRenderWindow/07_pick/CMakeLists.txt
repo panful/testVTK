@@ -16,6 +16,7 @@ find_package(VTK
         RenderingAnnotation # vtkAxesActor
         InteractionWidgets  # vtkOrientationMarkerWidget
         FiltersExtraction   # vtkExtractPolyDataGeometry
+        FiltersGeometry     # vtkDataSetSurfaceFilter
     QUIET
 )
 
