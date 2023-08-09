@@ -2750,6 +2750,7 @@ int main(int argc, char* argv[])
 #include "vtkGlyph3D.h"
 #include "vtkImageData.h"
 #include "vtkImageDataToPointSet.h"
+#include "vtkInteractorStyleTrackballCamera.h"
 #include "vtkLagrangianParticleTracker.h"
 #include "vtkMath.h"
 #include "vtkMultiBlockDataGroupFilter.h"
@@ -2765,7 +2766,6 @@ int main(int argc, char* argv[])
 #include "vtkRenderer.h"
 #include "vtkRungeKutta2.h"
 #include "vtkSphereSource.h"
-#include "vtkInteractorStyleTrackballCamera.h"
 
 int main(int, char*[])
 {
@@ -2774,29 +2774,30 @@ int main(int, char*[])
     seeds->SetNumberOfPoints(10);
     seeds->SetRadius(4);
     seeds->Update();
+
     vtkPolyData* seedPD    = seeds->GetOutput();
     vtkPointData* seedData = seedPD->GetPointData();
+    auto numOfPoints       = seedPD->GetNumberOfPoints();
 
     // Create seed data
     vtkNew<vtkDoubleArray> partVel;
     partVel->SetNumberOfComponents(3);
-    partVel->SetNumberOfTuples(seedPD->GetNumberOfPoints());
+    partVel->SetNumberOfTuples(numOfPoints);
     partVel->SetName("InitialVelocity");
-
-    vtkNew<vtkDoubleArray> partDens;
-    partDens->SetNumberOfComponents(1);
-    partDens->SetNumberOfTuples(seedPD->GetNumberOfPoints());
-    partDens->SetName("ParticleDensity");
-
-    vtkNew<vtkDoubleArray> partDiam;
-    partDiam->SetNumberOfComponents(1);
-    partDiam->SetNumberOfTuples(seedPD->GetNumberOfPoints());
-    partDiam->SetName("ParticleDiameter");
-
     partVel->FillComponent(0, 2);
     partVel->FillComponent(1, 5);
     partVel->FillComponent(2, 1);
+
+    vtkNew<vtkDoubleArray> partDens;
+    partDens->SetNumberOfComponents(1);
+    partDens->SetNumberOfTuples(numOfPoints);
+    partDens->SetName("ParticleDensity");
     partDens->FillComponent(0, 1920);
+
+    vtkNew<vtkDoubleArray> partDiam;
+    partDiam->SetNumberOfComponents(1);
+    partDiam->SetNumberOfTuples(numOfPoints);
+    partDiam->SetName("ParticleDiameter");
     partDiam->FillComponent(0, 0.1);
 
     seedData->AddArray(partVel);
@@ -2953,8 +2954,8 @@ int main(int, char*[])
     tracker->SetMaximumNumberOfSteps(-1);
     tracker->SetMaximumIntegrationTime(10.0);
     tracker->Update();
-    tracker->SetInputData(waveletImg);
-    tracker->SetSourceData(seedPD);
+    tracker->SetInputData(waveletImg); // inputData
+    tracker->SetSourceData(seedPD);    // sourceData
     tracker->SetMaximumNumberOfSteps(300);
     tracker->SetMaximumIntegrationTime(-1.0);
     tracker->SetSurfaceConnection(groupSurface->GetOutputPort());
@@ -3013,6 +3014,7 @@ int main(int, char*[])
         return EXIT_FAILURE;
     }
 
+    //----------------------------------------------------------------------
     // Glyph for interaction points
     vtkNew<vtkSphereSource> sphereGlyph;
     sphereGlyph->SetRadius(0.1);
@@ -3050,18 +3052,11 @@ int main(int, char*[])
     vtkNew<vtkActor> glyphActor;
     glyphActor->SetMapper(glyphMapper);
 
-    // Setup camera
-    vtkNew<vtkCamera> camera;
-    camera->SetFocalPoint(0, 0, -1);
-    camera->SetViewUp(0, 0, 1);
-    camera->SetPosition(0, -40, 0);
-
     // Setup render window, renderer, and interactor
     vtkNew<vtkRenderer> renderer;
-    renderer->SetActiveCamera(camera);
     renderer->AddActor(actor);
-    renderer->AddActor(surfaceActor);
-    renderer->AddActor(surfaceActor2);
+    // renderer->AddActor(surfaceActor);
+    // renderer->AddActor(surfaceActor2);
     renderer->AddActor(glyphActor);
     renderer->SetBackground(0.1, .5, 1);
 
@@ -3167,6 +3162,7 @@ int main()
 #include <vtkActor.h>
 #include <vtkAppendPolyData.h>
 #include <vtkArrayCalculator.h>
+#include <vtkCellData.h>
 #include <vtkDataSetMapper.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkLineSource.h>
@@ -3233,7 +3229,23 @@ int main()
     // 计算速度范围
     double scalarRange[2] { 0.0 };
     streamlinedata->GetPointData()->GetScalars()->GetRange(scalarRange);
-    std::cout << "scalar range:\t" << scalarRange[0] << '\t' << scalarRange[1] << '\n';
+    std::cout << "point scalar:\t" << scalarRange[0] << '\t' << scalarRange[1] << '\n';
+    if (auto&& pv = streamlinedata->GetPointData()->GetVectors())
+    {
+        std::cout << "point vector\t" << pv->GetRange()[0] << '\t' << pv->GetRange()[1] << '\t' << pv->GetRange()[2] << '\n';
+    }
+    if (auto&& cs = streamlinedata->GetCellData()->GetScalars())
+    {
+        std::cout << "cell scalar:\t" << cs[0] << '\t' << cs[1] << '\n';
+    }
+    if (auto&& cv = streamlinedata->GetCellData()->GetVectors())
+    {
+        std::cout << "cell vector\t" << cv->GetRange()[0] << '\t' << cv->GetRange()[1] << '\t' << cv->GetRange()[2] << '\n';
+    }
+
+    // 生成流线 向量数据不是必须的，标量数据是必须的，待进一步验证
+    //streamlinedata->GetPointData()->SetVectors(nullptr);
+    //streamlinedata->GetPointData()->SetScalars(nullptr);
 
     vtkNew<vtkScalarBarActor> scalarBar;
     vtkNew<vtkLookupTable> pColorTable;
