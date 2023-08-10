@@ -7,10 +7,10 @@
  * 2. 非结构cgns
  * 3. FLUENT *.cas *.dat 只绘制图形，不映射流场数据 FLUENT控制台使用 f c n wcd fileName 导出 fileName.cas和fileName.dat
  * 4. FLUENT *.cas *.dat 将流场数据映射到颜色
- * 
+ * 5. 构造vtkUnstructuredGrid，四面体、六面体、棱柱、棱锥等图形
  */
 
-#define TEST4
+#define TEST5
 
 #ifdef TEST1
 
@@ -331,3 +331,111 @@ int main()
 }
 
 #endif // TEST4
+
+#ifdef TEST5
+
+#include <iostream>
+#include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkDataSetMapper.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkMultiBlockDataSet.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkUnstructuredGrid.h>
+
+int main()
+{
+    vtkNew<vtkPoints> points;
+    // 0,1,2
+    points->InsertNextPoint(0, 0, 0);
+    points->InsertNextPoint(2, 0, 0);
+    points->InsertNextPoint(1, 2, 0);
+
+    // 3,4,5,6
+    points->InsertNextPoint(3, 0, 0);
+    points->InsertNextPoint(5, 0, 0);
+    points->InsertNextPoint(4, 0, 2);
+    points->InsertNextPoint(4, 2, 1);
+
+    // 7,8,9,10,11,12,13,14
+    points->InsertNextPoint(6, 0, 0);
+    points->InsertNextPoint(8, 0, 0);
+    points->InsertNextPoint(8, 0, 2);
+    points->InsertNextPoint(6, 0, 2);
+    points->InsertNextPoint(6, 2, 0);
+    points->InsertNextPoint(9, 2, 0);
+    points->InsertNextPoint(9, 2, 3);
+    points->InsertNextPoint(6, 2, 3);
+
+    // 15, 16, 17, 18, 19, 20
+    points->InsertNextPoint(10, 0, 0);
+    points->InsertNextPoint(11, 0, 2);
+    points->InsertNextPoint(12, 0, 0);
+    points->InsertNextPoint(10, 2, 0);
+    points->InsertNextPoint(11, 2, 2);
+    points->InsertNextPoint(12, 2, 0);
+
+    // 21, 22, 23, 24, 25
+    points->InsertNextPoint(13, 0, 0);
+    points->InsertNextPoint(15, 0, 0);
+    points->InsertNextPoint(15, 0, 2);
+    points->InsertNextPoint(13, 0, 2);
+    points->InsertNextPoint(14, 2, 1);
+
+    vtkNew<vtkUnstructuredGrid> usg;
+    usg->SetPoints(points);
+
+    // 三角形
+    vtkIdType ids_triangle[] { 0, 1, 2 };
+    usg->InsertNextCell(VTK_TRIANGLE, 3, ids_triangle);
+
+    // 四面体
+    vtkIdType ids_tetra[] { 3, 4, 5, 6 };
+    usg->InsertNextCell(VTK_TETRA, 4, ids_tetra);
+
+    // 六面体
+    vtkIdType ids_hexahedron[] { 7, 8, 9, 10, 11, 12, 13, 14 };
+    usg->InsertNextCell(VTK_HEXAHEDRON, 8, ids_hexahedron);
+
+    // 三棱柱
+    vtkIdType ids_wedge[] { 15, 16, 17, 18, 19, 20 };
+    usg->InsertNextCell(VTK_WEDGE, 6, ids_wedge);
+
+    // 四棱锥
+    vtkIdType ids_pyramid[] { 21, 22, 23, 24, 25 };
+    usg->InsertNextCell(VTK_PYRAMID, 5, ids_pyramid);
+
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(usg);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->SetSize(800, 600);
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST5

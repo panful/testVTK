@@ -30,7 +30,7 @@
 * 701 vtkContourFilter 等值面 vtkSampleFunction使用采样函数提取等值面
 */
 
-#define TEST105
+#define TEST501
 
 #ifdef TEST100
 
@@ -2764,8 +2764,6 @@ int main(int argc, char* argv[])
 
 // https://gitlab.kitware.com/vtk/vtk/-/blob/v9.2.0/Filters/FlowPaths/Testing/Cxx/TestLagrangianParticleTracker.cxx
 
-#include "vtkLagrangianMatidaIntegrationModel.h"
-
 #include "vtkActor.h"
 #include "vtkCamera.h"
 #include "vtkCellData.h"
@@ -2776,6 +2774,7 @@ int main(int argc, char* argv[])
 #include "vtkImageData.h"
 #include "vtkImageDataToPointSet.h"
 #include "vtkInteractorStyleTrackballCamera.h"
+#include "vtkLagrangianMatidaIntegrationModel.h"
 #include "vtkLagrangianParticleTracker.h"
 #include "vtkMath.h"
 #include "vtkMultiBlockDataGroupFilter.h"
@@ -2941,25 +2940,8 @@ int main(int, char*[])
     tracker->SetIntegrator(nullptr);
     tracker->SetIntegrationModel(nullptr);
     tracker->Print(cout);
-    if (tracker->GetSource() != nullptr || tracker->GetSurface() != nullptr)
-    {
-        std::cerr << "Incorrect Input Initialization" << std::endl;
-        return EXIT_FAILURE;
-    }
     tracker->SetIntegrator(integrator);
-    if (tracker->GetIntegrator() != integrator)
-    {
-        std::cerr << "Incorrect Integrator" << std::endl;
-        return EXIT_FAILURE;
-    }
-
     tracker->SetIntegrationModel(integrationModel);
-    if (tracker->GetIntegrationModel() != integrationModel)
-    {
-        std::cerr << "Incorrect Integration Model" << std::endl;
-        return EXIT_FAILURE;
-    }
-
     tracker->SetInputConnection(groupFlow->GetOutputPort());
     tracker->SetStepFactor(0.1);
     tracker->SetStepFactorMin(0.1);
@@ -2987,57 +2969,7 @@ int main(int, char*[])
     tracker->SetCellLengthComputationMode(vtkLagrangianParticleTracker::STEP_CUR_CELL_VEL_DIR);
     tracker->AdaptiveStepReintegrationOff();
     tracker->Update();
-    if (tracker->GetStepFactor() != 0.1)
-    {
-        std::cerr << "Incorrect StepFactor" << std::endl;
-        return EXIT_FAILURE;
-    }
-    if (tracker->GetStepFactorMin() != 0.1)
-    {
-        std::cerr << "Incorrect StepFactorMin" << std::endl;
-        return EXIT_FAILURE;
-    }
-    if (tracker->GetStepFactorMax() != 0.1)
-    {
-        std::cerr << "Incorrect StepFactorMax" << std::endl;
-        return EXIT_FAILURE;
-    }
-    if (tracker->GetMaximumNumberOfSteps() != 300)
-    {
-        std::cerr << "Incorrect MaximumNumberOfSteps" << std::endl;
-        return EXIT_FAILURE;
-    }
-    if (tracker->GetMaximumIntegrationTime() != -1.0)
-    {
-        std::cerr << "Incorrect MaximumIntegrationTime" << std::endl;
-        return EXIT_FAILURE;
-    }
-    if (tracker->GetCellLengthComputationMode() != vtkLagrangianParticleTracker::STEP_CUR_CELL_VEL_DIR)
-    {
-        std::cerr << "Incorrect CellLengthComputationMode" << std::endl;
-        return EXIT_FAILURE;
-    }
-    if (tracker->GetAdaptiveStepReintegration())
-    {
-        std::cerr << "Incorrect AdaptiveStepReintegration" << std::endl;
-        return EXIT_FAILURE;
-    }
-    if (!tracker->GetGenerateParticlePathsOutput())
-    {
-        std::cerr << "Incorrect GenerateParticlePathsOutput" << std::endl;
-        return EXIT_FAILURE;
-    }
     tracker->Print(cout);
-    if (tracker->GetSource() != seedPD)
-    {
-        std::cerr << "Incorrect Source" << std::endl;
-        return EXIT_FAILURE;
-    }
-    if (tracker->GetSurface() != groupSurface->GetOutput())
-    {
-        std::cerr << "Incorrect Surface" << std::endl;
-        return EXIT_FAILURE;
-    }
 
     //----------------------------------------------------------------------
     // Glyph for interaction points
@@ -3082,7 +3014,7 @@ int main(int, char*[])
     renderer->AddActor(actor);
     // renderer->AddActor(surfaceActor);
     // renderer->AddActor(surfaceActor2);
-    renderer->AddActor(glyphActor);
+    //renderer->AddActor(glyphActor);
     renderer->SetBackground(0.1, .5, 1);
 
     vtkNew<vtkRenderWindow> renderWindow;
@@ -3217,6 +3149,8 @@ int main()
     openFOAMReader->Update();
 
     vtkUnstructuredGrid* block0 = vtkUnstructuredGrid::SafeDownCast(openFOAMReader->GetOutput()->GetBlock(0));
+
+    block0->Print(std::cout);
 
     // 设置生成流线的位置
     vtkNew<vtkLineSource> line;
