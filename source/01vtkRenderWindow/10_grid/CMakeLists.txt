@@ -15,7 +15,9 @@ find_package(VTK
         loguru
         ParallelMPI
         FiltersExtraction
-        #IOCGNS         # CGNS需要在生成VTK时选择
+        #IOCGNS             # CGNS需要在生成VTK时选择
+        IOGeometry          # vtkFLUENTReader
+        RenderingAnnotation # vtkScalarBarActor
     QUIET
 )
 
@@ -28,17 +30,6 @@ target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES})
 target_link_directories(${target_name} PRIVATE ${VTK_PREFIX_PATH}/lib) # 找不到IOCGNS，手动链接
 target_link_libraries(${target_name} PRIVATE vtkIOCGNSReader-$<IF:$<CONFIG:Debug>,9.1d,9.1>.lib)
 
-message("-----------------------------")
-message("vtk_libraries ${VTK_LIBRARIES}")
-message("-----------------------------")
-message("vtk_dir ${VTK_DIR}")
-message("-----------------------------")
-message("vtk_prefix_path ${VTK_PREFIX_PATH}")
-message("-----------------------------")
-message("vtk_libraries_dir ${VTK_LIBRARIES_DIR}")
-message("-----------------------------")
-
-
 # 初始化vtk模块，不再需要在源代码中使用 VTK_MODULE_INIT(***)
 vtk_module_autoinit(
     TARGETS ${target_name}
@@ -46,9 +37,7 @@ vtk_module_autoinit(
 )
 
 # 安装EXE文件
-install(TARGETS ${target_name}
-        RUNTIME DESTINATION ./
-)
+install(TARGETS ${target_name} RUNTIME DESTINATION .)
 
 # 调用函数获取依赖的DLL文件
 set(ARG _FULL_NAME_ _NAME_ ${VTK_LIBRARIES})
@@ -83,4 +72,3 @@ add_custom_command(TARGET ${target_name}
         COMMAND ${CMAKE_COMMAND} -E
     copy_if_different ${VTK_PREFIX_PATH}/bin/vtkhdf5-$<IF:$<CONFIG:Debug>,9.1d,9.1>.dll $<TARGET_FILE_DIR:${target_name}>/vtkhdf5-$<IF:$<CONFIG:Debug>,9.1d,9.1>.dll
 )
-
