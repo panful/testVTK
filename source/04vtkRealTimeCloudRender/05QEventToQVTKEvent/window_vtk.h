@@ -1,4 +1,4 @@
-﻿#include <QVTKRenderWidget.h>
+#include <QVTKRenderWidget.h>
 #include <vtkSmartPointer.h>
 
 class vtkGenericOpenGLRenderWindow;

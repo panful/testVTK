@@ -1,4 +1,4 @@
-﻿#ifndef _SOCKET_H_
+#ifndef _SOCKET_H_
 #define _SOCKET_H_
 
 #include <WinSock2.h>

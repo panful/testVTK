@@ -1,4 +1,4 @@
-﻿#include "window.h"
+#include "window.h"
 #include "socket.h"
 
 #include <QDebug>

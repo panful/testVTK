@@ -1,4 +1,4 @@
-﻿#ifndef ShareCameraQt_H
+#ifndef ShareCameraQt_H
 #define ShareCameraQt_H
 
 #include <QMainWindow>

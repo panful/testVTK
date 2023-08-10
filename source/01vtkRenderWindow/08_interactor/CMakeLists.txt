@@ -1,4 +1,4 @@
-﻿set(target_name "01_08_interactor")
+set(target_name "01_08_interactor")
 
 find_package(VTK
     COMPONENTS

@@ -1,4 +1,4 @@
-﻿
+
 set(target_name "02_02_Undo")
 
 find_package(VTK REQUIRED)

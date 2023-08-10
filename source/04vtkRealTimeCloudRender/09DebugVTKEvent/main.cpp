@@ -1,4 +1,4 @@
-﻿
+
 #include <vtkCubeSource.h>
 #include <vtkSmartPointer.h>
 #include <vtkPolyDataMapper.h>

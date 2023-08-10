@@ -1,4 +1,4 @@
-﻿#include "clientWidget.h"
+#include "clientWidget.h"
 
 #include <iostream>
 #include <thread>

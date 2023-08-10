@@ -1,4 +1,4 @@
-﻿set(target_name "01_04_CameraTransform")
+set(target_name "01_04_CameraTransform")
 
 find_package(VTK
     COMPONENTS

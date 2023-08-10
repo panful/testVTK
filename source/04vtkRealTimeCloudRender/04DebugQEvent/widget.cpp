@@ -1,4 +1,4 @@
-﻿#include "widget.h"
+#include "widget.h"
 
 #include "vtkGenericOpenGLRenderWindow.h"
 #include <vtkSmartPointer.h>

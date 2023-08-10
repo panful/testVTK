@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include "window.h"
 #include "socket.h"
 

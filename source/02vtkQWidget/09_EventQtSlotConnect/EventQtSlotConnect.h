@@ -1,4 +1,4 @@
-﻿#ifndef EventQtSlotConnect_H
+#ifndef EventQtSlotConnect_H
 #define EventQtSlotConnect_H
 
 #include <QMainWindow>

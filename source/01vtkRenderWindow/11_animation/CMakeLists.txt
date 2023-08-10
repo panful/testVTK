@@ -1,4 +1,4 @@
-﻿set(target_name "01_11_animation")
+set(target_name "01_11_animation")
 
 find_package(VTK
     COMPONENTS

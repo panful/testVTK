@@ -1,4 +1,4 @@
-﻿
+
 add_subdirectory("01_Template")
 add_subdirectory("02_Undo")
 add_subdirectory("03_MultiWindow")

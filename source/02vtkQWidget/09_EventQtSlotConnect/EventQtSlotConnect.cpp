@@ -1,4 +1,4 @@
-﻿#include "EventQtSlotConnect.h"
+#include "EventQtSlotConnect.h"
 #include "ui_EventQtSlotConnect.h"
 
 #include <vtkEventQtSlotConnect.h>

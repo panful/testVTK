@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001
 
 if exist "build" (rd /s/q build)

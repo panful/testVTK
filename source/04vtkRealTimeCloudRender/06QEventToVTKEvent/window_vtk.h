@@ -1,4 +1,4 @@
-﻿#include <vtkSmartPointer.h>
+#include <vtkSmartPointer.h>
 
 class vtkRenderWindow;
 class vtkRenderer;

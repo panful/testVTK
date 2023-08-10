@@ -1,4 +1,4 @@
-﻿/*
+/*
  * 47.保存图片 (位图，矢量图）  qt框选截图 https://blog.csdn.net/GoForwardToStep/article/details/54237689
  * 48.矢量图svg保存
  * 49.vtkImageView  https://blog.csdn.net/liushao1031177/article/details/115799500

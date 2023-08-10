@@ -1,4 +1,4 @@
-﻿set(target_name "01_05_colorMap")
+set(target_name "01_05_colorMap")
 
 find_package(VTK
     COMPONENTS

@@ -1,4 +1,4 @@
-﻿
+
 # https://clang.llvm.org/docs/ClangFormatStyleOptions.html
 
 BasedOnStyle: WebKit

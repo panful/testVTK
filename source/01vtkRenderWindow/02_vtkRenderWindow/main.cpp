@@ -1,4 +1,4 @@
-﻿
+
 /*
 * mapper负责把数据映射到图像
 整个大剧院<—->vtkRenderWindow的渲染窗口。

@@ -1,4 +1,4 @@
-﻿set(target_name "01_12_shodow_lighting")
+set(target_name "01_12_shodow_lighting")
 
 find_package(VTK
     COMPONENTS

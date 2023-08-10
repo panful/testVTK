@@ -1,4 +1,4 @@
-﻿#include "window.h"
+#include "window.h"
 
 #include <vtkCubeSource.h>
 #include <vtkPolyDataMapper.h>

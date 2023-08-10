@@ -1,4 +1,4 @@
-﻿#ifndef SideBySideRenderWindowsQt_H
+#ifndef SideBySideRenderWindowsQt_H
 #define SideBySideRenderWindowsQt_H
 
 #include <QMainWindow>

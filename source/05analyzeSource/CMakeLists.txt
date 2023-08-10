@@ -1,4 +1,4 @@
-﻿set(target_name "05_analyzeSource")
+set(target_name "05_analyzeSource")
 
 find_package(VTK
     COMPONENTS

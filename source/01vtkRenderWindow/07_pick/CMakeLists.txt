@@ -1,4 +1,4 @@
-﻿set(target_name "01_07_pick")
+set(target_name "01_07_pick")
 
 find_package(VTK
     COMPONENTS

@@ -1,4 +1,4 @@
-﻿set(target_name "01_06_Parallel")
+set(target_name "01_06_Parallel")
 
 find_package(VTK
     COMPONENTS

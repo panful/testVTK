@@ -1,4 +1,4 @@
-﻿set(target_name "02_01_Template")
+set(target_name "02_01_Template")
 
 set(CMAKE_AUTOMOC ON)  # Meta-Object Compiler
 set(CMAKE_AUTORCC OFF) # Resource Compiler

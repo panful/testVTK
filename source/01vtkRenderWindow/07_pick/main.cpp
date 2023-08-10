@@ -1,4 +1,4 @@
-﻿/*
+/*
  * vtk拾取相关的类 https://blog.csdn.net/lovelanjuan/article/details/7301773
  *
  * 11.框选拾取 vtkAreaPicker

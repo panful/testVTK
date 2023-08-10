@@ -1,4 +1,4 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include <tchar.h>
 #include <vtkNamedColors.h>
 #include <vtkSmartPointer.h>

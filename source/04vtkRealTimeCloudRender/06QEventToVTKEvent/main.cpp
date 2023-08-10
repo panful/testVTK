@@ -1,4 +1,4 @@
-﻿#include <QApplication>
+#include <QApplication>
 #include "window_qt.h"
 
 int main(int argc, char** argv)

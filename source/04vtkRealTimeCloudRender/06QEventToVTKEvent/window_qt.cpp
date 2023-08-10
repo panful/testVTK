@@ -1,4 +1,4 @@
-﻿#include "window_qt.h"
+#include "window_qt.h"
 #include "window_vtk.h"
 
 #include "vtkGenericOpenGLRenderWindow.h"

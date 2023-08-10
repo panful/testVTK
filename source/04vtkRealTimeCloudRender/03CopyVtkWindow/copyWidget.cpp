@@ -1,4 +1,4 @@
-﻿#include "copyWidget.h"
+#include "copyWidget.h"
 
 CopyWidget::CopyWidget() :
     m_label(new QLabel(this))

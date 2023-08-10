@@ -1,4 +1,4 @@
-﻿set(target_name "01_00_Test")
+set(target_name "01_00_Test")
 
 find_package(VTK
     COMPONENTS

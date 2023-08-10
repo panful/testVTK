@@ -1,4 +1,4 @@
-﻿#include <QWidget>
+#include <QWidget>
 #include <QLabel>
 #include <QPixmap>
 

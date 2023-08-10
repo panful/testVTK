@@ -1,4 +1,4 @@
-﻿set(target_name "01_03_vtkRenderWindow")
+set(target_name "01_03_vtkRenderWindow")
 
 find_package(VTK
     COMPONENTS

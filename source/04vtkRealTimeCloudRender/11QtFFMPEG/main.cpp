@@ -1,4 +1,4 @@
-﻿#include <QApplication>
+#include <QApplication>
 #include "widget.h"
 
 #ifndef INITIAL_OPENGL

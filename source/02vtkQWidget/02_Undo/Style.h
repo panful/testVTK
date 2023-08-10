@@ -1,4 +1,4 @@
-﻿#include "vtkInteractorStyleRubberBand3D.h"
+#include "vtkInteractorStyleRubberBand3D.h"
 #include "vtkSmartPointer.h"
 #include <stack>
 #include <array>

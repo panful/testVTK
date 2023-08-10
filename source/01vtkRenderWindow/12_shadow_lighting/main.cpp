@@ -1,4 +1,4 @@
-﻿
+
 /*
  * 1. 阴影和光照 https://examples.vtk.org/site/Cxx/Visualization/ShadowsLightsDemo/
  * 2. 关闭默认的光照，让颜色的对比度看起来更明显

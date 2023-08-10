@@ -1,4 +1,4 @@
-﻿
+
 add_subdirectory ("01vtkRenderWindow")
 
 #find_package(Qt6 QUIET)

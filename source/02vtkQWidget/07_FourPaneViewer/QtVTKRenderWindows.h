@@ -1,4 +1,4 @@
-﻿#ifndef QtVTKRenderWindows_H
+#ifndef QtVTKRenderWindows_H
 #define QtVTKRenderWindows_H
 
 #include "vtkDistanceWidget.h"

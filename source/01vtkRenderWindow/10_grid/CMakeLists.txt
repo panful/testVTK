@@ -1,4 +1,4 @@
-﻿
+
 set(target_name "01_10_grid")
 
 find_package(VTK

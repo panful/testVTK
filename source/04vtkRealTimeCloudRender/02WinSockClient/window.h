@@ -1,4 +1,4 @@
-﻿#ifndef _WINDOW_H_
+#ifndef _WINDOW_H_
 #define _WINDOW_H_
 
 #include <QWidget>

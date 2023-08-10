@@ -1,4 +1,4 @@
-﻿#include <QVTKRenderWidget.h> 
+#include <QVTKRenderWidget.h> 
 #include <QMainWindow>
 
 class VTKWidget :public QVTKRenderWidget

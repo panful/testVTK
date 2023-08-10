@@ -1,4 +1,4 @@
-﻿
+
 #include "SideBySideRenderWindowsQt.h"
 #include "ui_SideBySideRenderWindowsQt.h"
 

@@ -1,4 +1,4 @@
-﻿#include "Style.h"
+#include "Style.h"
 #include "vtkObjectFactory.h"
 #include "vtkRenderWindowInteractor.h"
 #include "vtkCamera.h"
