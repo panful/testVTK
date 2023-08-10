@@ -4,8 +4,7 @@
 * 102 vtkScalarBarWidget 拖动色卡，获取色卡色带部分的具体位置，用来标记某一个颜色条
 * 103 scalars范围超出lookuptable的范围时，超出部分不显示或指定颜色
 * 104 自定义色卡的标签，解决因为double的精度导致标签计算错误
-*
-* 201 云图 stl文件
+* 105 给vtkPolyData添加多个vtkDataArray，指定某个Array映射颜色
 *
 * 300 vtkGlyph3D 官方示例 矢量图(箭头)
 * 301 vtkGlyph2D 官方示例 vtkGlyph2D继承自vtkGlyph3D
@@ -31,7 +30,7 @@
 * 701 vtkContourFilter 等值面 vtkSampleFunction使用采样函数提取等值面
 */
 
-#define TEST601
+#define TEST105
 
 #ifdef TEST100
 
@@ -831,83 +830,109 @@ int main(int, char*[])
 
 #endif // TEST104
 
-//---------------------------------------------------
-
-#ifdef TEST201
+#ifdef TEST105
 
 #include <vtkActor.h>
-#include <vtkFloatArray.h>
+#include <vtkCellData.h>
+#include <vtkDoubleArray.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkLookupTable.h>
 #include <vtkPointData.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
-#include <vtkSTLReader.h>
+#include <vtkScalarBarActor.h>
 #include <vtkSmartPointer.h>
 
 int main(int, char*[])
 {
-    // 加载一个STL模型
-    vtkSmartPointer<vtkSTLReader> source = vtkSmartPointer<vtkSTLReader>::New();
-    source->SetFileName("../resources/test1.stl");
-    source->Update();
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0.0, 0.0, 0.0);
+    points->InsertNextPoint(1.0, 0.0, 0.0);
+    points->InsertNextPoint(1.0, 1.0, 0.0);
+    points->InsertNextPoint(0.0, 1.0, 0.0);
 
-    int numPts                             = source->GetOutput()->GetPoints()->GetNumberOfPoints(); // 获取模型的顶点数量
-    vtkSmartPointer<vtkFloatArray> scalars = vtkSmartPointer<vtkFloatArray>::New();                 // 创建存储顶点属性的float数组
-    scalars->SetNumberOfValues(numPts);
-    for (int i = 0; i < numPts; ++i) // 为属性数组中的每个元素设置标量值（这个标量值可以当作颜色值）
-        scalars->SetValue(i, i);
+    vtkNew<vtkCellArray> cells;
+    cells->InsertNextCell({ 0, 1, 2, 3 });
 
-    vtkSmartPointer<vtkPolyData> poly = vtkSmartPointer<vtkPolyData>::New();
-    poly->DeepCopy(source->GetOutput());
-    poly->GetPointData()->SetScalars(scalars);
+    vtkNew<vtkDoubleArray> pressure_scalars;
+    pressure_scalars->SetName("pressure");
+    pressure_scalars->InsertNextValue(0.0);
+    pressure_scalars->InsertNextValue(1.0);
+    pressure_scalars->InsertNextValue(1.0);
+    pressure_scalars->InsertNextValue(0.0);
 
-    // 创建颜色查找表
-    vtkSmartPointer<vtkLookupTable> hueLut = vtkSmartPointer<vtkLookupTable>::New();
-    hueLut->SetNumberOfColors(numPts); // 指定颜色查找表中有多少种颜色
-    hueLut->SetHueRange(
-        0.67, 0.0); // 设定HSV颜色范围，色调H取值范围为0°～360°，从红色开始按逆时针方向计算，红色为0°/0.0，绿色为120°/0.34,蓝色为240°/0.67
+    vtkNew<vtkDoubleArray> density_scalars;
+    density_scalars->SetName("density");
+    density_scalars->InsertNextValue(0.0);
+    density_scalars->InsertNextValue(0.0);
+    density_scalars->InsertNextValue(2.0);
+    density_scalars->InsertNextValue(2.0);
+
+    double pressure_range[2] { 0.0, 1.0 };
+    double density_range[2] { 0.0, 2.0 };
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+    polyData->GetPointData()->AddArray(pressure_scalars);
+    polyData->GetPointData()->AddArray(density_scalars);
+
+    polyData->Print(std::cout);
+
+    vtkNew<vtkLookupTable> hueLut;
+    hueLut->SetNumberOfColors(20);
+    hueLut->SetNumberOfTableValues(20);
+    hueLut->SetHueRange(0.0, 0.67);
+    hueLut->SetRange(pressure_range);
+    // hueLut->SetRange(density_range);
     hueLut->Build();
 
-    vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    mapper->SetInputData(poly);
-    mapper->SetScalarRange(0, numPts); // 设置标量值的范围
-    mapper->ScalarVisibilityOn();
-    // mapper->SetColorModeToMapScalars();        // 无论变量数据是何种类型，该方法都通过查询表对标量数据进行映射
-    mapper->SetColorModeToDefault(); // 默认的映射器行为，即把unsigned
-                                     // char类型的标量属性数据当作颜色值，不执行隐式。对于其他类型的标量数据，将通过查询表映射。
-    mapper->SetLookupTable(hueLut);
+    //---------------------------------------------------------
+    vtkNew<vtkScalarBarActor> scalarBar;
+    scalarBar->SetLookupTable(hueLut);
+    scalarBar->SetMaximumNumberOfColors(20);
 
-    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
+    // ScalarMode 是 UsePointFieldData 或 UseCellFieldData时，才能使用SelectColorArray()设置颜色
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+    mapper->ScalarVisibilityOn();
+    mapper->SetLookupTable(hueLut);
+    mapper->InterpolateScalarsBeforeMappingOn();
+    mapper->SetScalarModeToUsePointFieldData();
+    mapper->SetScalarRange(pressure_range);
+    mapper->SelectColorArray("pressure");
+    // mapper->SetScalarRange(density_range);
+    // mapper->SelectColorArray("density");
+
+    vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
 
-    vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
-    renderer->GradientBackgroundOn();
-    renderer->SetBackground(1, 1, 1);
-    renderer->SetBackground2(0, 0, 0);
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->AddActor2D(scalarBar);
+    renderer->SetBackground(.1, .2, .3);
 
-    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+    vtkNew<vtkRenderWindow> renderWindow;
     renderWindow->AddRenderer(renderer);
 
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
     renderWindowInteractor->SetRenderWindow(renderWindow);
-    vtkSmartPointer<vtkInteractorStyleTrackballCamera> style = vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
     renderWindowInteractor->SetInteractorStyle(style);
 
-    renderer->AddActor(actor);
-    renderWindow->SetSize(600, 600);
+    renderWindow->SetSize(800, 600);
     renderWindow->Render();
     renderWindowInteractor->Start();
 
     return 0;
 }
 
-#endif // TEST201
-
-//---------------------------------------------------
+#endif // TEST105
 
 #ifdef TEST300
 
@@ -3244,8 +3269,8 @@ int main()
     }
 
     // 生成流线 向量数据不是必须的，标量数据是必须的，待进一步验证
-    //streamlinedata->GetPointData()->SetVectors(nullptr);
-    //streamlinedata->GetPointData()->SetScalars(nullptr);
+    // streamlinedata->GetPointData()->SetVectors(nullptr);
+    // streamlinedata->GetPointData()->SetScalars(nullptr);
 
     vtkNew<vtkScalarBarActor> scalarBar;
     vtkNew<vtkLookupTable> pColorTable;
