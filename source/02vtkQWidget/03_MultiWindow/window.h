@@ -14,7 +14,7 @@
 #include <vtkSphereSource.h>
 #include <vtkProperty.h>
 
-// 01_02_TEST64 多个vtkRenderWindow共享vtkActor
+// 01_02_TEST66 多个vtkRenderWindow共享vtkActor
 // vtkGenericOpenGLRenderWindow是不能共享上下文的，即不能共享actor mapper
 // 但是可以把一个window中的actor删除，然后添加到另一个上
 // 即不能同时在不同的window中添加同一个actor

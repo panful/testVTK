@@ -26,11 +26,12 @@
 * 600 OpenFOAM 文件读取
 * 601 vtkStreamTracer 流线图 展示流体流动的轨迹和流动方向
 * 602 流线、流管、流面
+* 603 流线生成需要的数据
 *
 * 701 vtkContourFilter 等值面 vtkSampleFunction使用采样函数提取等值面
 */
 
-#define TEST501
+#define TEST603
 
 #ifdef TEST100
 
@@ -1593,8 +1594,8 @@ int main(int, char*[])
     glyph->SetInputData(polydata);             // 顶点数据，即矢量图每一个图案的位置
     glyph->SetSourceData(source->GetOutput()); // 资源数据，即矢量图的图案
 
-    glyph->SetScaleFactor(1.); // 缩放比例
-    glyph->SetClamping(true);  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
+    glyph->SetScaleFactor(1.);                 // 缩放比例
+    glyph->SetClamping(true);                  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
     glyph->SetRange(0, 5); // 箭头大小映射表，因为大小由向量决定，所以这里的范围应该为{0,所有点的向量模长最大值}，向量模长始终不小于0
 
     // 颜色
@@ -1774,8 +1775,8 @@ int main(int, char*[])
     glyph->SetInputData(polydata);             // 顶点数据，即矢量图每一个图案的位置
     glyph->SetSourceData(source->GetOutput()); // 资源数据，即矢量图的图案
 
-    glyph->SetScaleFactor(1.); // 缩放比例
-    glyph->SetClamping(true);  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
+    glyph->SetScaleFactor(1.);                 // 缩放比例
+    glyph->SetClamping(true);                  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
     glyph->SetRange(0, 5); // 箭头大小映射表，因为大小由向量决定，所以这里的范围应该为{0,所有点的向量模长最大值}，向量模长始终不小于0
 
     // 颜色
@@ -3014,7 +3015,7 @@ int main(int, char*[])
     renderer->AddActor(actor);
     // renderer->AddActor(surfaceActor);
     // renderer->AddActor(surfaceActor2);
-    //renderer->AddActor(glyphActor);
+    // renderer->AddActor(glyphActor);
     renderer->SetBackground(0.1, .5, 1);
 
     vtkNew<vtkRenderWindow> renderWindow;
@@ -3064,8 +3065,8 @@ int main()
     vtkNew<vtkOpenFOAMReader> openFOAMReader;
     openFOAMReader->SetFileName("../resources/cavity/cavity.foam"); // 设置读取文件路径
     openFOAMReader->SetCreateCellToPoint(1);
-    openFOAMReader->SetSkipZeroTime(1); // 开启跳过0时刻
-    openFOAMReader->SetTimeValue(2.0);  // 设置需要读取的时刻
+    openFOAMReader->SetSkipZeroTime(1);                             // 开启跳过0时刻
+    openFOAMReader->SetTimeValue(2.0);                              // 设置需要读取的时刻
     openFOAMReader->Update();
 
     auto numOfBlocks = openFOAMReader->GetOutput()->GetNumberOfBlocks();
@@ -3144,8 +3145,8 @@ int main()
     vtkNew<vtkOpenFOAMReader> openFOAMReader;
     openFOAMReader->SetFileName("../resources/cavity/cavity.foam"); // 设置读取文件路径
     openFOAMReader->SetCreateCellToPoint(1);
-    openFOAMReader->SetSkipZeroTime(1); // 开启跳过0时刻
-    openFOAMReader->SetTimeValue(1.5);  // 设置需要读取的时刻
+    openFOAMReader->SetSkipZeroTime(1);                             // 开启跳过0时刻
+    openFOAMReader->SetTimeValue(1.5);                              // 设置需要读取的时刻
     openFOAMReader->Update();
 
     vtkUnstructuredGrid* block0 = vtkUnstructuredGrid::SafeDownCast(openFOAMReader->GetOutput()->GetBlock(0));
@@ -3163,15 +3164,15 @@ int main()
     streamline->SetSourceConnection(line->GetOutputPort());
     streamline->SetInputData(block0);
     streamline->SetIntegratorTypeToRungeKutta45(); // 设置流线的积分类型
-    streamline->SetMaximumPropagation(5000);       // 设置流线长度
-    streamline->SetIntegrationStepUnit(2);         // 设置流线积分步长单位
-    streamline->SetInitialIntegrationStep(0.2);    // 设置流线积分初始步长
-    streamline->SetMinimumIntegrationStep(0.01);   // 设置流线积分最小步长
-    streamline->SetMaximumIntegrationStep(0.5);    // 设置流线积分最大步长
-    streamline->SetMaximumNumberOfSteps(2000);     // 设置流线积分最大步数
-    streamline->SetIntegrationDirectionToBoth();   // 设置流线积分方向
-    streamline->SetTerminalSpeed(1e-12);           // 设置流线积分终止速度
-    streamline->SetMaximumError(1e-6);
+    // streamline->SetMaximumPropagation(5000);       // 设置流线长度
+    // streamline->SetIntegrationStepUnit(2);         // 设置流线积分步长单位
+    streamline->SetInitialIntegrationStep(0.2);  // 设置流线积分初始步长
+    streamline->SetMinimumIntegrationStep(0.01); // 设置流线积分最小步长
+    streamline->SetMaximumIntegrationStep(0.5);  // 设置流线积分最大步长
+    streamline->SetMaximumNumberOfSteps(2000);   // 设置流线积分最大步数
+    streamline->SetIntegrationDirectionToBoth(); // 设置流线积分方向
+    // streamline->SetTerminalSpeed(1e-12);           // 设置流线积分终止速度
+    // streamline->SetMaximumError(1e-6);
     streamline->Update();
 
     // 计算速度的模
@@ -3417,6 +3418,142 @@ int main(int argc, char* argv[])
 
 #endif // TEST602
 
+#ifdef TEST603
+
+#include <vtkActor.h>
+#include <vtkAppendPolyData.h>
+#include <vtkArrayCalculator.h>
+#include <vtkCellData.h>
+#include <vtkDataSetMapper.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLineSource.h>
+#include <vtkLookupTable.h>
+#include <vtkMultiBlockDataSet.h>
+#include <vtkOpenFOAMReader.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkScalarBarActor.h>
+#include <vtkSmartPointer.h>
+#include <vtkStreamTracer.h>
+#include <vtkTextProperty.h>
+#include <vtkUnstructuredGrid.h>
+
+int main()
+{
+    vtkNew<vtkOpenFOAMReader> openFOAMReader;
+    openFOAMReader->SetFileName("../resources/cavity/cavity.foam"); // 设置读取文件路径
+    openFOAMReader->SetCreateCellToPoint(1);
+    openFOAMReader->SetSkipZeroTime(1);                             // 开启跳过0时刻
+    openFOAMReader->SetTimeValue(1.5);                              // 设置需要读取的时刻
+    openFOAMReader->Update();
+
+    vtkUnstructuredGrid* block0 = vtkUnstructuredGrid::SafeDownCast(openFOAMReader->GetOutput()->GetBlock(0));
+    // block0->Print(std::cout);
+
+    auto vectors = block0->GetPointData()->GetVectors();
+    auto scalars = block0->GetPointData()->GetScalars();
+    std::cout << "Vectors name: " << vectors->GetName() << "\nScalars name: " << scalars->GetName() << '\n';
+
+    vtkNew<vtkUnstructuredGrid> grid;
+    grid->SetPoints(block0->GetPoints());
+    grid->GetPointData()->SetVectors(vectors);
+    // grid->GetPointData()->SetScalars(scalars); // 没有标量数据也可以生成流线，因为流线是速度的切线，只需要矢量型的速度数据即可
+
+    for (vtkIdType i = 0; i < block0->GetNumberOfCells(); ++i)
+    {
+        // grid必须有单元数据才能生成流线？
+        auto cell = block0->GetCell(i);
+        grid->InsertNextCell(cell->GetCellType(), cell->GetPointIds());
+    }
+
+    // 设置生成流线的位置
+    vtkNew<vtkLineSource> line;
+    line->SetPoint1(0.01, 0.01, 0.001);
+    line->SetPoint2(0.02, 0.02, 0.002);
+    line->SetResolution(10);
+    line->Update();
+
+    vtkNew<vtkStreamTracer> streamline;
+    streamline->SetSourceConnection(line->GetOutputPort());
+    streamline->SetInputData(grid);
+    streamline->SetIntegratorTypeToRungeKutta45(); // 设置流线的积分类型
+    streamline->SetMaximumPropagation(5000);       // 设置流线长度
+    streamline->SetIntegrationStepUnit(2);         // 设置流线积分步长单位
+    streamline->SetInitialIntegrationStep(0.2);    // 设置流线积分初始步长
+    streamline->SetMinimumIntegrationStep(0.01);   // 设置流线积分最小步长
+    streamline->SetMaximumIntegrationStep(0.5);    // 设置流线积分最大步长
+    streamline->SetMaximumNumberOfSteps(2000);     // 设置流线积分最大步数
+    streamline->SetIntegrationDirectionToBoth();   // 设置流线积分方向
+    streamline->SetTerminalSpeed(1e-12);           // 设置流线积分终止速度
+    streamline->SetMaximumError(1e-6);
+    streamline->Update();
+
+    // 计算速度的模
+    vtkNew<vtkArrayCalculator> calc;
+    calc->SetInputData(streamline->GetOutput());
+    calc->AddVectorArrayName("U");
+    calc->SetFunction("mag(U)");
+    calc->SetResultArrayName("u_mag");
+    calc->Update();
+
+    vtkPolyData* streamlinedata = vtkPolyData::SafeDownCast(calc->GetOutput());
+    streamlinedata->GetPointData()->SetActiveScalars("u_mag");
+
+    double scalarRange[2] { 0.0 };
+    if (auto _ponitdata = streamlinedata->GetPointData())
+    {
+        if (auto _scalars = _ponitdata->GetScalars())
+        {
+            _scalars->GetRange(scalarRange);
+            std::cout << "Range: " << scalarRange[0] << '\t' << scalarRange[1] << '\n';
+        }
+    }
+
+    vtkNew<vtkScalarBarActor> scalarBar;
+    vtkNew<vtkLookupTable> pColorTable;
+    pColorTable->SetHueRange(0.67, 0); // 标量条颜色范围，从蓝到红
+    pColorTable->SetRange(scalarRange);
+    pColorTable->Build();
+
+    scalarBar->SetLookupTable(pColorTable);
+
+    vtkNew<vtkPolyDataMapper> streamlinemappper;
+    streamlinemappper->SetInputData(streamlinedata);
+    streamlinemappper->SetLookupTable(pColorTable);
+    streamlinemappper->SetScalarRange(scalarRange);
+
+    vtkNew<vtkActor> streamlineactor;
+    streamlineactor->SetMapper(streamlinemappper);
+
+    vtkNew<vtkRenderer> ren;
+    ren->AddActor(streamlineactor);
+    ren->AddActor(scalarBar);
+    ren->SetBackground(.1, .2, .3);
+    ren->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(ren);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> TrackballCamera;
+    iren->SetInteractorStyle(TrackballCamera);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST603
+
 #ifdef TEST701
 
 #include <vtkActor.h>
@@ -3511,8 +3648,8 @@ int main(int argc, char* argv[])
     vtkNew<vtkQuadric> quadric;
     quadric->SetCoefficients(.5, 1., .2, 0., .1, 0., 0., .2, 0., 0.); // 设置二次函数的9个参数
 
-    vtkNew<vtkSampleFunction> sampler;        // 采样函数
-    sampler->SetSampleDimensions(30, 30, 30); // 设置精度
+    vtkNew<vtkSampleFunction> sampler;                                // 采样函数
+    sampler->SetSampleDimensions(30, 30, 30);                         // 设置精度
     sampler->SetImplicitFunction(quadric);
     sampler->Update();
 
