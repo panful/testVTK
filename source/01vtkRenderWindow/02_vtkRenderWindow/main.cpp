@@ -24,7 +24,7 @@
 11.拟合样条曲线生成柱状体
 12.vtkAppendPolyData合并多个polydata
 13.多窗口使用相同的数据同一个相机（即多个窗口显示完全一样的东西，交互也是同步的）
-14.vtkGlyph3D + vtkProbeFilter https://kitware.github.io/vtk-examples/site/Cxx/Visualization/RandomProbe/
+
 15.箭头，可以控制箭头的方向
 16.
 17.
@@ -41,12 +41,9 @@
 31.比例尺(vtkLegendScaleActor)
 32.
 33.vtkMaskPoints 对输入的数据进行挑拣筛选
-34.vtkprobefilter    探针
-35.
-36.探针
-37.探针 https://blog.csdn.net/liushao1031177/article/details/122860254
+
 38.plot https://kitware.github.io/vtk-examples/site/Cxx/Plotting/LinePlot/
-39.vtkProbeFilter 以单元形式设置标量数据
+
 40.
 41.
 42.
@@ -70,27 +67,21 @@
 
 */
 
-#define TEST64
+#define TEST40
 
-//在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
-//#include <vtkAutoInit.h>
-//VTK_MODULE_INIT(vtkRenderingOpenGL2);
-//VTK_MODULE_INIT(vtkInteractionStyle);
-//VTK_MODULE_INIT(vtkRenderingFreeType);
-//VTK_MODULE_INIT(vtkRenderingContextOpenGL2);
+// 在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
+// #include <vtkAutoInit.h>
+// VTK_MODULE_INIT(vtkRenderingOpenGL2);
+// VTK_MODULE_INIT(vtkInteractionStyle);
+// VTK_MODULE_INIT(vtkRenderingFreeType);
+// VTK_MODULE_INIT(vtkRenderingContextOpenGL2);
 
 #ifdef TEST1
 
-#include <vtkCubeSource.h>
-#include <vtkSmartPointer.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkActor.h>
-#include <vtkCamera.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindowInteractor.h>
 #include <vtkActor.h>
 #include <vtkAreaPicker.h>
+#include <vtkCamera.h>
+#include <vtkCubeSource.h>
 #include <vtkDataSetMapper.h>
 #include <vtkDataSetSurfaceFilter.h>
 #include <vtkExtractGeometry.h>
@@ -116,113 +107,111 @@
 #include <vtkVertexGlyphFilter.h>
 
 namespace {
-    // Define interaction style
-    class InteractorStyle : public vtkInteractorStyleRubberBandPick
+// Define interaction style
+class InteractorStyle : public vtkInteractorStyleRubberBandPick
+{
+public:
+    static InteractorStyle* New();
+    vtkTypeMacro(InteractorStyle, vtkInteractorStyleRubberBandPick);
+
+    virtual void OnLeftButtonUp() override
     {
-    public:
-        static InteractorStyle* New();
-        vtkTypeMacro(InteractorStyle, vtkInteractorStyleRubberBandPick);
+        SelectedActor->GetProperty()->SetColor(1, 0, 0);
 
-        virtual void OnLeftButtonUp() override
-        {
-            SelectedActor->GetProperty()->SetColor(1, 0, 0);
+        Superclass::OnLeftButtonUp();
+    }
 
-            Superclass::OnLeftButtonUp();
-        }
+    void SetActor(vtkSmartPointer<vtkActor> actor)
+    {
+        SelectedActor = actor;
+    }
 
-        void SetActor(vtkSmartPointer<vtkActor> actor)
-        {
-            SelectedActor = actor;
-        }
+private:
+    vtkSmartPointer<vtkActor> SelectedActor;
+};
 
-    private:
-        vtkSmartPointer<vtkActor> SelectedActor;
-    };
-
-    vtkStandardNewMacro(InteractorStyle);
+vtkStandardNewMacro(InteractorStyle);
 } // namespace
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkCubeSource> cube;
 
     // 如果要建立管道连接，请使用SetInputConnection
     // 如果要处理独立数据集，请使用SetInputData
-    //mapper
+    // mapper
     vtkNew<vtkPolyDataMapper> cubeMapper;
     cubeMapper->SetInputConnection(cube->GetOutputPort());
 
-    //actor
+    // actor
     vtkNew<vtkActor> cubeActor;
     cubeActor->SetMapper(cubeMapper);
-    //cubeActor->SetTexture()
+    // cubeActor->SetTexture()
 
-    //camera
+    // camera
     vtkNew<vtkCamera> camera;
-    camera->SetPosition(1, 1, 1);//设置相机位置
-    camera->SetFocalPoint(0, 0, 0);//设置相机焦点
+    camera->SetPosition(1, 1, 1);   // 设置相机位置
+    camera->SetFocalPoint(0, 0, 0); // 设置相机焦点
 
-    //renderer
+    // renderer
     vtkNew<vtkRenderer> renderer;
     renderer->AddActor(cubeActor);
     renderer->SetActiveCamera(camera);
     renderer->ResetCamera();
 
-    //RenderWindow
+    // RenderWindow
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
-    renWin->SetSize(600, 600);//设置window大小
+    renWin->SetSize(600, 600); // 设置window大小
 
     auto style = InteractorStyle::New();
     style->SetActor(cubeActor);
 
-    //RenderWindowInteractor
+    // RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
     iren->SetInteractorStyle(style);
 
-    //数据交互
+    // 数据交互
     renWin->Render();
     iren->Start();
 
     return 0;
-
 }
 
 #endif // TSET1
 
 #ifdef TEST2
 
-#include <vtkPolyData.h>
-#include <vtkPoints.h>
-#include <vtkCellArray.h>
-#include <vtkPolyDataMapper.h>
 #include <vtkActor.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindow.h>
-#include <vtkProperty.h>
 #include <vtkCamera.h>
+#include <vtkCellArray.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
 
 #include <array>
 #include <iostream>
 
-namespace
-{
-    std::array<float, 3> vertices{
-        10,10,10,
-        //1,0,0,
-        //1,1,0,
-        //0,1,0
-    };
+namespace {
+std::array<float, 3> vertices {
+    10, 10, 10,
+    // 1,0,0,
+    // 1,1,0,
+    // 0,1,0
+};
 
-    std::array<long long, 1> indices{
-        0,
-        //1,
-        //2,
-        //3,
-    };
-}
+std::array<long long, 1> indices {
+    0,
+    // 1,
+    // 2,
+    // 3,
+};
+} // namespace
 
 int main()
 {
@@ -236,18 +225,18 @@ int main()
     }
     for (size_t i = 0; i < indices.size(); i++)
     {
-        cells->InsertNextCell({ indices[i] });  // 这种插入方式有的时候会有问题，导致 GetCell(0)函数崩溃
+        cells->InsertNextCell({ indices[i] }); // 这种插入方式有的时候会有问题，导致 GetCell(0)函数崩溃
         cells->InsertNextCell(1, 0);
     }
 
     polyData->SetPoints(points);
     polyData->SetVerts(cells);
 
-    //mapper
+    // mapper
     vtkNew<vtkPolyDataMapper> mapper;
     mapper->SetInputData(polyData);
 
-    //actor
+    // actor
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
     actor->GetProperty()->SetColor(0, 1, 0);
@@ -255,26 +244,26 @@ int main()
 
     actor->Print(std::cout);
     actor->GetMapper()->GetInput()->Print(std::cout);
-    double bounds[6]{ 0 };
+    double bounds[6] { 0 };
     actor->GetMapper()->GetInput()->GetCellBounds(0, bounds);
     auto cell = actor->GetMapper()->GetInput()->GetCell(0);
     cell->GetBounds(bounds);
 
-    //renderer
+    // renderer
     vtkNew<vtkRenderer> renderer;
     renderer->AddActor(actor);
     renderer->ResetCamera();
 
-    //RenderWindow
+    // RenderWindow
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
     renWin->SetSize(600, 600);
 
-    //RenderWindowInteractor
+    // RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
 
-    //数据交互
+    // 数据交互
     renWin->Render();
     iren->Start();
 
@@ -305,11 +294,11 @@ int main()
 {
     vtkNew<vtkNamedColors> colors;
 
-    std::array<std::array<double, 3>, 8> pts = { { { { 0, 0, 0 } }, { { 1, 0, 0 } }, { { 1, 1, 0 } },
-      { { 0, 1, 0 } }, { { 0, 0, 1 } }, { { 1, 0, 1 } }, { { 1, 1, 1 } }, { { 0, 1, 1 } } } };
+    std::array<std::array<double, 3>, 8> pts = { { { { 0, 0, 0 } }, { { 1, 0, 0 } }, { { 1, 1, 0 } }, { { 0, 1, 0 } }, { { 0, 0, 1 } },
+        { { 1, 0, 1 } }, { { 1, 1, 1 } }, { { 0, 1, 1 } } } };
     // The ordering of the corner points on each face.
-    std::array<std::array<vtkIdType, 4>, 6> ordering = { { { { 0, 1, 2, 3 } }, { { 4, 5, 6, 7 } },
-      { { 0, 1, 5, 4 } }, { { 1, 2, 6, 5 } }, { { 2, 3, 7, 6 } }, { { 3, 0, 4, 7 } } } };
+    std::array<std::array<vtkIdType, 4>, 6> ordering
+        = { { { { 0, 1, 2, 3 } }, { { 4, 5, 6, 7 } }, { { 0, 1, 5, 4 } }, { { 1, 2, 6, 5 } }, { { 2, 3, 7, 6 } }, { { 3, 0, 4, 7 } } } };
 
     // We'll create the building blocks of polydata including data attributes.
     vtkNew<vtkPolyData> cube;
@@ -366,7 +355,6 @@ int main()
     return EXIT_SUCCESS;
 }
 
-
 #endif // TEST3
 
 #ifdef TEST4
@@ -395,14 +383,13 @@ int main()
     vtkNew<vtkNamedColors> colors;
 
     // https://blog.csdn.net/zy2317878/article/details/78744825
-    vtkNew<vtkDoubleArray> pcoords; //用来设置顶点的属性数据
+    vtkNew<vtkDoubleArray> pcoords;    // 用来设置顶点的属性数据
     pcoords->SetNumberOfComponents(3); // 设置元组的个数为3，默认为1
-    pcoords->SetNumberOfTuples(4);// 设置总的元组个数为10
+    pcoords->SetNumberOfTuples(4);     // 设置总的元组个数为10
     // Assign each tuple. There are 5 specialized versions of SetTuple:
     // SetTuple1 SetTuple2 SetTuple3 SetTuple4 SetTuple9
     // These take 1, 2, 3, 4 and 9 components respectively.
-    std::array<std::array<double, 3>, 4> pts = { { { { 0.0, 0.0, 0.0 } }, { { 0.0, 1.0, 0.0 } },
-      { { 1.0, 0.0, 0.0 } }, { { 1.0, 1.0, 0.0 } } } };
+    std::array<std::array<double, 3>, 4> pts = { { { { 0.0, 0.0, 0.0 } }, { { 0.0, 1.0, 0.0 } }, { { 1.0, 0.0, 0.0 } }, { { 1.0, 1.0, 0.0 } } } };
     for (auto i = 0ul; i < pts.size(); ++i)
     {
         pcoords->SetTuple(i, pts[i].data());
@@ -499,19 +486,15 @@ int main()
 {
     vtkNew<vtkNamedColors> colors;
 
-    std::array<double, 47> x = { { -1.22396, -1.17188, -1.11979, -1.06771, -1.01562, -0.963542,
-      -0.911458, -0.859375, -0.807292, -0.755208, -0.703125, -0.651042, -0.598958, -0.546875,
-      -0.494792, -0.442708, -0.390625, -0.338542, -0.286458, -0.234375, -0.182292, -0.130209,
-      -0.078125, -0.026042, 0.0260415, 0.078125, 0.130208, 0.182291, 0.234375, 0.286458, 0.338542,
-      0.390625, 0.442708, 0.494792, 0.546875, 0.598958, 0.651042, 0.703125, 0.755208, 0.807292,
-      0.859375, 0.911458, 0.963542, 1.01562, 1.06771, 1.11979, 1.17188 } };
-    std::array<double, 33> y = { { -1.25, -1.17188, -1.09375, -1.01562, -0.9375, -0.859375, -0.78125,
-      -0.703125, -0.625, -0.546875, -0.46875, -0.390625, -0.3125, -0.234375, -0.15625, -0.078125, 0,
-      0.078125, 0.15625, 0.234375, 0.3125, 0.390625, 0.46875, 0.546875, 0.625, 0.703125, 0.78125,
-      0.859375, 0.9375, 1.01562, 1.09375, 1.17188, 1.25 } };
-    std::array<double, 44> z = { { 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1, 1.1, 1.2,
-      1.3, 1.4, 1.5, 1.6, 1.7, 1.75, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.75, 2.8, 2.9,
-      3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.75, 3.8, 3.9 } };
+    std::array<double, 47> x = { { -1.22396, -1.17188, -1.11979, -1.06771, -1.01562, -0.963542, -0.911458, -0.859375, -0.807292, -0.755208, -0.703125,
+        -0.651042, -0.598958, -0.546875, -0.494792, -0.442708, -0.390625, -0.338542, -0.286458, -0.234375, -0.182292, -0.130209, -0.078125, -0.026042,
+        0.0260415, 0.078125, 0.130208, 0.182291, 0.234375, 0.286458, 0.338542, 0.390625, 0.442708, 0.494792, 0.546875, 0.598958, 0.651042, 0.703125,
+        0.755208, 0.807292, 0.859375, 0.911458, 0.963542, 1.01562, 1.06771, 1.11979, 1.17188 } };
+    std::array<double, 33> y = { { -1.25, -1.17188, -1.09375, -1.01562, -0.9375, -0.859375, -0.78125, -0.703125, -0.625, -0.546875, -0.46875,
+        -0.390625, -0.3125, -0.234375, -0.15625, -0.078125, 0, 0.078125, 0.15625, 0.234375, 0.3125, 0.390625, 0.46875, 0.546875, 0.625, 0.703125,
+        0.78125, 0.859375, 0.9375, 1.01562, 1.09375, 1.17188, 1.25 } };
+    std::array<double, 44> z = { { 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.75, 1.8, 1.9, 2, 2.1,
+        2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.75, 2.8, 2.9, 3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.75, 3.8, 3.9 } };
 
     // 通过定义三个指定x-y-z方向坐标的阵列来创建直线栅格。
     vtkNew<vtkFloatArray> xCoords;
@@ -605,7 +588,7 @@ int main()
 
     float rMin = 0.5, rMax = 1.0, deltaRad, deltaZ;
     std::array<int, 3> dims = { { 13, 11, 11 } };
-    //std::array<int, 3> dims = { { 2,3,4 } };
+    // std::array<int, 3> dims = { { 2,3,4 } };
 
     // Create the structured grid.
     vtkNew<vtkStructuredGrid> sgrid;
@@ -619,26 +602,26 @@ int main()
     vtkNew<vtkPoints> points;
     points->Allocate(dims[0] * dims[1] * dims[2]);
 
-    deltaZ = 2.0 / (dims[2] - 1);
+    deltaZ   = 2.0 / (dims[2] - 1);
     deltaRad = (rMax - rMin) / (dims[1] - 1);
     float x[3], v[3];
     v[2] = 0.0;
     for (auto k = 0; k < dims[2]; k++)
     {
-        x[2] = -1.0 + k * deltaZ;
+        x[2]        = -1.0 + k * deltaZ;
         int kOffset = k * dims[0] * dims[1];
         for (auto j = 0; j < dims[1]; j++)
         {
             float radius = rMin + j * deltaRad;
-            int jOffset = j * dims[0];
+            int jOffset  = j * dims[0];
             for (auto i = 0; i < dims[0]; i++)
             {
                 float theta = i * vtkMath::RadiansFromDegrees(15.0);
-                x[0] = radius * cos(theta);
-                x[1] = radius * sin(theta);
-                v[0] = -x[1];
-                v[1] = x[0];
-                int offset = i + jOffset + kOffset;
+                x[0]        = radius * cos(theta);
+                x[1]        = radius * sin(theta);
+                v[0]        = -x[1];
+                v[1]        = x[0];
+                int offset  = i + jOffset + kOffset;
                 points->InsertPoint(offset, x);
                 vectors->InsertTuple(offset, v);
             }
@@ -684,20 +667,20 @@ int main()
 
 #ifdef TEST7
 
-#include <vtkPoints.h>
-#include <vtkLine.h>
-#include <vtkSmartPointer.h>
-#include <vtkPolyDataWriter.h>
-#include <vtkPolyData.h>
 #include "vtkActor.h"
-#include "vtkRenderer.h"
-#include "vtkRenderWindow.h"
-#include "vtkPolyDataMapper.h"
-#include "vtkInteractorStyle.h"
-#include "vtkRenderWindowInteractor.h"
-#include "vtkProperty.h"
 #include "vtkCellArray.h"
+#include "vtkInteractorStyle.h"
 #include "vtkInteractorStyleTrackballCamera.h"
+#include "vtkPolyDataMapper.h"
+#include "vtkProperty.h"
+#include "vtkRenderWindow.h"
+#include "vtkRenderWindowInteractor.h"
+#include "vtkRenderer.h"
+#include <vtkLine.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataWriter.h>
+#include <vtkSmartPointer.h>
 
 #include <vtkCellType.h>
 
@@ -705,19 +688,19 @@ int main(int argc, char* argv[])
 {
     /*这种方式每一条线都要创建指针，建议使用例9方式填充数据*/
 
-    //创建三个坐标点
+    // 创建三个坐标点
     vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
-    points->InsertNextPoint(1.0, 0.0, 0.0); //返回第一个点的ID：0
-    points->InsertNextPoint(0.0, 0.0, 1.0); //返回第二个点的ID：1
-    points->InsertNextPoint(0.0, 0.0, 0.0); //返回第三个点的ID：2
+    points->InsertNextPoint(1.0, 0.0, 0.0); // 返回第一个点的ID：0
+    points->InsertNextPoint(0.0, 0.0, 1.0); // 返回第二个点的ID：1
+    points->InsertNextPoint(0.0, 0.0, 0.0); // 返回第三个点的ID：2
 
-    //每两个坐标点之间分别创建一条线
-    //SetId()的第一个参数是线段的端点ID，第二个参数是连接的点的ID
+    // 每两个坐标点之间分别创建一条线
+    // SetId()的第一个参数是线段的端点ID，第二个参数是连接的点的ID
     vtkSmartPointer<vtkLine> line0 = vtkSmartPointer<vtkLine>::New();
     line0->GetPointIds()->SetId(0, 0);
     line0->GetPointIds()->SetId(1, 1);
 
-    vtkSmartPointer<vtkLine>line1 = vtkSmartPointer<vtkLine>::New();
+    vtkSmartPointer<vtkLine> line1 = vtkSmartPointer<vtkLine>::New();
     line1->GetPointIds()->SetId(0, 1);
     line1->GetPointIds()->SetId(1, 2);
 
@@ -725,13 +708,13 @@ int main(int argc, char* argv[])
     line2->GetPointIds()->SetId(0, 2);
     line2->GetPointIds()->SetId(1, 0);
 
-    //创建单元数组，用于存储以上创建的线段
+    // 创建单元数组，用于存储以上创建的线段
     vtkSmartPointer<vtkCellArray> lines = vtkSmartPointer<vtkCellArray>::New();
     lines->InsertNextCell(line0);
     lines->InsertNextCell(line1);
     lines->InsertNextCell(line2);
 
-    //将点和线加入到数据集中，前者定义数据集的几何结构（顶点），后者定义拓扑结构（索引）
+    // 将点和线加入到数据集中，前者定义数据集的几何结构（顶点），后者定义拓扑结构（索引）
     vtkSmartPointer<vtkPolyData> polydata = vtkSmartPointer<vtkPolyData>::New();
     polydata->SetPoints(points);
     polydata->SetLines(lines);
@@ -758,47 +741,46 @@ int main(int argc, char* argv[])
     iren->Start();
 
     return 0;
-
 }
 
 #endif // TEST7
 
 #ifdef TEST8
 
-#include <vtkCubeSource.h>
-#include <vtkSmartPointer.h>
-#include <vtkPolyDataMapper.h>
 #include <vtkActor.h>
 #include <vtkCamera.h>
+#include <vtkCubeSource.h>
+#include <vtkLight.h>
+#include <vtkLightCollection.h>
+#include <vtkPolyDataMapper.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
 #include <vtkRenderWindowInteractor.h>
-#include <vtkLightCollection.h>
-#include <vtkLight.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
 
 #include <iostream>
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkCubeSource> cube;
 
-    //mapper
+    // mapper
     vtkNew<vtkPolyDataMapper> cubeMapper;
     cubeMapper->SetInputConnection(cube->GetOutputPort());
 
-    //actor
+    // actor
     vtkNew<vtkActor> cubeActor;
     cubeActor->SetMapper(cubeMapper);
     cubeActor->GetProperty()->SetColor(0, 1, 0);
-    //cubeActor->GetProperty()->
+    // cubeActor->GetProperty()->
 
-    //camera
+    // camera
     vtkNew<vtkCamera> camera;
-    camera->SetPosition(1, 1, 1);//设置相机位置
-    camera->SetFocalPoint(0, 0, 0);//设置相机焦点
+    camera->SetPosition(1, 1, 1);   // 设置相机位置
+    camera->SetFocalPoint(0, 0, 0); // 设置相机焦点
 
-    //renderer
+    // renderer
     vtkNew<vtkRenderer> renderer;
     renderer->GradientBackgroundOn();
     renderer->SetBackground(.8, .92, .97);
@@ -809,20 +791,20 @@ int main(int, char* [])
     renderer->SetActiveCamera(camera);
     renderer->ResetCamera();
 
-    //RenderWindow
+    // RenderWindow
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
-    renWin->SetSize(600, 600);//设置window大小
+    renWin->SetSize(600, 600); // 设置window大小
 
-    //RenderWindowInteractor
+    // RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
 
-    auto lights = renderer->GetLights();
+    auto lights   = renderer->GetLights();
     auto numLiths = lights->GetNumberOfItems();
     std::cout << numLiths << '\n';
 
-    //数据交互
+    // 数据交互
     renWin->Render();
     iren->Start();
 
@@ -834,9 +816,14 @@ int main(int, char* [])
 #ifdef TEST9
 
 #include <vtkActor.h>
+#include <vtkActor2D.h>
 #include <vtkCamera.h>
 #include <vtkCellArray.h>
 #include <vtkFloatArray.h>
+#include <vtkInteractorStyleTrackballActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkInteractorStyleUnicam.h>
+#include <vtkInteractorStyleUser.h>
 #include <vtkNamedColors.h>
 #include <vtkNew.h>
 #include <vtkPointData.h>
@@ -847,11 +834,6 @@ int main(int, char* [])
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
-#include <vtkActor2D.h>
-#include <vtkInteractorStyleUser.h>
-#include <vtkInteractorStyleUnicam.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkInteractorStyleTrackballActor.h>
 
 #include <array>
 
@@ -860,37 +842,37 @@ int main(int, char* [])
 int main()
 {
 #ifdef _CUBE
-    //立方体
-    std::array<std::array<double, 3>, 8> pts = { { { { 0, 0, 0 } }, { { 1, 0, 0 } }, { { 1, 1, 0 } },
-      { { 0, 1, 0 } }, { { 0, 0, 1 } }, { { 1, 0, 1 } }, { { 1, 1, 1 } }, { { 0, 1, 1 } } } };
+    // 立方体
+    std::array<std::array<double, 3>, 8> pts = { { { { 0, 0, 0 } }, { { 1, 0, 0 } }, { { 1, 1, 0 } }, { { 0, 1, 0 } }, { { 0, 0, 1 } },
+        { { 1, 0, 1 } }, { { 1, 1, 1 } }, { { 0, 1, 1 } } } };
     // The ordering of the corner points on each face.
-    std::array<std::array<vtkIdType, 4>, 6> ordering = { { { { 0, 1, 2, 3 } }, { { 4, 5, 6, 7 } },
-      { { 0, 1, 5, 4 } }, { { 1, 2, 6, 5 } }, { { 2, 3, 7, 6 } }, { { 3, 0, 4, 7 } } } };
+    std::array<std::array<vtkIdType, 4>, 6> ordering
+        = { { { { 0, 1, 2, 3 } }, { { 4, 5, 6, 7 } }, { { 0, 1, 5, 4 } }, { { 1, 2, 6, 5 } }, { { 2, 3, 7, 6 } }, { { 3, 0, 4, 7 } } } };
 #endif // _CUBE
 
 #ifdef _LINE
-    //三条线段
-    std::array<std::array<double, 3>, 4> pts = { { {0,0,0},{0,1,0},{1,1,0},{1,0,0}} };
-    std::array<std::array<vtkIdType, 2>, 3> ordering = { {{0,1},{1,2},{2,3} } };
+    // 三条线段
+    std::array<std::array<double, 3>, 4> pts         = { { { 0, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 } } };
+    std::array<std::array<vtkIdType, 2>, 3> ordering = { { { 0, 1 }, { 1, 2 }, { 2, 3 } } };
 #endif // _LINE
 
 #ifdef _TRIANGLE
-    //两个三角形构成一个长方形
-    std::array<std::array<double, 3>, 4> pts = { {{0,0,0} ,{0,1,0}, {1,1,0},{1,0,0} } }; //左下，左上，右上，右下
-    std::array<std::array<vtkIdType, 3>, 2> ordering = { {{0,1,2},{2,3,0}} };
+    // 两个三角形构成一个长方形
+    std::array<std::array<double, 3>, 4> pts = { { { 0, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 } } }; // 左下，左上，右上，右下
+    std::array<std::array<vtkIdType, 3>, 2> ordering = { { { 0, 1, 2 }, { 2, 3, 0 } } };
 #endif // _TRIANGLE
 
     vtkNew<vtkNamedColors> colors;
-    vtkNew<vtkPolyData> cube;  // 可以理解为opengl的vao
-    vtkNew<vtkPoints> points;  // 顶点
-    vtkNew<vtkCellArray> polys;// 索引
+    vtkNew<vtkPolyData> cube;      // 可以理解为opengl的vao
+    vtkNew<vtkPoints> points;      // 顶点
+    vtkNew<vtkCellArray> polys;    // 索引
     vtkNew<vtkFloatArray> scalars; // vtkDataArray 属性数据
 
     // 顶点，可以理解为opengl的vertices
     for (auto i = 0ul; i < pts.size(); ++i)
     {
         points->InsertPoint(i, pts[i].data());
-        scalars->InsertTuple1(i, i);  //第一个参数为顶点索引，第二个为实际值
+        scalars->InsertTuple1(i, i); // 第一个参数为顶点索引，第二个为实际值
     }
     // 索引，可以理解为opengl的indices
     for (auto&& i : ordering)
@@ -902,13 +884,13 @@ int main()
     cube->SetPoints(points);
 
     // 设置拓扑结构，即设置图元类型，类似的函数还有SetVerts（点）等
-    //cube->SetPolys(polys);  //多边形，面
-    cube->SetLines(polys);  //_LINE:三条线段（即首尾不相连），_TRIANGLE:四条线段（即首尾相连）
-    //cube->SetStrips(polys); //三角形带，面
-    //cube->SetVerts(polys);  //点
+    // cube->SetPolys(polys);  //多边形，面
+    cube->SetLines(polys); //_LINE:三条线段（即首尾不相连），_TRIANGLE:四条线段（即首尾相连）
+    // cube->SetStrips(polys); //三角形带，面
+    // cube->SetVerts(polys);  //点
 
     // 设置每个顶点的参数，可以理解为云图中数据的w分量
-    //cube->GetPointData()->SetScalars(scalars);
+    // cube->GetPointData()->SetScalars(scalars);
 
     // Mapper用来将输入的数据转换为几何图元（点、线、多边形）进行渲染
     vtkNew<vtkPolyDataMapper> cubeMapper;
@@ -917,11 +899,11 @@ int main()
     // 属性数据设置方法：https://blog.csdn.net/zy2317878/article/details/78744825
     // 获取流场参数的最大最小值，返回double数组
     auto scalar = cube->GetScalarRange();
-    double myScalarRange[]{ 0,2 };  // 可以理解为流场数据范围，最小值0为红色，最大值2为蓝色，那么1就为绿色
+    double myScalarRange[] { 0, 2 }; // 可以理解为流场数据范围，最小值0为红色，最大值2为蓝色，那么1就为绿色
     cubeMapper->SetScalarRange(cube->GetScalarRange());
-    //cubeMapper->SetScalarRange(myScalarRange);
+    // cubeMapper->SetScalarRange(myScalarRange);
 
-    //设置图元颜色
+    // 设置图元颜色
     vtkNew<vtkProperty> cubeProperty;
     cubeProperty->SetColor(0, 255, 0);
 
@@ -929,36 +911,36 @@ int main()
     // Actor依赖于Mapper对象和vtkPropety对象，Mapper负责存放数据和渲染信息等；vtkProperty负责控制颜色，不透明度等属性
     vtkNew<vtkActor> cubeActor;
     cubeActor->SetMapper(cubeMapper);
-    //cubeActor->SetTexture(); //设置纹理，具体用法可以看QWidgetVTK代码
+    // cubeActor->SetTexture(); //设置纹理，具体用法可以看QWidgetVTK代码
     cubeActor->SetProperty(cubeProperty);
 
     // 相机 常用函数Dolly()，Roll()，Azimuth()，Yaw()，Elevation()，Pitch()和Zoom()
     vtkNew<vtkCamera> camera;
-    camera->SetPosition(1, 1, 1); // 设置相机位置
-    camera->SetFocalPoint(0, 0, 0); //设置焦点位置
+    camera->SetPosition(1, 1, 1);   // 设置相机位置
+    camera->SetFocalPoint(0, 0, 0); // 设置焦点位置
 
-    vtkNew<vtkRenderer> renderer;   //负责管理场景的渲染过程，组成对象包括Actor，照相机，光照
-    vtkNew<vtkRenderWindow> renWin; //窗口，一个窗口可以有多个vtkRenderer，不同的render可以在不同的视口
+    vtkNew<vtkRenderer> renderer;   // 负责管理场景的渲染过程，组成对象包括Actor，照相机，光照
+    vtkNew<vtkRenderWindow> renWin; // 窗口，一个窗口可以有多个vtkRenderer，不同的render可以在不同的视口
     renWin->AddRenderer(renderer);
 
-    vtkNew<vtkRenderWindowInteractor> iren; //提供平台独立的响应鼠标，键盘，时钟时间的交互机制
-    iren->SetRenderWindow(renWin); //设置渲染窗口
+    vtkNew<vtkRenderWindowInteractor> iren; // 提供平台独立的响应鼠标，键盘，时钟时间的交互机制
+    iren->SetRenderWindow(renWin);          // 设置渲染窗口
 
     vtkInteractorStyleTrackballCamera* style = vtkInteractorStyleTrackballCamera::New();
-    iren->SetInteractorStyle(style); //定义交互器样式，默认为vtkInteractorStyleSwitch
+    iren->SetInteractorStyle(style); // 定义交互器样式，默认为vtkInteractorStyleSwitch
 
     renderer->AddActor(cubeActor);
     renderer->SetActiveCamera(camera);
     renderer->ResetCamera();
 
-    //背景颜色，可以设置为渐变色
+    // 背景颜色，可以设置为渐变色
     renderer->SetBackground(colors->GetColor3d("Black").GetData());
 
-    renWin->SetSize(600, 600); //窗口大小
+    renWin->SetSize(600, 600); // 窗口大小
 
     // interact with data
     renWin->Render();
-    iren->Start(); //程序进入事件响应循环，交互器处于等待状态
+    iren->Start(); // 程序进入事件响应循环，交互器处于等待状态
 
     return EXIT_SUCCESS;
 }
@@ -967,17 +949,17 @@ int main()
 
 #ifdef TEST10
 
+#include "vtkActor.h"
+#include "vtkCellArray.h"
+#include "vtkInteractorStyle.h"
+#include "vtkInteractorStyleTrackballCamera.h"
 #include "vtkPoints.h"
 #include "vtkPolyData.h"
-#include "vtkActor.h"
-#include "vtkRenderer.h"
-#include "vtkRenderWindow.h"
 #include "vtkPolyDataMapper.h"
-#include "vtkInteractorStyle.h"
-#include "vtkRenderWindowInteractor.h"
 #include "vtkProperty.h"
-#include "vtkCellArray.h"
-#include "vtkInteractorStyleTrackballCamera.h"
+#include "vtkRenderWindow.h"
+#include "vtkRenderWindowInteractor.h"
+#include "vtkRenderer.h"
 #include <vtkInteractorStyleUnicam.h>
 #include <vtkInteractorStyleUser.h>
 
@@ -987,14 +969,13 @@ int main(int argc, char* argv[])
 {
     size_t vercount = 4;
     size_t indcount = 4;
-    //size_t indcount = 6;
-    float vertices[] = { 0.,0.,1.,0.,1.,1.,2.,1. };  // 共四个2D顶点
-    unsigned int indices[] = { 0,1,2,3 };
-    //unsigned int indices[] = { 0,1,1,2,2,3 };
+    // size_t indcount = 6;
+    float vertices[]       = { 0., 0., 1., 0., 1., 1., 2., 1. }; // 共四个2D顶点
+    unsigned int indices[] = { 0, 1, 2, 3 };
+    // unsigned int indices[] = { 0,1,1,2,2,3 };
 
-
-    vtkPoints* points = vtkPoints::New();     //顶点
-    vtkCellArray* cells = vtkCellArray::New();//索引
+    vtkPoints* points   = vtkPoints::New();    // 顶点
+    vtkCellArray* cells = vtkCellArray::New(); // 索引
 
     for (size_t i = 0; i < vercount; i++)
     {
@@ -1003,7 +984,7 @@ int main(int argc, char* argv[])
 
     for (size_t i = 0; i < indcount; i += 2)
     {
-        cells->InsertNextCell({ indices[i],indices[i + 1] });
+        cells->InsertNextCell({ indices[i], indices[i + 1] });
     }
 
     // 渲染机制未知，需要同时设置点坐标与点坐标对应的verts
@@ -1012,17 +993,16 @@ int main(int argc, char* argv[])
     polyData->SetPoints(points);
     polyData->SetLines(cells);
 
-    //下面为正常的可视化流程，可设置的点云颜色、大小等
+    // 下面为正常的可视化流程，可设置的点云颜色、大小等
     vtkPolyDataMapper* mapper = vtkPolyDataMapper::New();
     mapper->SetInputData(polyData);
 
     vtkActor* actor = vtkActor::New();
     actor->SetMapper(mapper);
-    //设置颜色与点大小
+    // 设置颜色与点大小
     actor->GetProperty()->SetColor(1.0, 0.0, 0.0);
-    //actor->GetProperty()->SetPointSize(5);
+    // actor->GetProperty()->SetPointSize(5);
     actor->GetProperty()->SetLineWidth(5);
-
 
     vtkRenderer* renderer = vtkRenderer::New();
     renderer->AddActor(actor);
@@ -1035,10 +1015,9 @@ int main(int argc, char* argv[])
     vtkRenderWindowInteractor* iren = vtkRenderWindowInteractor::New();
     iren->SetRenderWindow(renderWindow);
 
-    vtkInteractorStyleTrackballCamera* style = vtkInteractorStyleTrackballCamera::New();  //左键旋转，滚轮缩放，滚轮拖动，右键缩放
+    vtkInteractorStyleTrackballCamera* style = vtkInteractorStyleTrackballCamera::New(); // 左键旋转，滚轮缩放，滚轮拖动，右键缩放
 
-
-    //style->set
+    // style->set
 
     iren->SetInteractorStyle(style);
 
@@ -1057,48 +1036,47 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-//cells->SetData();
-//cells->ExportLegacyFormat();
-//cells->ImportLegacyFormat();
-//cells->AppendLegacyFormat();
-//cells->InsertNextCell({ 2,1,2 });  // 第一个参数是单元顶点的个数
+// cells->SetData();
+// cells->ExportLegacyFormat();
+// cells->ImportLegacyFormat();
+// cells->AppendLegacyFormat();
+// cells->InsertNextCell({ 2,1,2 });  // 第一个参数是单元顶点的个数
 
 #endif // TEST10
 
 #ifdef TEST11
 
-#include <vtkSmartPointer.h>
-#include <vtkParametricFunctionSource.h>
-#include <vtkParametricSpline.h>
+#include <vtkActor.h>
+#include <vtkAutoInit.h>
+#include <vtkCamera.h>
 #include <vtkCellArray.h>
 #include <vtkCellData.h>
 #include <vtkDoubleArray.h>
+#include <vtkGlyph3DMapper.h>
+#include <vtkNamedColors.h>
+#include <vtkParametricFunctionSource.h>
+#include <vtkParametricSpline.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
-#include <vtkActor.h>
-#include <vtkCamera.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
 #include <vtkRenderWindowInteractor.h>
-#include <vtkGlyph3DMapper.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
 #include <vtkSphereSource.h>
-#include <vtkNamedColors.h>
-#include <vtkAutoInit.h> 
-#include <vtkTubeFilter.h> 
-int main(int, char* [])
+#include <vtkTubeFilter.h>
+
+int main(int, char*[])
 {
-    vtkSmartPointer<vtkNamedColors> colors =
-        vtkSmartPointer<vtkNamedColors>::New();
+    vtkSmartPointer<vtkNamedColors> colors = vtkSmartPointer<vtkNamedColors>::New();
 
     // Create three points. We will join (Origin and P0) with a red line and (Origin and P1) with a green line
     double origin[3] = { 0.0, 0.0, 0.0 };
-    double p0[3] = { 0,3,2 };
-    double p1[3] = { 5,4.4,3.6 };
-    double p2[3] = { 10,4.4,4.2 };
-    double p3[3] = { 15,4.4,4.8 };
-
+    double p0[3]     = { 0, 3, 2 };
+    double p1[3]     = { 5, 4.4, 3.6 };
+    double p2[3]     = { 10, 4.4, 4.2 };
+    double p3[3]     = { 15, 4.4, 4.8 };
 
     // Create a vtkPoints object and store the points in it
     vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
@@ -1108,37 +1086,29 @@ int main(int, char* [])
     points->InsertNextPoint(p2);
     points->InsertNextPoint(p3);
 
-    vtkSmartPointer<vtkParametricSpline> spline =
-        vtkSmartPointer<vtkParametricSpline>::New();
+    vtkSmartPointer<vtkParametricSpline> spline = vtkSmartPointer<vtkParametricSpline>::New();
     spline->SetPoints(points);
-    vtkSmartPointer<vtkParametricFunctionSource> functionSource =
-        vtkSmartPointer<vtkParametricFunctionSource>::New();
+    vtkSmartPointer<vtkParametricFunctionSource> functionSource = vtkSmartPointer<vtkParametricFunctionSource>::New();
     functionSource->SetParametricFunction(spline);
     functionSource->Update();
 
-    vtkSmartPointer<vtkTubeFilter> Tube =
-        vtkSmartPointer<vtkTubeFilter>::New();
+    vtkSmartPointer<vtkTubeFilter> Tube = vtkSmartPointer<vtkTubeFilter>::New();
     Tube->SetInputConnection(functionSource->GetOutputPort());
     Tube->SetRadius(0.5);
     Tube->SetNumberOfSides(20);
     Tube->Update();
     // Setup actor and mapper
-    vtkSmartPointer<vtkPolyDataMapper> mapper =
-        vtkSmartPointer<vtkPolyDataMapper>::New();
+    vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
     mapper->SetInputConnection(Tube->GetOutputPort());
 
-    vtkSmartPointer<vtkActor> actor =
-        vtkSmartPointer<vtkActor>::New();
+    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
     actor->SetMapper(mapper);
     actor->GetProperty()->SetColor(0, 1, 0);
     // Setup render window, renderer, and interactor
-    vtkSmartPointer<vtkRenderer> renderer =
-        vtkSmartPointer<vtkRenderer>::New();
-    vtkSmartPointer<vtkRenderWindow> renderWindow =
-        vtkSmartPointer<vtkRenderWindow>::New();
+    vtkSmartPointer<vtkRenderer> renderer         = vtkSmartPointer<vtkRenderer>::New();
+    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
     renderWindow->AddRenderer(renderer);
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor =
-        vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
     renderWindowInteractor->SetRenderWindow(renderWindow);
     renderer->AddActor(actor);
 
@@ -1154,11 +1124,11 @@ int main(int, char* [])
 
 #ifdef TEST12
 
-//https://blog.csdn.net/qq_41023026/article/details/119776151
+// https://blog.csdn.net/qq_41023026/article/details/119776151
 
 #include "vtkActor.h"
-#include "vtkXMLPolyDataReader.h"
 #include "vtkCutter.h"
+#include "vtkInteractorStyleTrackballCamera.h"
 #include "vtkPlane.h"
 #include "vtkPolyData.h"
 #include "vtkPolyDataMapper.h"
@@ -1167,18 +1137,17 @@ int main(int, char* [])
 #include "vtkRenderWindow.h"
 #include "vtkRenderWindowInteractor.h"
 #include "vtkRenderer.h"
+#include "vtkSmartPointer.h"
 #include "vtkStripper.h"
 #include "vtkTriangleFilter.h"
-#include "vtkSmartPointer.h"
-#include "vtkInteractorStyleTrackballCamera.h"
+#include "vtkXMLPolyDataReader.h"
 
-#include <vtkCubeSource.h>
+#include "vtkAppendPolyData.h"
+#include "vtkCleanPolyData.h"
 #include "vtkConeSource.h"
 #include "vtkLineSource.h"
 #include "vtkTubeFilter.h"
-#include "vtkAppendPolyData.h"
-#include "vtkCleanPolyData.h"
-
+#include <vtkCubeSource.h>
 
 int main()
 {
@@ -1189,7 +1158,7 @@ int main()
     coneSource->SetResolution(50);
     coneSource->Update();
 
-    // second 
+    // second
     vtkSmartPointer<vtkLineSource> line = vtkSmartPointer<vtkLineSource>::New();
     line->SetPoint1(1.0, 0, 0);
     line->SetPoint2(0, 1.0, 20);
@@ -1201,56 +1170,48 @@ int main()
     tube->SetCapping(1);
     tube->Update();
 
-    vtkNew< vtkCubeSource> cube;
+    vtkNew<vtkCubeSource> cube;
     cube->SetXLength(10);
     cube->SetYLength(10);
     cube->SetZLength(10);
     cube->Update();
 
     // combine two poly data
-    vtkSmartPointer<vtkAppendPolyData> appendFilter =
-        vtkSmartPointer<vtkAppendPolyData>::New();
+    vtkSmartPointer<vtkAppendPolyData> appendFilter = vtkSmartPointer<vtkAppendPolyData>::New();
     appendFilter->AddInputData(tube->GetOutput());
     appendFilter->AddInputData(coneSource->GetOutput());
     appendFilter->AddInputData(cube->GetOutput());
     appendFilter->Update();
 
     // Remove any duplicate points.
-    vtkSmartPointer<vtkCleanPolyData> cleanFilter =
-        vtkSmartPointer<vtkCleanPolyData>::New();
+    vtkSmartPointer<vtkCleanPolyData> cleanFilter = vtkSmartPointer<vtkCleanPolyData>::New();
     cleanFilter->SetInputConnection(appendFilter->GetOutputPort());
     cleanFilter->Update();
 
-    //Create a mapper and actor
-    vtkSmartPointer<vtkPolyDataMapper> appendmapper =
-        vtkSmartPointer<vtkPolyDataMapper>::New();
+    // Create a mapper and actor
+    vtkSmartPointer<vtkPolyDataMapper> appendmapper = vtkSmartPointer<vtkPolyDataMapper>::New();
     appendmapper->SetInputConnection(cleanFilter->GetOutputPort());
 
-    vtkSmartPointer<vtkActor> appendactor =
-        vtkSmartPointer<vtkActor>::New();
+    vtkSmartPointer<vtkActor> appendactor = vtkSmartPointer<vtkActor>::New();
     appendactor->SetMapper(appendmapper);
     appendactor->GetProperty()->SetColor(1., 0., 0.);
 
-    //Create a renderer, render window, and interactor
-    vtkSmartPointer<vtkRenderer> renderer =
-        vtkSmartPointer<vtkRenderer>::New();
+    // Create a renderer, render window, and interactor
+    vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
 
-    vtkSmartPointer<vtkRenderWindow> renderWindow =
-        vtkSmartPointer<vtkRenderWindow>::New();
+    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
 
     renderWindow->AddRenderer(renderer);
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor =
-        vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
-    //Add the actors to the scene
+    // Add the actors to the scene
     renderer->AddActor(appendactor);
     renderer->SetBackground(.3, .2, .1); // Background color dark red
 
-    //Render and interact
+    // Render and interact
     renderWindow->Render();
     renderWindowInteractor->Start();
-
 
     return EXIT_SUCCESS;
 }
@@ -1259,21 +1220,21 @@ int main()
 
 #ifdef TEST13
 
-//https://blog.csdn.net/calmreason/article/details/88712248
+// https://blog.csdn.net/calmreason/article/details/88712248
 
 #include "vtkActor.h"
-#include "vtkRenderer.h"
-#include "vtkRenderWindow.h"
-#include "vtkCamera.h"
-#include "vtkRenderWindowInteractor.h"
-#include "vtkCommand.h"
 #include "vtkCallbackCommand.h"
+#include "vtkCamera.h"
+#include "vtkCommand.h"
+#include "vtkContourRepresentation.h"
+#include "vtkContourWidget.h"
+#include "vtkInteractorStyleSwitch.h"
 #include "vtkPolyData.h"
 #include "vtkPolyDataMapper.h"
+#include "vtkRenderWindow.h"
+#include "vtkRenderWindowInteractor.h"
+#include "vtkRenderer.h"
 #include "vtkSmartPointer.h"
-#include "vtkInteractorStyleSwitch.h"
-#include "vtkContourWidget.h"
-#include "vtkContourRepresentation.h"
 
 static vtkSmartPointer<vtkRenderer> renderer01;
 static vtkSmartPointer<vtkRenderer> renderer02;
@@ -1290,6 +1251,7 @@ public:
     {
         return new vtkMyCameraCallback;
     }
+
     virtual void Execute(vtkObject* caller, unsigned long, void*)
     {
         vtkCamera* camera = static_cast<vtkCamera*>(caller);
@@ -1300,12 +1262,13 @@ public:
         camera->GetFocalPoint(focalPos);
         camera->GetViewUp(upVector);
 
-        //遍历所有renderer，都设置一遍最新的相机
+        // 遍历所有renderer，都设置一遍最新的相机
         renderer01->SetActiveCamera(camera);
         renderer02->SetActiveCamera(camera);
         renderWindow01->Render();
         renderWindow02->Render();
     }
+
     vtkSmartPointer<vtkRenderer> m_renderer;
 };
 
@@ -1316,6 +1279,7 @@ public:
     {
         return new vtkMyContourCallback;
     }
+
     void Execute(vtkObject* caller, unsigned long eventId, void* callData)
     {
         vtkSmartPointer<vtkPolyData> polydata = vtkSmartPointer<vtkPolyData>::New();
@@ -1333,7 +1297,7 @@ public:
 int main(int argc, char* argv[])
 {
     // 制作数据polydata
-    int numPts = 5;
+    int numPts                        = 5;
     vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
     for (int i = 0; i < numPts; i++)
     {
@@ -1362,7 +1326,6 @@ int main(int argc, char* argv[])
     polydata->SetPoints(points);
     polydata->SetLines(lines);
 
-
     renderer01 = vtkSmartPointer<vtkRenderer>::New();
     renderer02 = vtkSmartPointer<vtkRenderer>::New();
 
@@ -1377,11 +1340,10 @@ int main(int argc, char* argv[])
     windowInteractor01->SetRenderWindow(renderWindow01);
     windowInteractor02->SetRenderWindow(renderWindow02);
 
-
     contourWidget1->CreateDefaultRepresentation();
     contourWidget2->CreateDefaultRepresentation();
 
-    //渲染时使用同样的数据
+    // 渲染时使用同样的数据
     contourWidget1->SetInteractor(windowInteractor01);
     contourWidget2->SetInteractor(windowInteractor02);
     contourWidget1->On();
@@ -1389,161 +1351,54 @@ int main(int argc, char* argv[])
     contourWidget1->Initialize(polydata);
     contourWidget2->Initialize(polydata);
 
-    //形状使用同样的数据来保持同步
-    vtkSmartPointer< vtkMyContourCallback> contourCallBack1 = vtkSmartPointer< vtkMyContourCallback>::New();
-    contourCallBack1->m_contourWidget = contourWidget1;
-    vtkSmartPointer< vtkMyContourCallback> contourCallBack2 = vtkSmartPointer< vtkMyContourCallback>::New();
-    contourCallBack2->m_contourWidget = contourWidget2;
-    contourWidget1->AddObserver(vtkCommand::EndInteractionEvent, contourCallBack1);//拖动控制点完成
-    contourWidget2->AddObserver(vtkCommand::EndInteractionEvent, contourCallBack2);//拖动控制点完成
-    contourWidget1->AddObserver(vtkCommand::KeyReleaseEvent, contourCallBack1);//删除一个控制点
-    contourWidget2->AddObserver(vtkCommand::KeyReleaseEvent, contourCallBack2);//删除一个拖动控制点
-    contourWidget1->AddObserver(vtkCommand::InteractionEvent, contourCallBack1);//拖动一个控制点
-    contourWidget2->AddObserver(vtkCommand::InteractionEvent, contourCallBack2);//拖动一个拖动控制点
+    // 形状使用同样的数据来保持同步
+    vtkSmartPointer<vtkMyContourCallback> contourCallBack1 = vtkSmartPointer<vtkMyContourCallback>::New();
+    contourCallBack1->m_contourWidget                      = contourWidget1;
+    vtkSmartPointer<vtkMyContourCallback> contourCallBack2 = vtkSmartPointer<vtkMyContourCallback>::New();
+    contourCallBack2->m_contourWidget                      = contourWidget2;
+    contourWidget1->AddObserver(vtkCommand::EndInteractionEvent, contourCallBack1); // 拖动控制点完成
+    contourWidget2->AddObserver(vtkCommand::EndInteractionEvent, contourCallBack2); // 拖动控制点完成
+    contourWidget1->AddObserver(vtkCommand::KeyReleaseEvent, contourCallBack1);     // 删除一个控制点
+    contourWidget2->AddObserver(vtkCommand::KeyReleaseEvent, contourCallBack2);     // 删除一个拖动控制点
+    contourWidget1->AddObserver(vtkCommand::InteractionEvent, contourCallBack1);    // 拖动一个控制点
+    contourWidget2->AddObserver(vtkCommand::InteractionEvent, contourCallBack2);    // 拖动一个拖动控制点
 
-
-    //相机同步
+    // 相机同步
     vtkSmartPointer<vtkMyCameraCallback> cameraCallback1 = vtkSmartPointer<vtkMyCameraCallback>::New();
-    cameraCallback1->m_renderer = renderer01;
+    cameraCallback1->m_renderer                          = renderer01;
     vtkSmartPointer<vtkMyCameraCallback> cameraCallback2 = vtkSmartPointer<vtkMyCameraCallback>::New();
-    cameraCallback2->m_renderer = renderer02;
+    cameraCallback2->m_renderer                          = renderer02;
     renderer01->GetActiveCamera()->AddObserver(vtkCommand::ModifiedEvent, cameraCallback1);
     renderer02->GetActiveCamera()->AddObserver(vtkCommand::ModifiedEvent, cameraCallback2);
     renderer01->ResetCamera();
     renderer02->ResetCamera();
 
-    //程序启动
+    // 程序启动
     windowInteractor01->Initialize();
     windowInteractor02->Initialize();
     windowInteractor01->Start();
     windowInteractor02->Start();
 
     return 0;
-
 }
 
 #endif // TEST13
 
-#ifdef TEST14
-
-#include <vtkActor.h>
-#include <vtkCone.h>
-#include <vtkDataSetMapper.h>
-#include <vtkGlyph3D.h>
-
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPointData.h>
-#include <vtkPointSource.h>
-#include <vtkProbeFilter.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSampleFunction.h>
-#include <vtkSmartPointer.h>
-#include <vtkSphereSource.h>
-#include <vtkThreshold.h>
-#include <vtkThresholdPoints.h>
-#include <vtkUnsignedCharArray.h>
-
-int main(int argc, char* argv[])
-{
-    int resolution = 50;
-    if (argc > 1)
-    {
-        resolution = atoi(argv[1]);
-    }
-
-    vtkNew<vtkNamedColors> colors;
-
-    // Create a sampled cone
-    vtkNew<vtkCone> implicitCone;
-    implicitCone->SetAngle(30.0);
-
-    double radius = 1.;
-    vtkNew<vtkSampleFunction> sampledCone;
-    sampledCone->SetSampleDimensions(resolution, resolution, resolution);
-    double xMin = -radius * 2.0;
-    double xMax = radius * 2.0;
-    sampledCone->SetModelBounds(xMin, xMax, xMin, xMax, xMin, xMax);
-    sampledCone->SetImplicitFunction(implicitCone);
-
-    vtkNew<vtkThreshold> thresholdCone;
-    thresholdCone->SetInputConnection(sampledCone->GetOutputPort());
-    thresholdCone->SetLowerThreshold(0);
-    thresholdCone->SetThresholdFunction(vtkThreshold::THRESHOLD_LOWER);
-
-    vtkNew<vtkPointSource> randomPoints;
-    randomPoints->SetCenter(0.0, 0.0, 0.0);
-    randomPoints->SetNumberOfPoints(10000);
-    randomPoints->SetDistributionToUniform();
-    randomPoints->SetRadius(xMax);
-
-    // Probe the cone dataset with random points
-    vtkNew<vtkProbeFilter> randomProbe;
-    randomProbe->SetInputConnection(0, randomPoints->GetOutputPort());
-    randomProbe->SetInputConnection(1, thresholdCone->GetOutputPort());
-    randomProbe->Update();
-    randomProbe->GetOutput()->GetPointData()->SetActiveScalars(
-        "vtkValidPointMask");
-
-    vtkNew<vtkThresholdPoints> selectPoints;
-    selectPoints->SetInputConnection(randomProbe->GetOutputPort());
-    selectPoints->ThresholdByUpper(1.0);
-
-    vtkNew<vtkSphereSource> sphere;
-    sphere->SetRadius(0.025);
-
-    vtkNew<vtkGlyph3D> glyph;
-    glyph->SetSourceConnection(sphere->GetOutputPort());
-    glyph->SetInputConnection(selectPoints->GetOutputPort());
-
-    // Create a mapper and actor
-    vtkNew<vtkDataSetMapper> mapper;
-    mapper->SetInputConnection(glyph->GetOutputPort());
-    mapper->ScalarVisibilityOff();
-    vtkNew<vtkActor> actor;
-    actor->SetMapper(mapper);
-    actor->GetProperty()->SetColor(colors->GetColor3d("MistyRose").GetData());
-
-    // Visualize
-    vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("RandomProbe");
-
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-
-    renderer->AddActor(actor);
-    renderer->SetBackground(colors->GetColor3d("RoyalBlue").GetData());
-
-    renderWindow->Render();
-    renderWindowInteractor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-
-
-#endif // TEST14
-
 #ifdef TEST15
 
+#include <vtkActor.h>
 #include <vtkArrowSource.h>
 #include <vtkPolyData.h>
-#include <vtkSmartPointer.h>
 #include <vtkPolyDataMapper.h>
-#include <vtkActor.h>
 #include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
 #include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
 
-#include <vtkTransform.h>
-#include <vtkTransformPolyDataFilter.h>
 #include <vtkDataSetMapper.h>
 #include <vtkMinimalStandardRandomSequence.h>
+#include <vtkTransform.h>
+#include <vtkTransformPolyDataFilter.h>
 
 #include <array>
 #include <iostream>
@@ -1578,8 +1433,7 @@ vtkSmartPointer<vtkDataSetMapper> createArrow(double* start, double* end)
 
     // The Y axis is Z cross X
     vtkMath::Cross(normalizedZ, normalizedX, normalizedY);
-    vtkSmartPointer<vtkMatrix4x4> matrix =
-        vtkSmartPointer<vtkMatrix4x4>::New();
+    vtkSmartPointer<vtkMatrix4x4> matrix = vtkSmartPointer<vtkMatrix4x4>::New();
 
     // Create the direction cosine matrix
     matrix->Identity();
@@ -1621,8 +1475,8 @@ int main()
     {
         vtkNew<vtkArrowSource> arrowSource;
 
-        auto num1 = arrowSource->GetShaftResolution();  //6
-        auto num2 = arrowSource->GetTipResolution();    //6
+        auto num1 = arrowSource->GetShaftResolution(); // 6
+        auto num2 = arrowSource->GetTipResolution();   // 6
 
         arrowSource->SetShaftRadius(.01);
         arrowSource->SetTipLength(.2);
@@ -1631,14 +1485,13 @@ int main()
 
         std::cout << num1 << ',' << num2 << '\n';
 
-        auto polyData = arrowSource->GetOutput();
+        auto polyData  = arrowSource->GetOutput();
         auto numPoints = polyData->GetNumberOfPoints();
-        auto numCells = polyData->GetNumberOfCells();
-        auto numPolys = polyData->GetNumberOfPolys();
+        auto numCells  = polyData->GetNumberOfCells();
+        auto numPolys  = polyData->GetNumberOfPolys();
 
         std::cout << "numPoints: " << numPoints << '\t' << "numCells: " << numCells << '\t' << "numPolys: " << numPolys << '\n';
     }
-
 
     vtkNew<vtkActor> actor;
 
@@ -1661,8 +1514,8 @@ int main()
     else
     {
         // 自定义位置
-        double start[] = { 1,0,10 };
-        double end[] = { 20,-10,10 };
+        double start[] = { 1, 0, 10 };
+        double end[]   = { 20, -10, 10 };
         actor->SetMapper(createArrow(start, end));
     }
 
@@ -1684,10 +1537,6 @@ int main()
 
 #endif // TEST15
 
-
-
-
-
 #ifdef TEST18
 
 #include "vtkActor.h"
@@ -1700,47 +1549,45 @@ int main()
 #include "vtkRenderWindow.h"
 #include "vtkRenderWindowInteractor.h"
 #include "vtkRenderer.h"
-#include <vtkLookupTable.h>
 #include "vtkSmartPointer.h"
+#include <vtkLookupTable.h>
 
 int main()
 {
     int i;
-    //定义立方体的顶点坐标
-    static float x[8][3] = { { 0, 0, 0 }, { 1, 0, 0 }, { 1, 1, 0 }, { 0, 1, 0 },
-    { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 } };
-    //定义单元，每4个顶点建立一个四边形单元，共计6个单元
-    static vtkIdType pts[6][4] = { { 0, 1, 2, 3 }, { 4, 5, 6, 7 }, { 0, 1, 5, 4 },
-    { 1, 2, 6, 5 }, { 2, 3, 7, 6 }, { 3, 0, 4, 7 } };
-    //创建对象
-    vtkSmartPointer<vtkPolyData> cube = vtkSmartPointer<vtkPolyData>::New();
-    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+    // 定义立方体的顶点坐标
+    static float x[8][3] = { { 0, 0, 0 }, { 1, 0, 0 }, { 1, 1, 0 }, { 0, 1, 0 }, { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 } };
+    // 定义单元，每4个顶点建立一个四边形单元，共计6个单元
+    static vtkIdType pts[6][4] = { { 0, 1, 2, 3 }, { 4, 5, 6, 7 }, { 0, 1, 5, 4 }, { 1, 2, 6, 5 }, { 2, 3, 7, 6 }, { 3, 0, 4, 7 } };
+    // 创建对象
+    vtkSmartPointer<vtkPolyData> cube   = vtkSmartPointer<vtkPolyData>::New();
+    vtkSmartPointer<vtkPoints> points   = vtkSmartPointer<vtkPoints>::New();
     vtkSmartPointer<vtkCellArray> polys = vtkSmartPointer<vtkCellArray>::New();
-    //存储顶点
+    // 存储顶点
     for (i = 0; i < 8; i++)
         points->InsertPoint(i, x[i]);
-    //设定单元
+    // 设定单元
     for (i = 0; i < 6; i++)
         polys->InsertNextCell(4, pts[i]);
 
-    //存储标量值
+    // 存储标量值
     vtkSmartPointer<vtkFloatArray> scalars = vtkSmartPointer<vtkFloatArray>::New();
-    //设定每个顶点的标量值
+    // 设定每个顶点的标量值
     for (i = 0; i < 8; i++)
         scalars->InsertTuple1(i, i * 4);
-    //创建多边形数据
+    // 创建多边形数据
     cube->SetPoints(points);
-    //设定单元类型为多边形
+    // 设定单元类型为多边形
     cube->SetPolys(polys);
-    //设定每个顶点的标量值
+    // 设定每个顶点的标量值
     cube->GetPointData()->SetScalars(scalars);
-    //定义颜色映射表
+    // 定义颜色映射表
     vtkSmartPointer<vtkLookupTable> pColorTable = vtkSmartPointer<vtkLookupTable>::New();
-    //设置颜色表中的颜色
+    // 设置颜色表中的颜色
     pColorTable->SetNumberOfColors(256);
-    pColorTable->SetHueRange(0.67, 0.0);        //色调范围从红色到蓝色
+    pColorTable->SetHueRange(0.67, 0.0); // 色调范围从红色到蓝色
     pColorTable->Build();
-    //数据映射
+    // 数据映射
     vtkSmartPointer<vtkPolyDataMapper> cubeMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
     cubeMapper->SetInputData(cube);
     cubeMapper->SetScalarRange(0, 7);
@@ -1748,7 +1595,7 @@ int main()
     vtkSmartPointer<vtkActor> cubeActor = vtkSmartPointer<vtkActor>::New();
     cubeActor->SetMapper(cubeMapper);
 
-    vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
+    vtkSmartPointer<vtkRenderer> renderer   = vtkSmartPointer<vtkRenderer>::New();
     vtkSmartPointer<vtkRenderWindow> renWin = vtkSmartPointer<vtkRenderWindow>::New();
     renWin->AddRenderer(renderer);
     vtkSmartPointer<vtkRenderWindowInteractor> iren = vtkSmartPointer<vtkRenderWindowInteractor>::New();
@@ -1781,7 +1628,7 @@ int main()
 
 #include <iostream>
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkSmartPointer<vtkSphereSource> model1 = vtkSmartPointer<vtkSphereSource>::New();
     model1->SetPhiResolution(100);
@@ -1795,8 +1642,7 @@ int main(int, char* [])
     model2->SetRadius(1);
     model2->SetCenter(0, 4, 0.0);
 
-    vtkSmartPointer<vtkDistancePolyDataFilter> distanceFilter =
-        vtkSmartPointer<vtkDistancePolyDataFilter>::New();
+    vtkSmartPointer<vtkDistancePolyDataFilter> distanceFilter = vtkSmartPointer<vtkDistancePolyDataFilter>::New();
 
     distanceFilter->SetInputConnection(0, model1->GetOutputPort());
     distanceFilter->SetInputConnection(1, model2->GetOutputPort());
@@ -1824,7 +1670,7 @@ int main(int, char* [])
     actor2->SetMapper(mapper2);
 
     vtkSmartPointer<vtkScalarBarActor> scalarBar = vtkSmartPointer<vtkScalarBarActor>::New();
-    //scalarBar->SetLookupTable(mapper->GetLookupTable());
+    // scalarBar->SetLookupTable(mapper->GetLookupTable());
     scalarBar->SetLookupTable(mapper2->GetLookupTable());
     scalarBar->SetTitle("Distance");
     scalarBar->SetNumberOfLabels(5);
@@ -1834,8 +1680,7 @@ int main(int, char* [])
     vtkSmartPointer<vtkRenderWindow> renWin = vtkSmartPointer<vtkRenderWindow>::New();
     renWin->AddRenderer(renderer);
 
-    vtkSmartPointer<vtkRenderWindowInteractor> renWinInteractor =
-        vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    vtkSmartPointer<vtkRenderWindowInteractor> renWinInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
     renWinInteractor->SetRenderWindow(renWin);
 
     renderer->AddActor(actor);
@@ -1864,6 +1709,8 @@ int main(int, char* [])
 #include <vtkConeSource.h>
 #include <vtkCubeSource.h>
 #include <vtkElevationFilter.h>
+#include <vtkGenericOpenGLRenderWindow.h>
+#include <vtkInteractorStyleRubberBand3D.h>
 #include <vtkLookupTable.h>
 #include <vtkNamedColors.h>
 #include <vtkNew.h>
@@ -1877,27 +1724,23 @@ int main(int, char* [])
 #include <vtkTextProperty.h>
 #include <vtkTransform.h>
 #include <vtkTransformPolyDataFilter.h>
-#include <vtkInteractorStyleRubberBand3D.h>
-#include <vtkGenericOpenGLRenderWindow.h>
 
 #include <array>
 
 namespace {
 
-    /**
-     * Make an axes actor.
-     *
-     * @param scale: 轴的比例和方向
-     * @param xyzLabels: 轴的文字标签
-     * @return The axes actor.
-     */
-    vtkSmartPointer<vtkAxesActor>
-        MakeAxesActor(std::array<double, 3>& scale,
-            std::array<std::string, 3>& xyzLabels);
+/**
+ * Make an axes actor.
+ *
+ * @param scale: 轴的比例和方向
+ * @param xyzLabels: 轴的文字标签
+ * @return The axes actor.
+ */
+vtkSmartPointer<vtkAxesActor> MakeAxesActor(std::array<double, 3>& scale, std::array<std::string, 3>& xyzLabels);
 
 } // namespace
 
-int main(int, char* [])
+int main(int, char*[])
 {
     // Basic stuff setup
     // Set up the renderer, window, and interactor
@@ -1905,18 +1748,18 @@ int main(int, char* [])
 
     vtkNew<vtkRenderer> ren;
     vtkNew<vtkRenderWindow> renWin;
-    //vtkNew< vtkGenericOpenGLRenderWindow> renWin;
+    // vtkNew< vtkGenericOpenGLRenderWindow> renWin;
 
     renWin->AddRenderer(ren);
     renWin->SetSize(640, 480);
     vtkNew<vtkRenderWindowInteractor> iRen;
     iRen->SetRenderWindow(renWin);
 
-    vtkNew< vtkInteractorStyleRubberBand3D> style;
+    vtkNew<vtkInteractorStyleRubberBand3D> style;
     iRen->SetInteractorStyle(style);
 
-    std::array<std::string, 3> xyzLabels{ {"X", "Y", "Z"} };
-    std::array<double, 3> scale{ {1.0, 1.0, 1.0} };
+    std::array<std::string, 3> xyzLabels { { "X", "Y", "Z" } };
+    std::array<double, 3> scale { { 1.0, 1.0, 1.0 } };
     auto axes = MakeAxesActor(scale, xyzLabels);
 
     // 2D的窗口小部件，可以用鼠标拖来拖去，小部件上可以绘制其他图元
@@ -1924,20 +1767,20 @@ int main(int, char* [])
     om2->SetOrientationMarker(axes);
     // Position lower right in the viewport.
     om2->SetViewport(0.5, 0, 1.0, 0.5);
-    //om2->SetShouldConstrainSize(true);       // 开启最大最小尺寸限制
-    //om2->SetSizeConstraintDimensionSizes();  // 设置最大和最小尺寸
+    // om2->SetShouldConstrainSize(true);       // 开启最大最小尺寸限制
+    // om2->SetSizeConstraintDimensionSizes();  // 设置最大和最小尺寸
 
     om2->SetInteractor(iRen);
     om2->EnabledOn();
     om2->InteractiveOn();
 
-    //ren->AddActor(axes);
+    // ren->AddActor(axes);
 
     // 设置窗口的背景颜色（渐变色）
-    //ren->SetBackground2(colors->GetColor3d("RoyalBlue").GetData());
+    // ren->SetBackground2(colors->GetColor3d("RoyalBlue").GetData());
     ren->SetBackground(.1, .2, .3);
-    //ren->SetBackground(colors->GetColor3d("MistyRose").GetData());
-    //ren->GradientBackgroundOn();
+    // ren->SetBackground(colors->GetColor3d("MistyRose").GetData());
+    // ren->GradientBackgroundOn();
 
     // 设置摄像机方向
     ren->GetActiveCamera()->Azimuth(45);
@@ -1955,67 +1798,60 @@ int main(int, char* [])
 
 namespace {
 
-    vtkSmartPointer<vtkAxesActor>
-        MakeAxesActor(std::array<double, 3>& scale,
-            std::array<std::string, 3>& xyzLabels)
-    {
-        vtkNew<vtkAxesActor> axes;
-        //axes->SetScale(scale[0], scale[1], scale[2]);
-        //axes->SetShaftTypeToCylinder();
-        //axes->SetXAxisLabelText(xyzLabels[0].c_str());
-        //axes->SetYAxisLabelText(xyzLabels[1].c_str());
-        //axes->SetZAxisLabelText(xyzLabels[2].c_str());
+vtkSmartPointer<vtkAxesActor> MakeAxesActor(std::array<double, 3>& scale, std::array<std::string, 3>& xyzLabels)
+{
+    vtkNew<vtkAxesActor> axes;
+    // axes->SetScale(scale[0], scale[1], scale[2]);
+    // axes->SetShaftTypeToCylinder();
+    // axes->SetXAxisLabelText(xyzLabels[0].c_str());
+    // axes->SetYAxisLabelText(xyzLabels[1].c_str());
+    // axes->SetZAxisLabelText(xyzLabels[2].c_str());
 
-        //axes->SetCylinderRadius(0.5 * axes->GetCylinderRadius());  //轴的粗细
-        //axes->SetConeRadius(1.025 * axes->GetConeRadius());        //圆锥的大小
-        //axes->SetSphereRadius(0.1 * axes->GetSphereRadius());
+    // axes->SetCylinderRadius(0.5 * axes->GetCylinderRadius());  //轴的粗细
+    // axes->SetConeRadius(1.025 * axes->GetConeRadius());        //圆锥的大小
+    // axes->SetSphereRadius(0.1 * axes->GetSphereRadius());
 
+    vtkTextProperty* tprop = axes->GetXAxisCaptionActor2D()->GetCaptionTextProperty();
+    tprop->ItalicOn();             // 启用文本斜体
+    tprop->ShadowOn();             // 启用文本阴影
+    tprop->SetFontFamilyToTimes(); // 字体
+    tprop->SetColor(1, 1, 1);      // 标签文字颜色
 
-        vtkTextProperty* tprop = axes->GetXAxisCaptionActor2D()->GetCaptionTextProperty();
-        tprop->ItalicOn();  //启用文本斜体
-        tprop->ShadowOn();  //启用文本阴影
-        tprop->SetFontFamilyToTimes();  //字体
-        tprop->SetColor(1, 1, 1);  //标签文字颜色
-
-        // Use the same text properties on the other two axes.
-        axes->GetYAxisCaptionActor2D()->GetCaptionTextProperty()->ShallowCopy(tprop);
-        axes->GetZAxisCaptionActor2D()->GetCaptionTextProperty()->ShallowCopy(tprop);
-        return axes;
-    }
+    // Use the same text properties on the other two axes.
+    axes->GetYAxisCaptionActor2D()->GetCaptionTextProperty()->ShallowCopy(tprop);
+    axes->GetZAxisCaptionActor2D()->GetCaptionTextProperty()->ShallowCopy(tprop);
+    return axes;
+}
 
 } // namespace
 
-
 #endif // TEST20
-
-
 
 #ifdef TEST22
 
- // https://blog.csdn.net/minmindianzi/article/details/87071213
+// https://blog.csdn.net/minmindianzi/article/details/87071213
 
-#include <vtkSmartPointer.h>
-#include <vtkPolyDataMapper.h>
 #include <vtkActor.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkProperty.h>
+#include <vtkAxesActor.h>
+#include <vtkGlyph3DMapper.h>
 #include <vtkPlane.h>
-#include <vtkSphereSource.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
-#include <vtkGlyph3DMapper.h>
-#include <vtkAxesActor.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
 #include <vtkTextActor.h>
 #include <vtkTextProperty.h>
 
-int main(int, char* [])
+int main(int, char*[])
 {
-    vtkSmartPointer<vtkPlane> plane =
-        vtkSmartPointer<vtkPlane>::New();
-    double origin[] = { 0, 0, 0 };
-    double normal[] = { 0, 0, 1 };
+    vtkSmartPointer<vtkPlane> plane = vtkSmartPointer<vtkPlane>::New();
+    double origin[]                 = { 0, 0, 0 };
+    double normal[]                 = { 0, 0, 1 };
     plane->SetOrigin(origin);
     plane->SetNormal(normal);
 
@@ -2024,59 +1860,48 @@ int main(int, char* [])
     plane->ProjectPoint(p, origin, normal, projected);
 
     char outputMsg[256] = { 0 };
-    //sprintf_s(outputMsg, sizeof(outputMsg), "p(%f, %f, %f)", p[0], p[1], p[2]);
-    sprintf_s(outputMsg, sizeof(outputMsg), "p(%f, %f, %f)\nprojected(%f, %f, %f)", p[0], p[1], p[2],
-        projected[0], projected[1], projected[2]);
+    // sprintf_s(outputMsg, sizeof(outputMsg), "p(%f, %f, %f)", p[0], p[1], p[2]);
+    sprintf_s(outputMsg, sizeof(outputMsg), "p(%f, %f, %f)\nprojected(%f, %f, %f)", p[0], p[1], p[2], projected[0], projected[1], projected[2]);
 
-    vtkSmartPointer<vtkTextActor> textActor =
-        vtkSmartPointer<vtkTextActor>::New();
+    vtkSmartPointer<vtkTextActor> textActor = vtkSmartPointer<vtkTextActor>::New();
     textActor->SetPosition2(100, 40);
     textActor->GetTextProperty()->SetFontSize(24);
     textActor->GetTextProperty()->SetColor(0, 1, 0);
     textActor->SetInput(outputMsg);
 
-    vtkSmartPointer<vtkSphereSource> pointsSphere =
-        vtkSmartPointer<vtkSphereSource>::New();
+    vtkSmartPointer<vtkSphereSource> pointsSphere = vtkSmartPointer<vtkSphereSource>::New();
     pointsSphere->SetPhiResolution(21);
     pointsSphere->SetThetaResolution(21);
     pointsSphere->SetRadius(.5);
 
-    vtkSmartPointer<vtkPoints> points =
-        vtkSmartPointer<vtkPoints>::New();
+    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
     points->InsertNextPoint(p);
     points->InsertNextPoint(projected);
 
-    vtkSmartPointer<vtkPolyData> pointsData =
-        vtkSmartPointer<vtkPolyData>::New();
+    vtkSmartPointer<vtkPolyData> pointsData = vtkSmartPointer<vtkPolyData>::New();
     pointsData->SetPoints(points);
 
-    vtkSmartPointer<vtkGlyph3DMapper> pointsMapper =
-        vtkSmartPointer<vtkGlyph3DMapper>::New();
+    vtkSmartPointer<vtkGlyph3DMapper> pointsMapper = vtkSmartPointer<vtkGlyph3DMapper>::New();
     pointsMapper->SetInputData(pointsData);
     pointsMapper->SetSourceConnection(pointsSphere->GetOutputPort());
 
-    vtkSmartPointer<vtkActor> pointsActor =
-        vtkSmartPointer<vtkActor>::New();
+    vtkSmartPointer<vtkActor> pointsActor = vtkSmartPointer<vtkActor>::New();
     pointsActor->SetMapper(pointsMapper);
     pointsActor->GetProperty()->SetColor(1, 0, 0);
 
 #define LINE_LEN 10.
-    vtkSmartPointer<vtkAxesActor> axesActor =
-        vtkSmartPointer<vtkAxesActor>::New();
+    vtkSmartPointer<vtkAxesActor> axesActor = vtkSmartPointer<vtkAxesActor>::New();
     axesActor->SetPosition(0, 0, 0);
     axesActor->SetTotalLength(LINE_LEN, LINE_LEN, LINE_LEN);
     axesActor->SetShaftType(0);
     axesActor->SetAxisLabels(0);
     axesActor->SetCylinderRadius(0.02);
 
-    vtkSmartPointer<vtkRenderer> renderer =
-        vtkSmartPointer<vtkRenderer>::New();
-    vtkSmartPointer<vtkRenderWindow> renderWindow =
-        vtkSmartPointer<vtkRenderWindow>::New();
+    vtkSmartPointer<vtkRenderer> renderer         = vtkSmartPointer<vtkRenderer>::New();
+    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
     renderWindow->SetSize(600, 600);
     renderWindow->AddRenderer(renderer);
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor =
-        vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
     renderer->AddActor2D(textActor);
@@ -2123,47 +1948,48 @@ int main(int, char* [])
 
 namespace {
 
-    class MyRubberBand : public vtkInteractorStyleRubberBand3D
+class MyRubberBand : public vtkInteractorStyleRubberBand3D
+{
+public:
+    static MyRubberBand* New();
+    vtkTypeMacro(MyRubberBand, vtkInteractorStyleRubberBand3D);
+
+    void OnLeftButtonUp() override
     {
-    public:
-        static MyRubberBand* New();
-        vtkTypeMacro(MyRubberBand, vtkInteractorStyleRubberBand3D);
+        std::cout << "left button up\n";
+        // Superclass::OnLeftButtonUp();
+    }
 
-        void OnLeftButtonUp() override
-        {
-            std::cout << "left button up\n";
-            //Superclass::OnLeftButtonUp();
-        }
+    void OnLeftButtonDown() override
+    {
+        std::cout << "left button down\n";
+        Superclass::OnLeftButtonDown();
+    }
 
-        void OnLeftButtonDown() override
-        {
-            std::cout << "left button down\n";
-            Superclass::OnLeftButtonDown();
-        }
+    void OnLeftButtonDoubleClick() override
+    {
+        std::cout << "left button double click\n";
+        Superclass::OnLeftButtonDoubleClick();
+    }
 
-        void OnLeftButtonDoubleClick() override
-        {
-            std::cout << "left button double click\n";
-            Superclass::OnLeftButtonDoubleClick();
-        }
+    void OnMouseMove() override
+    {
+        Superclass::OnMouseMove();
+    }
 
-        void OnMouseMove() override
-        {
-            Superclass::OnMouseMove();
-        }
-        void OnChar() override
-        {
-            auto ret = this->Interactor->GetKeyCode();
-            std::cout << "press key: " << ret << '\n';
-            Superclass::OnChar();
-        }
-    };
+    void OnChar() override
+    {
+        auto ret = this->Interactor->GetKeyCode();
+        std::cout << "press key: " << ret << '\n';
+        Superclass::OnChar();
+    }
+};
 
-    vtkStandardNewMacro(MyRubberBand);
+vtkStandardNewMacro(MyRubberBand);
 
 } // namespace
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkNamedColors> colors;
 
@@ -2195,7 +2021,6 @@ int main(int, char* [])
     renderWindow->SetSize(800, 600);
     renderWindow->Render();
 
-
     vtkNew<MyRubberBand> style;
     renderWindowInteractor->SetInteractorStyle(style);
 
@@ -2207,11 +2032,11 @@ int main(int, char* [])
 
 #endif // TEST23
 
-
-
 #ifdef TEST25
 
 #include <vtkCamera.h>
+#include <vtkCellArray.h>
+#include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkProperty.h>
@@ -2221,81 +2046,90 @@ int main(int, char* [])
 #include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
 #include <vtkTriangleFilter.h>
-#include <vtkPolyData.h>
-#include <vtkPoints.h>
-#include <vtkCellArray.h>
 
 #include <array>
 #include <iostream>
 
 // 四条线段组成一个正方形
-namespace
-{
-    std::array<float, 16 * 3> vertices{
-        0,0,0,
-        0,1,0,
-        0,2,0,
-        0,3,0,
+namespace {
+std::array<float, 16 * 3> vertices {
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    2,
+    0,
+    0,
+    3,
+    0,
 
-        1,0,0,
-        1,1,0,
-        1,2,0,
-        1,3,0,
+    1,
+    0,
+    0,
+    1,
+    1,
+    0,
+    1,
+    2,
+    0,
+    1,
+    3,
+    0,
 
-        2,0,0,
-        2,1,0,
-        2,2,0,
-        2,3,0,
+    2,
+    0,
+    0,
+    2,
+    1,
+    0,
+    2,
+    2,
+    0,
+    2,
+    3,
+    0,
 
-        3,0,0,
-        3,1,0,
-        3,2,0,
-        3,3,0,
-    };
+    3,
+    0,
+    0,
+    3,
+    1,
+    0,
+    3,
+    2,
+    0,
+    3,
+    3,
+    0,
+};
 
-    std::array<long long, 9 * 4> indices1{
-        0,1,5,4,
-        1,2,6,5,
-        2,3,7,6,
+std::array<long long, 9 * 4> indices1 { 0, 1, 5, 4, 1, 2, 6, 5, 2, 3, 7, 6,
 
-        4,5,9,8,
-        5,6,10,9,
-        6,7,11,10,
+    4, 5, 9, 8, 5, 6, 10, 9, 6, 7, 11, 10,
 
-        8,9,13,12,
-        9,10,14,13,
-        10,11,15,14
-    };
+    8, 9, 13, 12, 9, 10, 14, 13, 10, 11, 15, 14 };
 
-    std::array<long long, 18 * 3> indices2{
-        0,1,5,
-        0,5,4,
+std::array<long long, 18 * 3> indices2 { 0, 1, 5, 0, 5, 4,
 
-        1,2,6,
-        1,6,5,
+    1, 2, 6, 1, 6, 5,
 
-        2,3,7,
-        2,7,6,
+    2, 3, 7, 2, 7, 6,
 
-        4,5,9,
-        4,9,8,
+    4, 5, 9, 4, 9, 8,
 
-        5,6,10,
-        5,10,9,
+    5, 6, 10, 5, 10, 9,
 
-        6,7,11,
-        6,11,10,
+    6, 7, 11, 6, 11, 10,
 
-        8,9,13,
-        8,13,12,
+    8, 9, 13, 8, 13, 12,
 
-        9,10,14,
-        9,14,13,
+    9, 10, 14, 9, 14, 13,
 
-        10,11,15,
-        10,15,14
-    };
-}
+    10, 11, 15, 10, 15, 14 };
+} // namespace
 
 vtkSmartPointer<vtkPolyData> GenPolyData(int type)
 {
@@ -2312,17 +2146,16 @@ vtkSmartPointer<vtkPolyData> GenPolyData(int type)
     {
         for (size_t i = 0; i < indices2.size(); i += 3)
         {
-            cells->InsertNextCell({ indices2[i],indices2[i + 1] ,indices2[i + 2] });
+            cells->InsertNextCell({ indices2[i], indices2[i + 1], indices2[i + 2] });
         }
     }
     else if (type == 4)
     {
         for (size_t i = 0; i < indices1.size(); i += 4)
         {
-            cells->InsertNextCell({ indices1[i],indices1[i + 1] ,indices1[i + 2],indices1[i + 3] });
+            cells->InsertNextCell({ indices1[i], indices1[i + 1], indices1[i + 2], indices1[i + 3] });
         }
     }
-
 
     polyData->SetPoints(points);
     polyData->SetPolys(cells);
@@ -2333,7 +2166,7 @@ vtkSmartPointer<vtkPolyData> GenPolyData(int type)
 int main()
 {
     auto trianglePoly = GenPolyData(3);
-    auto quad = GenPolyData(4);
+    auto quad         = GenPolyData(4);
 
     // 将多边形转为三角形
     vtkNew<vtkTriangleFilter> triangleFilter;
@@ -2345,7 +2178,7 @@ int main()
     // 输入必须是三角形，如果不是可以用vtkTriangleFilter进行三角化
     vtkNew<vtkQuadricDecimation> decimate;
     decimate->SetInputData(triangleFilter->GetOutput());
-    //decimate->SetInputData(trianglePoly);
+    // decimate->SetInputData(trianglePoly);
     decimate->AttributeErrorMetricOn();
     decimate->SetTargetReduction(.9);
     decimate->VolumePreservationOn();
@@ -2362,31 +2195,31 @@ int main()
     std::cout << "before number of polys: " << trianglePoly->GetNumberOfPolys() << '\n';
     std::cout << "before number of points: " << trianglePoly->GetNumberOfPoints() << '\n';
 
-    //mapper
+    // mapper
     vtkNew<vtkPolyDataMapper> cubeMapper;
     cubeMapper->SetInputData(decimated);
 
-    //actor
+    // actor
     vtkNew<vtkActor> cubeActor;
     cubeActor->SetMapper(cubeMapper);
     cubeActor->GetProperty()->SetColor(0, 1, 0);
     cubeActor->GetProperty()->SetRepresentationToWireframe();
 
-    //renderer
+    // renderer
     vtkNew<vtkRenderer> renderer;
     renderer->AddActor(cubeActor);
     renderer->ResetCamera();
 
-    //RenderWindow
+    // RenderWindow
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
     renWin->SetSize(600, 600);
 
-    //RenderWindowInteractor
+    // RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
 
-    //数据交互
+    // 数据交互
     renWin->Render();
     iren->Start();
 
@@ -2397,27 +2230,27 @@ int main()
 
 #ifdef TEST26
 
-#include <vtkSmartPointer.h>
-#include <vtkJPEGReader.h>
-#include <vtkTexture.h>
-#include <vtkCylinderSource.h>
-#include <vtkPolyDataMapper.h>
 #include <vtkActor.h>
-#include <vtkRenderer.h>
-#include <vtkLight.h>
 #include <vtkCamera.h>
+#include <vtkCylinderSource.h>
+#include <vtkJPEGReader.h>
+#include <vtkLight.h>
+#include <vtkPolyDataMapper.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkTexture.h>
 
 int main()
 {
     // 加载图片
-    //vtkSmartPointer<vtkBMPReader>bmpReader = vtkSmartPointer<vtkBMPReader>::New();
-    //bmpReader->SetFileName("test.bmp");
-    vtkSmartPointer<vtkJPEGReader>jpgReader = vtkSmartPointer<vtkJPEGReader>::New();
+    // vtkSmartPointer<vtkBMPReader>bmpReader = vtkSmartPointer<vtkBMPReader>::New();
+    // bmpReader->SetFileName("test.bmp");
+    vtkSmartPointer<vtkJPEGReader> jpgReader = vtkSmartPointer<vtkJPEGReader>::New();
     jpgReader->SetFileName("resource/test1.jpg");
     // 生成纹理
-    vtkSmartPointer<vtkTexture>texture = vtkSmartPointer<vtkTexture>::New();
+    vtkSmartPointer<vtkTexture> texture = vtkSmartPointer<vtkTexture>::New();
     texture->SetInputConnection(jpgReader->GetOutputPort());
     texture->InterpolateOn();
 
@@ -2439,13 +2272,13 @@ int main()
     cylinderActor->SetTexture(texture);
 
     // 设置图像颜色
-    //cylinderActor->GetProperty()->SetColor(1.0, 0.0, 0.0);
+    // cylinderActor->GetProperty()->SetColor(1.0, 0.0, 0.0);
 
     // render
     vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
     renderer->AddActor(cylinderActor);
     renderer->SetBackground(.1, .2, .3);
-    //renderer->SetBackground2(1, 0, 0);
+    // renderer->SetBackground2(1, 0, 0);
 
     // 光照
     vtkSmartPointer<vtkLight> myLight = vtkSmartPointer<vtkLight>::New();
@@ -2461,8 +2294,8 @@ int main()
     renderer->AddLight(myLight2);
 
     // 相机
-    vtkSmartPointer<vtkCamera>myCamera = vtkSmartPointer<vtkCamera>::New();
-    myCamera->SetClippingRange(0.0475, 2.3786); //前后裁剪平面
+    vtkSmartPointer<vtkCamera> myCamera = vtkSmartPointer<vtkCamera>::New();
+    myCamera->SetClippingRange(0.0475, 2.3786); // 前后裁剪平面
     myCamera->SetFocalPoint(0.0573, 0.2134, 0.0523);
     myCamera->SetPosition(0, 0, 5);
     myCamera->ComputeViewPlaneNormal();
@@ -2486,8 +2319,6 @@ int main()
 
 #endif // TEST26
 
-
-
 #ifdef TEST31
 
 #include <vtkActor.h>
@@ -2505,7 +2336,7 @@ int main()
 #include <vtkShaderProperty.h>
 #include <vtkTextProperty.h>
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkNamedColors> colors;
 
@@ -2532,39 +2363,39 @@ int main(int, char* [])
 
     vtkNew<vtkLegendScaleActor> legendScaleActor;
     // 位置可以通过继承vtkLegendScaleActor并重新实现BuildRepresentation方法并修改LabelActors的坐标来修改
-    //legendScaleActor->LegendVisibilityOff();  //主比例尺不显示
-    //legendScaleActor->VisibilityOff();        // 所有都不显示
-    //legendScaleActor->BottomAxisVisibilityOff();//下面的比例尺不显示
-    //legendScaleActor->LeftAxisVisibilityOff();  //左边比例尺不显示
-    //legendScaleActor->RightAxisVisibilityOff();
-    //legendScaleActor->TopAxisVisibilityOff();
+    // legendScaleActor->LegendVisibilityOff();  //主比例尺不显示
+    // legendScaleActor->VisibilityOff();        // 所有都不显示
+    // legendScaleActor->BottomAxisVisibilityOff();//下面的比例尺不显示
+    // legendScaleActor->LeftAxisVisibilityOff();  //左边比例尺不显示
+    // legendScaleActor->RightAxisVisibilityOff();
+    // legendScaleActor->TopAxisVisibilityOff();
 
-    //legendScaleActor->SetLabelMode(); //设置比例尺标签模式
-    //legendScaleActor->SetLabelModeToXYCoordinates();
-    //legendScaleActor->SetLabelModeToDistance();
+    // legendScaleActor->SetLabelMode(); //设置比例尺标签模式
+    // legendScaleActor->SetLabelModeToXYCoordinates();
+    // legendScaleActor->SetLabelModeToDistance();
 
-    //legendScaleActor->UseBoundsOff();
-    //legendScaleActor->SetAllocatedRenderTime();
-    //legendScaleActor->SetCornerOffsetFactor(0);//设置四个次比例尺相交距离
-    //legendScaleActor->SetTopBorderOffset(0); //设置上比例尺到窗口边缘的距离
-    //legendScaleActor->SetDragable(false);  //和拖动有关，默认为true
-    //legendScaleActor->SetEstimatedRenderTime();
-    //legendScaleActor->SetMemkindDirectory("sss");
-    //vtkNew<vtkShaderProperty> shaderProperty;
-    //legendScaleActor->SetShaderProperty(shaderProperty); //设置着色器属性
-    //legendScaleActor->SetRenderTimeMultiplier();
-    //legendScaleActor->SetPropertyKeys();
+    // legendScaleActor->UseBoundsOff();
+    // legendScaleActor->SetAllocatedRenderTime();
+    // legendScaleActor->SetCornerOffsetFactor(0);//设置四个次比例尺相交距离
+    // legendScaleActor->SetTopBorderOffset(0); //设置上比例尺到窗口边缘的距离
+    // legendScaleActor->SetDragable(false);  //和拖动有关，默认为true
+    // legendScaleActor->SetEstimatedRenderTime();
+    // legendScaleActor->SetMemkindDirectory("sss");
+    // vtkNew<vtkShaderProperty> shaderProperty;
+    // legendScaleActor->SetShaderProperty(shaderProperty); //设置着色器属性
+    // legendScaleActor->SetRenderTimeMultiplier();
+    // legendScaleActor->SetPropertyKeys();
 
-    //legendScaleActor->GetLegendLabelProperty()->SetColor(1, 0, 0); //标签文本属性
-    //legendScaleActor->GetLegendTitleProperty()->SetColor(0, 1, 0); //标题文本属性
-    //legendScaleActor->GetLegendTitleProperty()->SetFontSize(legendScaleActor->GetLegendLabelProperty()->GetFontSize() * 10);
-    //legendScaleActor->GetLegendLabelProperty()->SetFontSize(legendScaleActor->GetLegendLabelProperty()->GetFontSize() * 2);
-    //legendScaleActor->GetLegendTitleProperty()->SetLineOffset(100);
-    //legendScaleActor->GetLegendLabelProperty()->SetLineOffset(-250);
+    // legendScaleActor->GetLegendLabelProperty()->SetColor(1, 0, 0); //标签文本属性
+    // legendScaleActor->GetLegendTitleProperty()->SetColor(0, 1, 0); //标题文本属性
+    // legendScaleActor->GetLegendTitleProperty()->SetFontSize(legendScaleActor->GetLegendLabelProperty()->GetFontSize() * 10);
+    // legendScaleActor->GetLegendLabelProperty()->SetFontSize(legendScaleActor->GetLegendLabelProperty()->GetFontSize() * 2);
+    // legendScaleActor->GetLegendTitleProperty()->SetLineOffset(100);
+    // legendScaleActor->GetLegendLabelProperty()->SetLineOffset(-250);
 
-    //vtkNew<vtkPropCollection> propCollection;
-    //legendScaleActor->GetActors(propCollection);
-    //auto bound = legendScaleActor->GetBounds();
+    // vtkNew<vtkPropCollection> propCollection;
+    // legendScaleActor->GetActors(propCollection);
+    // auto bound = legendScaleActor->GetBounds();
 
     // Add the actor to the scene
     renderer->AddActor(actor);
@@ -2583,44 +2414,28 @@ int main(int, char* [])
 
 #ifdef TEST33
 
-#include <vtkSmartPointer.h>
-#include <vtkPoints.h>
-#include <vtkCellArray.h>
-#include <vtkPolyData.h>
-#include <vtkMaskPoints.h>
-#include <vtkMaskPolyData.h>
-#include <vtkMaskFields.h>
-#include <vtkMaskPointsFilter.h>
 #include <vtkAlgorithmOutput.h>
+#include <vtkCellArray.h>
+#include <vtkMaskFields.h>
+#include <vtkMaskPoints.h>
+#include <vtkMaskPointsFilter.h>
+#include <vtkMaskPolyData.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkSmartPointer.h>
 #include <vtkSphereSource.h>
 
 #include <array>
 
-namespace
-{
-    std::array<float, 8 * 3> vertices{
-        0,0,0,
-        1,0,0,
-        1,1,0,
-        0,1,0,
+namespace {
+std::array<float, 8 * 3> vertices { 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0,
 
-        0,2,0,
-        1,2,0,
-        1,3,0,
-        0,3,0
-    };
+    0, 2, 0, 1, 2, 0, 1, 3, 0, 0, 3, 0 };
 
-    std::array<long long, 7 * 2> indices{
-        0,1,
-        1,2,
-        2,3,
-        3,4,
+std::array<long long, 7 * 2> indices { 0, 1, 1, 2, 2, 3, 3, 4,
 
-        4,5,
-        5,6,
-        6,7
-    };
-}
+    4, 5, 5, 6, 6, 7 };
+} // namespace
 
 int main()
 {
@@ -2638,7 +2453,7 @@ int main()
 
         for (size_t i = 0; i < indices.size(); i += 2)
         {
-            lines->InsertNextCell({ indices[i],indices[i + 1] });
+            lines->InsertNextCell({ indices[i], indices[i + 1] });
         }
 
         for (size_t i = 0; i < 8; i++)
@@ -2648,9 +2463,8 @@ int main()
         }
 
         polyData->SetPoints(points);
-        //polyData->SetLines(lines);
+        // polyData->SetLines(lines);
         polyData->SetVerts(verts);
-
 
         std::cout << "num points:\t" << polyData->GetNumberOfPoints() << '\n';
         std::cout << "num cells:\t" << polyData->GetNumberOfCells() << '\n';
@@ -2718,12 +2532,11 @@ int main()
 
         for (size_t i = 0; i < indices.size(); i += 2)
         {
-            lines->InsertNextCell({ indices[i],indices[i + 1] });
+            lines->InsertNextCell({ indices[i], indices[i + 1] });
         }
 
         polyData->SetPoints(points);
         polyData->SetLines(lines);
-
 
         std::cout << "num points:\t" << polyData->GetNumberOfPoints() << '\n';
         std::cout << "num cells:\t" << polyData->GetNumberOfCells() << '\n';
@@ -2753,9 +2566,8 @@ int main()
         vtkNew<vtkPolyData> polyData;
         vtkNew<vtkMaskFields> maskArrays;
         maskArrays->SetInputData(polyData);
-        maskArrays->SetInputArrayToProcess(0, 0, 0,
-            vtkDataObject::FIELD_ASSOCIATION_POINTS, "Normals");
-        maskArrays->CopyFieldOff(1,"");
+        maskArrays->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "Normals");
+        maskArrays->CopyFieldOff(1, "");
         maskArrays->CopyAttributesOn();
         maskArrays->Update();
     }
@@ -2763,481 +2575,7 @@ int main()
     return 0;
 }
 
-
 #endif // TEST33
-
-#ifdef TEST34
-#include <vtkActor.h>
-#include <vtkCylinder.h>
-
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPointData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProbeFilter.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSampleFunction.h>
-#include <vtkSphere.h>
-#include <vtkUnsignedCharArray.h>
-#include <vtkVersion.h>
-
-// vtkFlyingEdges3D was introduced in VTK >= 8.2
-#if VTK_MAJOR_VERSION >= 9 || (VTK_MAJOR_VERSION >= 8 && VTK_MINOR_VERSION >= 2)
-#define USE_FLYING_EDGES
-#else
-#undef USE_FLYING_EDGES
-#endif
-
-#ifdef USE_FLYING_EDGES
-#include <vtkFlyingEdges3D.h>
-#else
-#include <vtkMarchingCubes.h>
-#endif
-
-int main(int argc, char* argv[])
-{
-    int resolution = 50;
-    if (argc > 1)
-    {
-        resolution = atoi(argv[1]);
-    }
-
-    vtkNew<vtkNamedColors> colors;
-
-    // Create a sampled sphere
-    vtkNew<vtkSphere> implicitSphere;
-    double radius = 1.0;
-    implicitSphere->SetRadius(radius);
-
-    vtkNew<vtkSampleFunction> sampledSphere;
-    sampledSphere->SetSampleDimensions(resolution, resolution, resolution);
-    double xMin = -radius * 2.0;
-    double xMax = radius * 2.0;
-    sampledSphere->SetModelBounds(xMin, xMax, xMin, xMax, xMin, xMax);
-    sampledSphere->SetImplicitFunction(implicitSphere);
-
-#ifdef USE_FLYING_EDGES
-    vtkNew<vtkFlyingEdges3D> isoSphere;
-#else
-    vtkNew<vtkMarchingCubes> isoSphere;
-#endif
-    isoSphere->SetValue(0, 2.0);
-    isoSphere->SetInputConnection(sampledSphere->GetOutputPort());
-
-    // Create a sampled cylinder
-    vtkNew<vtkCylinder> implicitCylinder;
-    implicitCylinder->SetRadius(radius / 2.0);
-    vtkNew<vtkSampleFunction> sampledCylinder;
-    sampledCylinder->SetSampleDimensions(resolution, resolution, resolution);
-    sampledCylinder->SetModelBounds(xMin, xMax, xMin, xMax, xMin, xMax);
-    sampledCylinder->SetImplicitFunction(implicitCylinder);
-
-    // Probe cylinder with the sphere isosurface
-    vtkNew<vtkProbeFilter> probeCylinder;
-    probeCylinder->SetInputConnection(0, isoSphere->GetOutputPort());
-    probeCylinder->SetInputConnection(1, sampledCylinder->GetOutputPort());
-    probeCylinder->Update();
-
-    // Restore the original normals
-    probeCylinder->GetOutput()->GetPointData()->SetNormals(
-        isoSphere->GetOutput()->GetPointData()->GetNormals());
-
-    std::cout << "Scalar range: "
-        << probeCylinder->GetOutput()->GetScalarRange()[0] << ", "
-        << probeCylinder->GetOutput()->GetScalarRange()[1] << std::endl;
-
-    // Create a mapper and actor
-    vtkNew<vtkPolyDataMapper> mapSphere;
-    mapSphere->SetInputConnection(probeCylinder->GetOutputPort());
-    mapSphere->SetScalarRange(probeCylinder->GetOutput()->GetScalarRange());
-
-    vtkNew<vtkActor> sphere;
-    sphere->SetMapper(mapSphere);
-
-    // Visualize
-    vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("IsosurfaceSampling");
-
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-
-    renderer->AddActor(sphere);
-    renderer->SetBackground(colors->GetColor3d("AliceBlue").GetData());
-
-    renderWindow->Render();
-    renderWindowInteractor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST34
-
-
-
-#ifdef TEST36
-
-#include <vtkActor.h>
-#include <vtkCamera.h>
-#include <vtkCellArray.h>
-#include <vtkDataSetMapper.h>
-#include <vtkDelaunay2D.h>
-#include <vtkDoubleArray.h>
-#include <vtkFloatArray.h>
-
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkLine.h>
-#include <vtkMinimalStandardRandomSequence.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPointData.h>
-#include <vtkPoints.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProbeFilter.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkTriangle.h>
-#include <vtkVertexGlyphFilter.h>
-#include <vtkWarpScalar.h>
-#include <vtkXMLPolyDataWriter.h>
-
-#include <iostream>
-
-namespace {
-
-    // Get the camera position.
-    void CameraModifiedCallback(vtkObject* caller,
-        long unsigned int vtkNotUsed(eventId),
-        void* vtkNotUsed(clientData),
-        void* vtkNotUsed(callData));
-} // namespace
-
-int main(int, char* [])
-{
-    vtkNew<vtkNamedColors> colors;
-
-    // Create a random set of 100 points in the xy-plane in (0,10)x(0,10).
-    // If you had instead started with a set of (x,y,z) points, you must copy
-    // the zvalues into a FloatArray and set it as the data set's scalars,
-    // and then set the z-coordinates to zero
-    vtkNew<vtkPoints> randomPoints;
-
-    vtkNew<vtkFloatArray> zvalues;
-    zvalues->SetName("ZValues");
-
-    unsigned int gridSize = 10;
-    float maxHeight = 1;
-    vtkNew<vtkMinimalStandardRandomSequence> randomSequence;
-    randomSequence->SetSeed(8775070);
-    for (unsigned int i = 0; i < 100; ++i)
-    {
-        double x, y, z;
-        // random position and radius
-        x = randomSequence->GetRangeValue(0, gridSize);
-        randomSequence->Next();
-        y = randomSequence->GetRangeValue(0, gridSize);
-        randomSequence->Next();
-        z = randomSequence->GetRangeValue(0, maxHeight);
-        randomSequence->Next();
-
-
-        // 两种不同的点集会产生不同的结果
-        // 因为这个点集是赋值给数据源，探测点还是 （x, y, 0）
-        // 当数据源的 Z 轴值为非零值时，探测的结果属性值都为0
-
-        // randomPoints->InsertNextPoint ( x, y, z);
-        randomPoints->InsertNextPoint(x, y, 0);
-        zvalues->InsertNextValue(z);
-    }
-
-    // Add the grid points to a polydata object
-    vtkNew<vtkPolyData> randomPolyData;
-    randomPolyData->SetPoints(randomPoints);
-    randomPolyData->GetPointData()->SetScalars(zvalues);
-
-    // Triangulate the grid points. If you do not have a mesh (points
-    // only), the output will not be interpolated!
-    vtkNew<vtkDelaunay2D> randomDelaunay;
-    randomDelaunay->SetInputData(randomPolyData);
-    randomDelaunay->Update();
-
-    // Create a grid of points to interpolate over
-    vtkNew<vtkPoints> gridPoints;
-    for (unsigned int x = 0; x < gridSize; x++)
-    {
-        for (unsigned int y = 0; y < gridSize; y++)
-        {
-            gridPoints->InsertNextPoint(2 * x, 2 * y, 0);
-        }
-    }
-
-    // Create a dataset from the grid points
-    vtkNew<vtkPolyData> gridPolyData;
-    gridPolyData->SetPoints(gridPoints);
-
-    // Perform the interpolation
-    vtkNew<vtkProbeFilter> probeFilter;
-    probeFilter->SetSourceConnection(randomDelaunay->GetOutputPort());
-    probeFilter->SetInputData(
-        gridPolyData); //
-    // Interpolate 'Source' at these points
-    probeFilter->Update();
-
-    // Map the output zvalues to the z-coordinates of the data so that
-    // we get a surface, rather than a flat grid with interpolated
-    // scalars.
-    vtkNew<vtkWarpScalar> gridWarpScalar;
-    gridWarpScalar->SetInputConnection(probeFilter->GetOutputPort());
-    gridWarpScalar->Update();
-
-    //////// Setup outputs ////////
-    // Output random points
-    // Map the output zvalues to the z-coordinates of the data
-    vtkNew<vtkWarpScalar> randomWarpScalar;
-    randomWarpScalar->SetInputConnection(randomDelaunay->GetOutputPort());
-    randomWarpScalar->Update();
-
-    // Mesh the output grid points
-    vtkNew<vtkDelaunay2D> gridDelaunay;
-    gridDelaunay->SetInputConnection(gridWarpScalar->GetOutputPort());
-
-    ////////// Setup visualization ////////
-    vtkNew<vtkDataSetMapper> randomMapper;
-    randomMapper->SetInputConnection(randomWarpScalar->GetOutputPort());
-    //randomMapper->ScalarVisibilityOff();
-
-    vtkNew<vtkActor> randomActor;
-    randomActor->SetMapper(randomMapper);
-    randomActor->GetProperty()->SetColor(colors->GetColor3d("Salmon").GetData());
-    randomActor->GetProperty()->SetPointSize(3);
-
-    vtkNew<vtkDataSetMapper> gridMapper;
-    gridMapper->SetInputConnection(gridDelaunay->GetOutputPort());
-    //gridMapper->ScalarVisibilityOff();
-
-    vtkNew<vtkActor> gridActor;
-    gridActor->SetMapper(gridMapper);
-    gridActor->GetProperty()->SetColor(colors->GetColor3d("SteelBlue").GetData());
-    gridActor->GetProperty()->SetPointSize(3);
-
-    vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("InterpolateMeshOnGrid");
-
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-
-    vtkNew<vtkInteractorStyleTrackballCamera> style;
-    renderWindowInteractor->SetInteractorStyle(style);
-
-    renderer->AddActor(randomActor);
-    //renderer->AddActor(gridActor);
-    renderer->SetBackground(colors->GetColor3d("SlateGray").GetData());
-
-
-    renderWindow->Render();
-    renderWindowInteractor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-
-#endif // TEST36
-
-#ifdef TEST37
-
-#include <vtkActor.h>
-#include <vtkCamera.h>
-#include <vtkCellArray.h>
-#include <vtkDataSetMapper.h>
-
-#include <vtkImageReader2.h>
-#include <vtkImageReader2Factory.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPoints.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataReader.h>
-#include <vtkProbeFilter.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSmartPointer.h>
-#include <vtkSplineFilter.h>
-#include <vtkWindowLevelLookupTable.h>
-
-#include <sstream>
-
-namespace {
-    vtkSmartPointer<vtkPolyData> SweepLine(vtkPolyData* line, double direction[3],
-        double distance, unsigned int cols);
-}
-
-int main(int argc, char* argv[])
-{
-    vtkNew<vtkNamedColors> colors;
-
-    // Verify arguments
-    if (argc < 4)
-    {
-        std::cout << "Usage: " << argv[0] << " InputVolume PolyDataInput"
-            << " Resolution" << std::endl;
-        std::cout << "e.g. HeadMRVolume.mhd polyline.vtk 200" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    // Parse arguments
-    std::string volumeFileName = argv[1];
-    std::string polyDataFileName = argv[2];
-    std::stringstream ssResolution;
-    ssResolution << argv[3];
-    unsigned int resolution;
-    ssResolution >> resolution;
-
-    // Output arguments
-    std::cout << "InputVolume: " << volumeFileName << std::endl
-        << "PolyDataInput: " << polyDataFileName << std::endl
-        << "Resolution: " << resolution << std::endl;
-
-    // Read the volume data
-    vtkNew<vtkImageReader2Factory> imageFactory;
-    vtkSmartPointer<vtkImageReader2> imageReader;
-    imageReader.TakeReference(
-        imageFactory->CreateImageReader2(volumeFileName.c_str()));
-    imageReader->SetFileName(volumeFileName.c_str());
-    imageReader->Update();
-
-    // Read the Polyline
-    vtkNew<vtkPolyDataReader> polyLineReader;
-    polyLineReader->SetFileName(polyDataFileName.c_str());
-    polyLineReader->Update();
-
-    vtkNew<vtkSplineFilter> spline;
-    spline->SetInputConnection(polyLineReader->GetOutputPort());
-    spline->SetSubdivideToSpecified();
-    spline->SetNumberOfSubdivisions(resolution);
-
-    // Sweep the line to form a surface
-    double direction[3];
-    direction[0] = 0.0;
-    direction[1] = 0.0;
-    direction[2] = 1.0;
-    double distance = 164;
-    spline->Update();
-    auto surface =
-        SweepLine(spline->GetOutput(), direction, distance, atoi(argv[3]));
-
-    // Probe the volume with the extruded surface
-    vtkNew<vtkProbeFilter> sampleVolume;
-    sampleVolume->SetInputConnection(1, imageReader->GetOutputPort());
-    sampleVolume->SetInputData(0, surface);
-
-    // Compute a simple window/level based on scalar range
-    vtkNew<vtkWindowLevelLookupTable> wlLut;
-    double range = imageReader->GetOutput()->GetScalarRange()[1] - imageReader->GetOutput()->GetScalarRange()[0];
-    double level = (imageReader->GetOutput()->GetScalarRange()[1] + imageReader->GetOutput()->GetScalarRange()[0]) / 2.0;
-    wlLut->SetWindow(range);
-    wlLut->SetLevel(level);
-
-    // Create a mapper and actor.
-    vtkNew<vtkDataSetMapper> mapper;
-    mapper->SetInputConnection(sampleVolume->GetOutputPort());
-    mapper->SetLookupTable(wlLut);
-    mapper->SetScalarRange(0, 255);
-
-    vtkNew<vtkActor> actor;
-    actor->SetMapper(mapper);
-
-    // Create a renderer, render window, and interactor
-    vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("CurvedReformation");
-
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-
-    // Add the actors to the scene
-    renderer->AddActor(actor);
-    renderer->SetBackground(colors->GetColor3d("DarkSlateGray").GetData());
-
-    // Set the camera for viewing medical images
-    renderer->GetActiveCamera()->SetViewUp(0, 0, 1);
-    renderer->GetActiveCamera()->SetPosition(0, 0, 0);
-    renderer->GetActiveCamera()->SetFocalPoint(0, 1, 0);
-    renderer->ResetCamera();
-
-    // Render and interact
-    renderWindow->Render();
-    renderWindowInteractor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-namespace {
-
-    vtkSmartPointer<vtkPolyData> SweepLine(vtkPolyData* line, double direction[3],
-        double distance, unsigned int cols)
-    {
-        unsigned int rows = line->GetNumberOfPoints();
-        double spacing = distance / cols;
-        vtkNew<vtkPolyData> surface;
-
-        // Generate the points
-        cols++;
-        unsigned int numberOfPoints = rows * cols;
-        unsigned int numberOfPolys = (rows - 1) * (cols - 1);
-        vtkNew<vtkPoints> points;
-        points->Allocate(numberOfPoints);
-        vtkNew<vtkCellArray> polys;
-        polys->Allocate(numberOfPolys * 4);
-
-        double x[3];
-        unsigned int cnt = 0;
-        for (unsigned int row = 0; row < rows; row++)
-        {
-            for (unsigned int col = 0; col < cols; col++)
-            {
-                double p[3];
-                line->GetPoint(row, p);
-                x[0] = p[0] + direction[0] * col * spacing;
-                x[1] = p[1] + direction[1] * col * spacing;
-                x[2] = p[2] + direction[2] * col * spacing;
-                points->InsertPoint(cnt++, x);
-            }
-        }
-        // Generate the quads
-        vtkIdType pts[4];
-        for (unsigned int row = 0; row < rows - 1; row++)
-        {
-            for (unsigned int col = 0; col < cols - 1; col++)
-            {
-                pts[0] = col + row * (cols);
-                pts[1] = pts[0] + 1;
-                pts[2] = pts[0] + cols + 1;
-                pts[3] = pts[0] + cols;
-                polys->InsertNextCell(4, pts);
-            }
-        }
-        surface->SetPoints(points);
-        surface->SetPolys(polys);
-
-        return surface;
-    }
-} // namespace
-
-
-
-#endif // TEST37
 
 #ifdef TEST38
 
@@ -3255,7 +2593,7 @@ namespace {
 #include <vtkRenderer.h>
 #include <vtkTable.h>
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkNamedColors> colors;
 
@@ -3276,7 +2614,7 @@ int main(int, char* [])
 
     // Fill in the table with some example values.
     int numPoints = 69;
-    float inc = 7.5 / (numPoints - 1);
+    float inc     = 7.5 / (numPoints - 1);
     table->SetNumberOfRows(numPoints);
     for (int i = 0; i < numPoints; ++i)
     {
@@ -3322,121 +2660,6 @@ int main(int, char* [])
 
 #endif // TEST38
 
-#ifdef TEST39
-
-#include <vtkActor.h>
-#include <vtkFloatArray.h>
-#include <vtkLookupTable.h>
-#include <vtkPointData.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkSmartPointer.h>
-#include <vtkSTLReader.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkCellData.h>
-#include <vtkProperty.h>
-#include <vtkTextProperty.h>
-#include <vtkProbeFilter.h>
-#include <vtkSplineFilter.h>
-#include <vtkPolyLine.h>
-#include <vtkDelaunay2D.h>
-
-//probeFilter->SetInputConnection(1, );
-//probeFilter->SetInputData(0, poly); //需要探测的数据
-    //https://blog.csdn.net/Jane_yuhui/article/details/83991316
-//probeFilter->SetSourceData(source); //源数据，需要探测的数据
-//probeFilter->SetInputConnection()   //重采样（点集）
-
-int main(int, char* [])
-{
-    // 顶点
-    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
-    for (size_t i = 0; i < 10; i++)
-    {
-        points->InsertNextPoint(i, 0, 0);
-        points->InsertNextPoint(i + 1, 1, 0);
-        points->InsertNextPoint(i, 2, 0);
-        points->InsertNextPoint(i + 1, 3, 0);
-    }
-
-    //// 拓扑
-    vtkSmartPointer<vtkCellArray> cell_poly = vtkSmartPointer<vtkCellArray>::New();
-    for (long long i = 0; i < 33; i += 4)
-    {
-        cell_poly->InsertNextCell({ i,i + 1,i + 5,i + 4 });
-        cell_poly->InsertNextCell({ i + 1,i + 2,i + 6,i + 5 });
-        cell_poly->InsertNextCell({ i + 2,i + 3,i + 7,i + 6 });
-    }
-
-    // 流场参数
-    vtkSmartPointer<vtkFloatArray> scalars = vtkSmartPointer<vtkFloatArray>::New();        // 创建存储顶点属性的float数组
-    scalars->SetNumberOfValues(27);
-    for (int i = 0; i < 27; i++)        // 为属性数组中的每个元素设置标量值（这个标量值可以当作颜色值）
-    {
-        scalars->SetValue(i, i);
-    }
-
-
-    vtkSmartPointer<vtkPolyData> poly1 = vtkSmartPointer<vtkPolyData>::New();
-    poly1->SetPoints(points);
-    poly1->SetPolys(cell_poly);
-
-    auto num = poly1->GetNumberOfCells();
-    poly1->GetCellData()->SetScalars(scalars);
-
-
-    //vtkNew<vtkProbeFilter> probeFilter;
-    //probeFilter->SetInputData(0, poly);
-    //probeFilter->SetInputConnection(1, filter->GetOutputPort());
-
-    // 创建颜色查找表
-    vtkSmartPointer<vtkLookupTable> hueLut = vtkSmartPointer<vtkLookupTable>::New();
-    hueLut->SetHueRange(0.67, 0.0);            // 设定HSV颜色范围，色调H取值范围为0°～360°，从红色开始按逆时针方向计算，红色为0°/0.0，绿色为120°/0.34,蓝色为240°/0.67
-    hueLut->Build();
-
-
-    vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    mapper->SetInputData(poly1);
-    mapper->SetScalarRange(0, 26);            // 设置标量值的范围
-    mapper->SetLookupTable(hueLut);
-
-    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-    actor->SetMapper(mapper);
-
-    vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
-
-    renderer->SetBackground(.1, .2, .3);
-
-    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
-    renderWindow->AddRenderer(renderer);
-
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-    vtkSmartPointer<vtkInteractorStyleTrackballCamera> style = vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
-    renderWindowInteractor->SetInteractorStyle(style);
-
-    renderer->AddActor(actor);
-
-    auto ret = actor->GetMapper()->GetInput()->GetNumberOfCells();
-
-    renderWindow->SetSize(600, 600);
-    renderWindow->Render();
-    renderWindowInteractor->Start();
-
-    return 0;
-}
-
-#endif // TEST39
-
-
-
-
-
-
-
 #ifdef TEST43
 
 //
@@ -3459,7 +2682,7 @@ int main(int, char* [])
 // additionally needed vtk header for this example
 #include <vtkAlgorithmOutput.h>
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkNamedColors> colors;
 
@@ -3472,8 +2695,7 @@ int main(int, char* [])
     // actor
     vtkNew<vtkActor> sphereActor;
     sphereActor->SetMapper(sphereMapper);
-    sphereActor->GetProperty()->SetColor(
-        colors->GetColor3d("MistyRose").GetData());
+    sphereActor->GetProperty()->SetColor(colors->GetColor3d("MistyRose").GetData());
 
     // renderer
     vtkNew<vtkRenderer> ren1;
@@ -3504,16 +2726,14 @@ int main(int, char* [])
     //
     // next two lines are the core lines for reverse access
     //
-    vtkSmartPointer<vtkAlgorithm> algorithm =
-        sphereActor->GetMapper()->GetInputConnection(0, 0)->GetProducer();
-    auto srcReference = dynamic_cast<vtkSphereSource*>(algorithm.GetPointer());
+    vtkSmartPointer<vtkAlgorithm> algorithm = sphereActor->GetMapper()->GetInputConnection(0, 0)->GetProducer();
+    auto srcReference                       = dynamic_cast<vtkSphereSource*>(algorithm.GetPointer());
 
     float origRadius = srcReference->GetRadius();
     for (int i = 0; i < 360; ++i)
     {
         // change radius of the spheresource
-        srcReference->SetRadius(origRadius *
-            (1 + sin((float)i / 180.0 * vtkMath::Pi())));
+        srcReference->SetRadius(origRadius * (1 + sin((float)i / 180.0 * vtkMath::Pi())));
         // change x-position of the actor
         sphereActor->SetPosition(sin((float)i / 45.0 * vtkMath::Pi()) * 0.5, 0, 0);
         renWin->Render();
@@ -3556,15 +2776,13 @@ int main(int, char* [])
 #include <vector>
 
 namespace {
-    // void RandomPointInBounds(vtkPolyData* polydata, double p[3]);
-    void RandomPointInBounds(vtkPolyData* polydata, double p[3],
-        vtkMinimalStandardRandomSequence* rng);
+// void RandomPointInBounds(vtkPolyData* polydata, double p[3]);
+void RandomPointInBounds(vtkPolyData* polydata, double p[3], vtkMinimalStandardRandomSequence* rng);
 
-    double TimeOctree(vtkPolyData* polydata, int maxPoints, int numberOfTrials,
-        vtkMinimalStandardRandomSequence* rng);
+double TimeOctree(vtkPolyData* polydata, int maxPoints, int numberOfTrials, vtkMinimalStandardRandomSequence* rng);
 } // namespace
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkNamedColors> colors;
 
@@ -3605,8 +2823,7 @@ int main(int, char* [])
     {
         table->SetValue(static_cast<vtkIdType>(i), 0, results[i].first);
         table->SetValue(static_cast<vtkIdType>(i), 1, results[i].second);
-        std::cout << "Put " << results[i].first << " " << results[i].second
-            << " in the table." << std::endl;
+        std::cout << "Put " << results[i].first << " " << results[i].second << " in the table." << std::endl;
     }
 
     // Set up the view
@@ -3635,82 +2852,77 @@ int main(int, char* [])
 }
 
 namespace {
-    void RandomPointInBounds(vtkPolyData* polydata, double p[3],
-        vtkMinimalStandardRandomSequence* rng)
-    {
-        double bounds[6];
-        polydata->GetBounds(bounds);
+void RandomPointInBounds(vtkPolyData* polydata, double p[3], vtkMinimalStandardRandomSequence* rng)
+{
+    double bounds[6];
+    polydata->GetBounds(bounds);
 
-        for (auto i = 0; i < 3; ++i)
-        {
-            p[i] = bounds[i * 2] +
-                (bounds[i * 2 + 1] - bounds[i * 2]) * rng->GetRangeValue(0.0, 1.0);
-            rng->Next();
-        }
+    for (auto i = 0; i < 3; ++i)
+    {
+        p[i] = bounds[i * 2] + (bounds[i * 2 + 1] - bounds[i * 2]) * rng->GetRangeValue(0.0, 1.0);
+        rng->Next();
+    }
+}
+
+double TimeOctree(vtkPolyData* polydata, int maxPoints, int numberOfTrials, vtkMinimalStandardRandomSequence* rng)
+{
+    vtkNew<vtkTimerLog> timer;
+    timer->StartTimer();
+
+    // Create the tree
+    vtkNew<vtkOctreePointLocator> octree;
+    octree->SetDataSet(polydata);
+    octree->SetMaximumPointsPerRegion(maxPoints);
+    octree->BuildLocator();
+
+    std::cout << "With maxPoints = " << maxPoints << " there are " << octree->GetNumberOfLeafNodes() << " leaf nodes." << std::endl;
+
+    for (int i = 0; i < numberOfTrials; i++)
+    {
+        double p[3];
+        RandomPointInBounds(polydata, p, rng);
+        // vtkIdType iD = octree->FindClosestPoint(p);
+        octree->FindClosestPoint(p);
     }
 
-    double TimeOctree(vtkPolyData* polydata, int maxPoints, int numberOfTrials,
-        vtkMinimalStandardRandomSequence* rng)
-    {
-        vtkNew<vtkTimerLog> timer;
-        timer->StartTimer();
+    timer->StopTimer();
 
-        // Create the tree
-        vtkNew<vtkOctreePointLocator> octree;
-        octree->SetDataSet(polydata);
-        octree->SetMaximumPointsPerRegion(maxPoints);
-        octree->BuildLocator();
+    std::cout << "Octree took " << timer->GetElapsedTime() << std::endl;
 
-        std::cout << "With maxPoints = " << maxPoints << " there are "
-            << octree->GetNumberOfLeafNodes() << " leaf nodes." << std::endl;
-
-        for (int i = 0; i < numberOfTrials; i++)
-        {
-            double p[3];
-            RandomPointInBounds(polydata, p, rng);
-            // vtkIdType iD = octree->FindClosestPoint(p);
-            octree->FindClosestPoint(p);
-        }
-
-        timer->StopTimer();
-
-        std::cout << "Octree took " << timer->GetElapsedTime() << std::endl;
-
-        return timer->GetElapsedTime();
-    }
+    return timer->GetElapsedTime();
+}
 
 } // namespace
-
 
 #endif // TEST44
 
 #ifdef TEST45
 
 #include <vtkActor.h>
+#include <vtkAlgorithmOutput.h>
+#include <vtkCellData.h>
+#include <vtkDataSet.h>
+#include <vtkDataSetMapper.h>
 #include <vtkFloatArray.h>
+#include <vtkGlyph3D.h>
+#include <vtkImageMapToColors.h>
+#include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkLookupTable.h>
+#include <vtkNamedColors.h>
 #include <vtkPointData.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
-#include <vtkRenderer.h>
+#include <vtkProperty.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
-#include <vtkSmartPointer.h>
+#include <vtkRenderer.h>
 #include <vtkSTLReader.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkCellData.h>
-#include <vtkProperty.h>
+#include <vtkSmartPointer.h>
 #include <vtkTextProperty.h>
-#include <vtkImageMapToColors.h>
-#include <vtkNamedColors.h>
-#include <vtkDataSetMapper.h>
-#include <vtkDataSet.h>
-#include <vtkAlgorithmOutput.h>
-#include <vtkGlyph3D.h>
 
 #define Two
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkNamedColors> colors;
 
@@ -3723,7 +2935,7 @@ int main(int, char* [])
     vtkSmartPointer<vtkCellArray> cell_line = vtkSmartPointer<vtkCellArray>::New();
     for (long long i = 0; i < 9; ++i)
     {
-        cell_line->InsertNextCell({ i,i + 1 });
+        cell_line->InsertNextCell({ i, i + 1 });
     }
 
     vtkSmartPointer<vtkFloatArray> scalars = vtkSmartPointer<vtkFloatArray>::New();
@@ -3739,13 +2951,14 @@ int main(int, char* [])
 
     // 创建颜色查找表
     vtkSmartPointer<vtkLookupTable> hueLut = vtkSmartPointer<vtkLookupTable>::New();
-    hueLut->SetHueRange(0.67, 0.0);            // 设定HSV颜色范围，色调H取值范围为0°～360°，从红色开始按逆时针方向计算，红色为0°/0.0，绿色为120°/0.34,蓝色为240°/0.67
+    hueLut->SetHueRange(
+        0.67, 0.0); // 设定HSV颜色范围，色调H取值范围为0°～360°，从红色开始按逆时针方向计算，红色为0°/0.0，绿色为120°/0.34,蓝色为240°/0.67
     hueLut->SetRampToSQRT();
     hueLut->Build();
 
     vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
     mapper->SetInputData(poly);
-    mapper->SetScalarRange(0, 9);            // 设置标量值的范围
+    mapper->SetScalarRange(0, 9); // 设置标量值的范围
     mapper->SetLookupTable(hueLut);
 
     vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
@@ -3759,8 +2972,8 @@ int main(int, char* [])
 
 #ifdef Two
 
-    //左右两个窗口用来对比
-    double leftViewport[4] = { 0.0, 0.0, 0.5, 1.0 };
+    // 左右两个窗口用来对比
+    double leftViewport[4]  = { 0.0, 0.0, 0.5, 1.0 };
     double rightViewport[4] = { 0.5, 0.0, 1.0, 1.0 };
 
     // Setup both renderers
@@ -3783,16 +2996,16 @@ int main(int, char* [])
     }
 
     auto poly1 = actor->GetMapper()->GetInput();
-    //vtkSmartPointer<vtkDataSet> poly2 = vtkSmartPointer<vtkDataSet>::New();
+    // vtkSmartPointer<vtkDataSet> poly2 = vtkSmartPointer<vtkDataSet>::New();
     vtkSmartPointer<vtkPolyData> poly2 = vtkSmartPointer<vtkPolyData>::New();
     poly2->DeepCopy(poly1);
 
     poly2->GetPointData()->SetScalars(scalars2);
 
-    //vtkSmartPointer<vtkDataSetMapper> mapper2 = vtkSmartPointer<vtkDataSetMapper>::New();
+    // vtkSmartPointer<vtkDataSetMapper> mapper2 = vtkSmartPointer<vtkDataSetMapper>::New();
     vtkSmartPointer<vtkPolyDataMapper> mapper2 = vtkSmartPointer<vtkPolyDataMapper>::New();
     mapper2->SetInputData(poly2);
-    mapper2->SetScalarRange(0, 9);            // 设置标量值的范围
+    mapper2->SetScalarRange(0, 9); // 设置标量值的范围
     mapper2->SetLookupTable(hueLut);
 
     vtkSmartPointer<vtkActor> actor2 = vtkSmartPointer<vtkActor>::New();
@@ -3804,8 +3017,8 @@ int main(int, char* [])
     renderer->AddActor(actor);
 #endif
 
-    //vtkSmartPointer<vtkAlgorithm> algorithm = actor->GetMapper()->GetInputConnection(0, 0)->GetProducer();
-    //auto p = dynamic_cast<vtkGlyph3D*>(algorithm.GetPointer());
+    // vtkSmartPointer<vtkAlgorithm> algorithm = actor->GetMapper()->GetInputConnection(0, 0)->GetProducer();
+    // auto p = dynamic_cast<vtkGlyph3D*>(algorithm.GetPointer());
 
     vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
     renderWindowInteractor->SetRenderWindow(renderWindow);
@@ -3821,19 +3034,19 @@ int main(int, char* [])
 
 #ifdef TEST46
 
-#include <vtkSmartPointer.h>
-#include <vtkSphereSource.h>
+#include <vtkActor.h>
 #include <vtkCellLocator.h>
+#include <vtkCoordinate.h>
 #include <vtkGenericCell.h>
 #include <vtkPolyDataMapper.h>
-#include <vtkActor.h>
-#include <vtkRenderer.h>
+#include <vtkProperty.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
-#include <vtkProperty.h>
-#include <vtkCoordinate.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
 
-int main(int, char* [])
+int main(int, char*[])
 {
     auto sphereSource = vtkSmartPointer<vtkSphereSource>::New();
     sphereSource->Update();
@@ -3845,11 +3058,11 @@ int main(int, char* [])
 
     double testPoint[3] = { 0.6, 0.5, 0.0 };
 
-    //Find the closest points to TestPoint
+    // Find the closest points to TestPoint
     auto assistCell = vtkSmartPointer<vtkGenericCell>::New();
-    double closestPoint[3];//the coordinates of the closest point will be returned here
-    double closestPointDist2; //the squared distance to the closest point will be returned here
-    vtkIdType cellId; //the cell id of the cell containing the closest point will be returned here
+    double closestPoint[3];   // the coordinates of the closest point will be returned here
+    double closestPointDist2; // the squared distance to the closest point will be returned here
+    vtkIdType cellId;         // the cell id of the cell containing the closest point will be returned here
     int subId;
     cellLocator->FindClosestPoint(testPoint, closestPoint, assistCell, cellId, subId, closestPointDist2);
 
@@ -3903,52 +3116,48 @@ int main(int, char* [])
     return EXIT_SUCCESS;
 }
 
-
 #endif // TEST46
-
-
 
 #ifdef TEST51
 
+#include <vtkActor.h>
+#include <vtkNamedColors.h>
 #include <vtkPlaneSource.h>
 #include <vtkPolyData.h>
-#include <vtkSmartPointer.h>
 #include <vtkPolyDataMapper.h>
-#include <vtkActor.h>
 #include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
 #include <vtkRenderWindowInteractor.h>
-#include <vtkNamedColors.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
 
 #include <array>
 #include <vtkProperty.h>
 
-#include "vtkSmartPointer.h"
 #include "vtkLineSource.h"
-#include "vtkRendererCollection.h"
 #include "vtkRenderer.h"
+#include "vtkRendererCollection.h"
+#include "vtkSmartPointer.h"
 
 #include "vtkInteractorStyleRubberBand2D.h"
 
-#include <vtkSmartPointer.h>
-#include <vtkRectilinearWipeWidget.h>
-#include <vtkRectilinearWipeRepresentation.h>
-#include <vtkJPEGReader.h>
-#include <vtkImageRectilinearWipe.h>
 #include <vtkImageActor.h>
 #include <vtkImageMapper3D.h>
+#include <vtkImageRectilinearWipe.h>
+#include <vtkJPEGReader.h>
+#include <vtkRectilinearWipeRepresentation.h>
+#include <vtkRectilinearWipeWidget.h>
+#include <vtkSmartPointer.h>
 
-#include <vtkRenderer.h>
+#include <vtkBMPReader.h>
+#include <vtkCommand.h>
+#include <vtkInteractorStyleImage.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkObjectFactory.h>
+#include <vtkProperty2D.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
-#include <vtkProperty2D.h>
-#include <vtkCommand.h>
-#include <vtkObjectFactory.h>
-#include <vtkInteractorStyleImage.h>
+#include <vtkRenderer.h>
 #include <vtkResliceImageViewer.h>
-#include <vtkBMPReader.h>
-#include <vtkInteractorStyleRubberBand3D.h>
-
 
 class MyRubberBand : public vtkInteractorStyleRubberBand3D
 {
@@ -3958,24 +3167,25 @@ public:
 
     virtual void OnLeftButtonDown()
     {
-        vtkInteractorStyleRubberBand3D::OnLeftButtonDown(); //必须有这一句
-        //if (mExistActor)
+        vtkInteractorStyleRubberBand3D::OnLeftButtonDown(); // 必须有这一句
+        // if (mExistActor)
         //{
-        //    return;
-        //}
+        //     return;
+        // }
         startPosition[0] = this->GetInteractor()->GetEventPosition()[0];
         startPosition[1] = this->GetInteractor()->GetEventPosition()[1];
         startPosition[2] = 0;
 
         std::cout << "startPosition: " << startPosition[0] << "  " << startPosition[1] << std::endl;
     }
+
     virtual void OnLeftButtonUp()
     {
-        vtkInteractorStyleRubberBand3D::OnLeftButtonUp(); //必须有这一句
+        vtkInteractorStyleRubberBand3D::OnLeftButtonUp(); // 必须有这一句
 
-        //if (mExistActor)
+        // if (mExistActor)
         //{
-            //return;
+        // return;
         //}
 
         endPosition[0] = this->GetInteractor()->GetEventPosition()[0];
@@ -3990,14 +3200,12 @@ public:
         double start[4];
         this->viewer->GetRenderer()->GetWorldPoint(start);
 
-
         this->viewer->GetRenderer()->SetDisplayPoint(endPosition);
         this->viewer->GetRenderer()->DisplayToView();
         this->viewer->GetRenderer()->ViewToWorld();
 
         double end[4];
         this->viewer->GetRenderer()->GetWorldPoint(end);
-
 
         double point1[3];
         double point2[3];
@@ -4013,17 +3221,25 @@ public:
         right[0] = start[0] > end[0] ? start[0] : end[0];
         right[1] = start[1] > end[1] ? start[1] : end[1];
 
-        point1[0] = left[0];  point1[1] = left[1];  point1[2] = 0;
-        point2[0] = left[0];  point2[1] = right[1]; point2[2] = 0;
-        point3[0] = right[0]; point3[1] = right[1]; point3[2] = 0;
-        point4[0] = right[0]; point4[1] = left[1];  point4[2] = 0;
+        point1[0] = left[0];
+        point1[1] = left[1];
+        point1[2] = 0;
+        point2[0] = left[0];
+        point2[1] = right[1];
+        point2[2] = 0;
+        point3[0] = right[0];
+        point3[1] = right[1];
+        point3[2] = 0;
+        point4[0] = right[0];
+        point4[1] = left[1];
+        point4[2] = 0;
 
         this->SetLine(point1, point2);
         this->SetLine(point2, point3);
         this->SetLine(point3, point4);
         this->SetLine(point4, point1);
-
     }
+
     void SetLine(double point1[], double point2[])
     {
         vtkSmartPointer<vtkLineSource> lineSource = vtkSmartPointer<vtkLineSource>::New();
@@ -4041,54 +3257,50 @@ public:
         this->viewer->GetRenderer()->AddActor2D(actor);
         this->viewer->Render();
         mExistActor = true;
-
-
     }
-    vtkSmartPointer<vtkImageViewer2>  viewer;
-    //vtkSmartPointer<vtkResliceImageViewer>  viewer;
+
+    vtkSmartPointer<vtkImageViewer2> viewer;
+
+    // vtkSmartPointer<vtkResliceImageViewer>  viewer;
     void SetRender(vtkImageViewer2* render)
     {
         viewer = render;
     }
+
 protected:
     MyRubberBand()
     {
-        //viewer = vtkSmartPointer<vtkImageViewer2>::New();
-        //viewer->SetupInteractor(this->GetInteractor());
+        // viewer = vtkSmartPointer<vtkImageViewer2>::New();
+        // viewer->SetupInteractor(this->GetInteractor());
         mExistActor = false;
     }
-    // 
+
+    //
 private:
     double startPosition[3];
     double endPosition[3];
 
     bool mExistActor;
-    //vtkImageViewer2 * mRender;
-
+    // vtkImageViewer2 * mRender;
 };
+
 vtkStandardNewMacro(MyRubberBand);
 
-int main(int, char* [])
+int main(int, char*[])
 {
-    vtkSmartPointer<vtkNamedColors> colors =
-        vtkSmartPointer<vtkNamedColors>::New();
+    vtkSmartPointer<vtkNamedColors> colors = vtkSmartPointer<vtkNamedColors>::New();
 
     // Set the background color.
-    std::array<unsigned char, 4> bkg{ { 26, 51, 77, 255 } };
+    std::array<unsigned char, 4> bkg { { 26, 51, 77, 255 } };
     colors->SetColor("BkgColor", bkg.data());
 
-
     // Create a renderer, render window and interactor
-    vtkSmartPointer<vtkRenderer> renderer =
-        vtkSmartPointer<vtkRenderer>::New();
+    vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
 
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor =
-        vtkSmartPointer<vtkRenderWindowInteractor>::New();
-    //renderWindowInteractor->SetRenderWindow(renderWindow);
+    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    // renderWindowInteractor->SetRenderWindow(renderWindow);
 
-
-    vtkSmartPointer<vtkBMPReader> reader1 =
-        vtkSmartPointer<vtkBMPReader>::New();
+    vtkSmartPointer<vtkBMPReader> reader1 = vtkSmartPointer<vtkBMPReader>::New();
     reader1->SetFileName("./32.bmp");
     reader1->Update();
 
@@ -4108,8 +3320,7 @@ int main(int, char* [])
     viewer->Render();
     viewer->GetRenderer()->SetBackground(1, 1, 1);
     viewer->GetRenderWindow()->SetWindowName("ImageViewer2D");
-    vtkSmartPointer<vtkRenderWindowInteractor> rwi =
-        vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    vtkSmartPointer<vtkRenderWindowInteractor> rwi = vtkSmartPointer<vtkRenderWindowInteractor>::New();
     viewer->SetupInteractor(rwi);
     vtkSmartPointer<MyRubberBand> g_style = vtkSmartPointer<MyRubberBand>::New();
 
@@ -4117,13 +3328,9 @@ int main(int, char* [])
 
     rwi->SetInteractorStyle(g_style);
 
-
-
     g_style->SetRender(viewer);
 
-
-    //设置交互属性
-
+    // 设置交互属性
 
     rwi->Start();
     return EXIT_SUCCESS;
@@ -4131,19 +3338,17 @@ int main(int, char* [])
 
 #endif // TEST51
 
-
-
 #ifdef TEST58
 
-#include <vtkCubeSource.h>
-#include <vtkSmartPointer.h>
-#include <vtkPolyDataMapper.h>
 #include <vtkActor.h>
 #include <vtkCamera.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindowInteractor.h>
 #include <vtkCommand.h>
+#include <vtkCubeSource.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
 
 #include <iostream>
 
@@ -4154,6 +3359,7 @@ public:
     {
         return new CallBack;
     }
+
     virtual void Execute(vtkObject* caller, unsigned long, void*)
     {
         vtkWindow* window = static_cast<vtkWindow*>(caller);
@@ -4163,61 +3369,60 @@ public:
     }
 };
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkCubeSource> cube;
     vtkNew<vtkPolyDataMapper> cubeMapper;
     cubeMapper->SetInputConnection(cube->GetOutputPort());
 
-    //actor
+    // actor
     vtkNew<vtkActor> cubeActor;
     cubeActor->SetMapper(cubeMapper);
 
-    //camera
+    // camera
     vtkNew<vtkCamera> camera;
-    camera->SetPosition(1, 1, 1);//设置相机位置
-    camera->SetFocalPoint(0, 0, 0);//设置相机焦点
+    camera->SetPosition(1, 1, 1);   // 设置相机位置
+    camera->SetFocalPoint(0, 0, 0); // 设置相机焦点
 
-    //renderer
+    // renderer
     vtkNew<vtkRenderer> renderer;
     renderer->AddActor(cubeActor);
     renderer->SetActiveCamera(camera);
     renderer->ResetCamera();
 
-    //RenderWindow
+    // RenderWindow
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
-    renWin->SetSize(600, 600);//设置window大小
+    renWin->SetSize(600, 600); // 设置window大小
     auto cb = CallBack::New();
     renWin->AddObserver(vtkCommand::WindowResizeEvent, cb);
 
-    //RenderWindowInteractor
+    // RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
 
-    //数据交互
+    // 数据交互
     renWin->Render();
     iren->Start();
 
     return 0;
-
 }
 
 #endif // TEST58
 
 #ifdef TEST59
 
-#include <vtkPolyDataMapper.h>
 #include <vtkActor.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindowInteractor.h>
+#include <vtkCommand.h>
+#include <vtkLineRepresentation.h>
+#include <vtkLineWidget2.h>
 #include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
 #include <vtkSphereSource.h>
-#include <vtkLineWidget2.h>
-#include <vtkLineRepresentation.h>
-#include <vtkCommand.h>
 
 // This does the actual work.
 // Callback for the interaction
@@ -4232,12 +3437,10 @@ public:
     virtual void Execute(vtkObject* caller, unsigned long, void*)
     {
 
-        vtkLineWidget2* lineWidget =
-            reinterpret_cast<vtkLineWidget2*>(caller);
+        vtkLineWidget2* lineWidget = reinterpret_cast<vtkLineWidget2*>(caller);
 
         // Get the actual box coordinates of the line
-        vtkSmartPointer<vtkPolyData> polydata =
-            vtkSmartPointer<vtkPolyData>::New();
+        vtkSmartPointer<vtkPolyData> polydata = vtkSmartPointer<vtkPolyData>::New();
         static_cast<vtkLineRepresentation*>(lineWidget->GetRepresentation())->GetPolyData(polydata);
 
         // Display one of the points, just so we know it's working
@@ -4245,50 +3448,43 @@ public:
         polydata->GetPoint(0, p);
         std::cout << "P: " << p[0] << " " << p[1] << " " << p[2] << std::endl;
     }
-    vtkLineCallback() {}
 
+    vtkLineCallback()
+    {
+    }
 };
 
-
-int main(int, char* [])
+int main(int, char*[])
 {
-    vtkSmartPointer<vtkSphereSource> sphereSource =
-        vtkSmartPointer<vtkSphereSource>::New();
+    vtkSmartPointer<vtkSphereSource> sphereSource = vtkSmartPointer<vtkSphereSource>::New();
     sphereSource->Update();
 
     // Create a mapper and actor
-    vtkSmartPointer<vtkPolyDataMapper> mapper =
-        vtkSmartPointer<vtkPolyDataMapper>::New();
+    vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
     mapper->SetInputConnection(sphereSource->GetOutputPort());
-    vtkSmartPointer<vtkActor> actor =
-        vtkSmartPointer<vtkActor>::New();
+    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
     actor->SetMapper(mapper);
 
     // A renderer and render window
-    vtkSmartPointer<vtkRenderer> renderer =
-        vtkSmartPointer<vtkRenderer>::New();
-    vtkSmartPointer<vtkRenderWindow> renderWindow =
-        vtkSmartPointer<vtkRenderWindow>::New();
+    vtkSmartPointer<vtkRenderer> renderer         = vtkSmartPointer<vtkRenderer>::New();
+    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
     renderWindow->AddRenderer(renderer);
-    //renderer->AddActor(actor);
+    // renderer->AddActor(actor);
 
     // An interactor
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor =
-        vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
-    vtkSmartPointer<vtkLineWidget2> lineWidget =
-        vtkSmartPointer<vtkLineWidget2>::New();
+    vtkSmartPointer<vtkLineWidget2> lineWidget = vtkSmartPointer<vtkLineWidget2>::New();
     lineWidget->SetInteractor(renderWindowInteractor);
     lineWidget->CreateDefaultRepresentation();
 
     // You could do this if you want to set properties at this point:
-    //vtkSmartPointer<vtkLineRepresentation> lineRepresentation = 
-      //vtkSmartPointer<vtkLineRepresentation>::New();
-    //lineWidget->SetRepresentation(lineRepresentation);
+    // vtkSmartPointer<vtkLineRepresentation> lineRepresentation =
+    // vtkSmartPointer<vtkLineRepresentation>::New();
+    // lineWidget->SetRepresentation(lineRepresentation);
 
-    vtkSmartPointer<vtkLineCallback> lineCallback =
-        vtkSmartPointer<vtkLineCallback>::New();
+    vtkSmartPointer<vtkLineCallback> lineCallback = vtkSmartPointer<vtkLineCallback>::New();
 
     lineWidget->AddObserver(vtkCommand::InteractionEvent, lineCallback);
 
@@ -4309,29 +3505,29 @@ int main(int, char* [])
 
 #ifdef TEST60
 
-#include "vtkTextRenderer.h"
 #include "vtkNew.h"
-#include "vtkRenderer.h"
 #include "vtkRenderWindow.h"
 #include "vtkRenderWindowInteractor.h"
+#include "vtkRenderer.h"
+#include "vtkSmartPointer.h"
 #include "vtkStdString.h"
 #include "vtkTextActor.h"
 #include "vtkTextProperty.h"
-#include "vtkSmartPointer.h"
+#include "vtkTextRenderer.h"
 #include "vtkUnicodeString.h"
-#include <windows.h>
 #include <iostream>
 #include <string>
+#include <windows.h>
 
 int main(int argc, char* argv[])
 {
-    //if (argc < 2)
+    // if (argc < 2)
     //{
-    //    cerr << "Missing font filename." << endl;
-    //    return EXIT_FAILURE;
-    //}
+    //     cerr << "Missing font filename." << endl;
+    //     return EXIT_FAILURE;
+    // }
 
-    //std::string uncodeFontFile(argv[1]);
+    // std::string uncodeFontFile(argv[1]);
 
     vtkSmartPointer<vtkTextRenderer> tren = vtkSmartPointer<vtkTextRenderer>::New();
     if (tren == nullptr)
@@ -4343,11 +3539,12 @@ int main(int argc, char* argv[])
     if (strcmp(tren->GetClassName(), "vtkMathTextFreeTypeTextRenderer") != 0)
     {
         std::cerr << "Object factory returning unrecognized vtkTextRenderer "
-            "override: " << tren->GetClassName() << std::endl;
+                     "override: "
+                  << tren->GetClassName() << std::endl;
         return EXIT_FAILURE;
     }
 
-    std::string str = "Sample multiline\ntext rendered\nusing FreeTypeTools.";
+    std::string str                      = "Sample multiline\ntext rendered\nusing FreeTypeTools.";
     vtkSmartPointer<vtkTextActor> actor1 = vtkSmartPointer<vtkTextActor>::New();
     actor1->GetTextProperty()->SetFontSize(20);
     actor1->GetTextProperty()->SetColor(1.0, 0.0, 0.0);
@@ -4440,7 +3637,7 @@ int main(int argc, char* argv[])
     actor10->GetTextProperty()->SetJustificationToRight();
     actor10->GetTextProperty()->SetOrientation(45);
     actor10->SetInput("Test MathText $\\int_0^\\infty\\frac{2\\pi}"
-        "{x - \\frac{z}{4}}\\,dx$");
+                      "{x - \\frac{z}{4}}\\,dx$");
     actor10->SetPosition(588, 433);
 
     // Invalid latex markup -- should fallback to freetype.
@@ -4479,7 +3676,7 @@ int main(int argc, char* argv[])
     // UTF-8 freetype handling:
     vtkSmartPointer<vtkTextActor> actor15 = vtkSmartPointer<vtkTextActor>::New();
     actor15->GetTextProperty()->SetFontFamily(VTK_FONT_FILE);
-    //actor15->GetTextProperty()->SetFontFile(uncodeFontFile.c_str());
+    // actor15->GetTextProperty()->SetFontFile(uncodeFontFile.c_str());
     actor15->GetTextProperty()->SetJustificationToCentered();
     actor15->GetTextProperty()->SetVerticalJustificationToCentered();
     actor15->GetTextProperty()->SetFontSize(18);
@@ -4534,6 +3731,7 @@ int main(int argc, char* argv[])
 
 #include <vtkActor.h>
 #include <vtkCallbackCommand.h>
+#include <vtkCommand.h>
 #include <vtkInteractorStyleRubberBand2D.h>
 #include <vtkNamedColors.h>
 #include <vtkNew.h>
@@ -4544,17 +3742,14 @@ int main(int argc, char* argv[])
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 #include <vtkSphereSource.h>
-#include <vtkCommand.h>
 
 namespace {
 
-    void SelectionChangedCallbackFunction(vtkObject* caller,
-        long unsigned int eventId,
-        void* clientData, void* callData);
+void SelectionChangedCallbackFunction(vtkObject* caller, long unsigned int eventId, void* clientData, void* callData);
 
 }
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkNamedColors> colors;
 
@@ -4588,7 +3783,7 @@ int main(int, char* [])
 
     vtkNew<vtkInteractorStyleRubberBand2D> style;
     style->AddObserver(vtkCommand::SelectionChangedEvent, selectionChangedCallback);
-    //style->AddObserver(vtkCommand::SelectionChangedEvent, [](vtkObject* caller, unsigned long, void*, void*) {});
+    // style->AddObserver(vtkCommand::SelectionChangedEvent, [](vtkObject* caller, unsigned long, void*, void*) {});
 
     renderWindowInteractor->SetInteractorStyle(style);
 
@@ -4600,22 +3795,19 @@ int main(int, char* [])
 
 namespace {
 
-    void SelectionChangedCallbackFunction(vtkObject* vtkNotUsed(caller),
-        long unsigned int vtkNotUsed(eventId),
-        void* vtkNotUsed(clientData),
-        void* callData)
-    {
-        std::cout << "SelectionChanged callback" << std::endl;
+void SelectionChangedCallbackFunction(
+    vtkObject* vtkNotUsed(caller), long unsigned int vtkNotUsed(eventId), void* vtkNotUsed(clientData), void* callData)
+{
+    std::cout << "SelectionChanged callback" << std::endl;
 
-        unsigned int* rect = reinterpret_cast<unsigned int*>(callData);
-        unsigned int pos1X = rect[0];
-        unsigned int pos1Y = rect[1];
-        unsigned int pos2X = rect[2];
-        unsigned int pos2Y = rect[3];
+    unsigned int* rect = reinterpret_cast<unsigned int*>(callData);
+    unsigned int pos1X = rect[0];
+    unsigned int pos1Y = rect[1];
+    unsigned int pos2X = rect[2];
+    unsigned int pos2Y = rect[3];
 
-        std::cout << "Start x: " << pos1X << " Start y: " << pos1Y
-            << " End x: " << pos2X << " End y: " << pos2Y << std::endl;
-    }
+    std::cout << "Start x: " << pos1X << " Start y: " << pos1Y << " End x: " << pos2X << " End y: " << pos2Y << std::endl;
+}
 
 } // namespace
 
@@ -4649,77 +3841,74 @@ namespace {
 
 namespace {
 
-    class MyRubberBand : public vtkInteractorStyleRubberBand2D
+class MyRubberBand : public vtkInteractorStyleRubberBand2D
+{
+public:
+    static MyRubberBand* New();
+    vtkTypeMacro(MyRubberBand, vtkInteractorStyleRubberBand2D);
+
+    virtual void OnLeftButtonUp() override
     {
-    public:
-        static MyRubberBand* New();
-        vtkTypeMacro(MyRubberBand, vtkInteractorStyleRubberBand2D);
-
-        virtual void OnLeftButtonUp() override
+        if (this->Interaction == SELECTING)
         {
-            if (this->Interaction == SELECTING)
+            this->Interaction = NONE;
+
+            // Clear the rubber band
+            const int* size = this->Interactor->GetRenderWindow()->GetSize();
+            // unsigned char* pixels = this->PixelArray->GetPointer(0);
+            unsigned char* pixels = nullptr;
+            // this->Interactor->GetRenderWindow()->SetRGBACharPixelData(
+            //     0, 0, 300, 300, pixels, 0);
+            this->Interactor->GetRenderWindow()->Frame();
+
+            unsigned int rect[5];
+            rect[0] = this->StartPosition[0];
+            rect[1] = this->StartPosition[1];
+            rect[2] = this->EndPosition[0];
+            rect[3] = this->EndPosition[1];
+            if (this->Interactor->GetShiftKey())
             {
-                this->Interaction = NONE;
-
-                // Clear the rubber band
-                const int* size = this->Interactor->GetRenderWindow()->GetSize();
-                //unsigned char* pixels = this->PixelArray->GetPointer(0);
-                unsigned char* pixels = nullptr;
-                //this->Interactor->GetRenderWindow()->SetRGBACharPixelData(
-                //    0, 0, 300, 300, pixels, 0);
-                this->Interactor->GetRenderWindow()->Frame();
-
-                unsigned int rect[5];
-                rect[0] = this->StartPosition[0];
-                rect[1] = this->StartPosition[1];
-                rect[2] = this->EndPosition[0];
-                rect[3] = this->EndPosition[1];
-                if (this->Interactor->GetShiftKey())
-                {
-                    rect[4] = SELECT_UNION;
-                }
-                else
-                {
-                    rect[4] = SELECT_NORMAL;
-                }
-                this->InvokeEvent(vtkCommand::SelectionChangedEvent, reinterpret_cast<void*>(rect));
-                this->InvokeEvent(vtkCommand::EndInteractionEvent);
+                rect[4] = SELECT_UNION;
             }
-            else if (this->Interaction == PANNING)
+            else
             {
-                this->Interaction = NONE;
-                this->InvokeEvent(vtkCommand::EndInteractionEvent);
+                rect[4] = SELECT_NORMAL;
             }
-
-
-
-            std::cout << "Start position: " << this->StartPosition[0] << " "
-                << this->StartPosition[1] << std::endl;
-            std::cout << "End position: " << this->EndPosition[0] << " "
-                << this->EndPosition[1] << std::endl;
+            this->InvokeEvent(vtkCommand::SelectionChangedEvent, reinterpret_cast<void*>(rect));
+            this->InvokeEvent(vtkCommand::EndInteractionEvent);
         }
-
-        virtual void OnLeftButtonDown() override
+        else if (this->Interaction == PANNING)
         {
-            Superclass::OnLeftButtonDown();
+            this->Interaction = NONE;
+            this->InvokeEvent(vtkCommand::EndInteractionEvent);
         }
 
-        virtual void OnMouseMove() override
-        {
-            Superclass::OnMouseMove();
-        }
-        virtual void OnChar() override
-        {
-            auto ret = this->Interactor->GetKeyCode();
-            Superclass::OnChar();
-        }
-    };
+        std::cout << "Start position: " << this->StartPosition[0] << " " << this->StartPosition[1] << std::endl;
+        std::cout << "End position: " << this->EndPosition[0] << " " << this->EndPosition[1] << std::endl;
+    }
 
-    vtkStandardNewMacro(MyRubberBand);
+    virtual void OnLeftButtonDown() override
+    {
+        Superclass::OnLeftButtonDown();
+    }
+
+    virtual void OnMouseMove() override
+    {
+        Superclass::OnMouseMove();
+    }
+
+    virtual void OnChar() override
+    {
+        auto ret = this->Interactor->GetKeyCode();
+        Superclass::OnChar();
+    }
+};
+
+vtkStandardNewMacro(MyRubberBand);
 
 } // namespace
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkNamedColors> colors;
 
@@ -4751,7 +3940,6 @@ int main(int, char* [])
     renderWindow->SetSize(800, 600);
     renderWindow->Render();
 
-
     vtkNew<MyRubberBand> style;
     renderWindowInteractor->SetInteractorStyle(style);
 
@@ -4765,48 +3953,44 @@ int main(int, char* [])
 
 #endif // TEST61
 
-
-
-
-
 #ifdef TEST64
 
-#include "vtkSmartPointer.h"
 #include "vtkActor.h"
+#include "vtkAutoInit.h"
+#include "vtkAxesActor.h"
+#include "vtkBiDimensionalWidget.h"
 #include "vtkCamera.h"
 #include "vtkCellPicker.h"
 #include "vtkCommand.h"
+#include "vtkDICOMImageReader.h"
 #include "vtkImageActor.h"
-#include "vtkImageReslice.h"
-#include "vtkInteractorStyleImage.h"
+#include "vtkImageData.h"
 #include "vtkImageMapToColors.h"
 #include "vtkImagePlaneWidget.h"
 #include "vtkImageReader.h"
+#include "vtkImageReslice.h"
 #include "vtkInteractorEventRecorder.h"
+#include "vtkInteractorStyleImage.h"
 #include "vtkLookupTable.h"
 #include "vtkOutlineFilter.h"
-#include "vtkDICOMImageReader.h"
+#include "vtkPlane.h"
+#include "vtkPlaneSource.h"
+#include "vtkPointData.h"
 #include "vtkPolyDataMapper.h"
 #include "vtkProperty.h"
+#include "vtkProperty2D.h"
 #include "vtkRenderWindow.h"
 #include "vtkRenderWindowInteractor.h"
 #include "vtkRenderer.h"
-#include "vtkImageData.h"
-#include "vtkPointData.h"
-#include "vtkPlaneSource.h"
-#include "vtkPlane.h"
-#include "vtkResliceCursorActor.h"
-#include "vtkResliceCursorPolyDataAlgorithm.h"
 #include "vtkResliceCursor.h"
-#include "vtkResliceCursorWidget.h"
+#include "vtkResliceCursorActor.h"
 #include "vtkResliceCursorLineRepresentation.h"
-#include "vtkBiDimensionalWidget.h"
-#include "vtkAutoInit.h"
-#include "vtkAxesActor.h"
-#include "vtkTransform.h"
-#include "vtkTextActor.h"
-#include "vtkProperty2D.h"
+#include "vtkResliceCursorPolyDataAlgorithm.h"
 #include "vtkResliceCursorThickLineRepresentation.h"
+#include "vtkResliceCursorWidget.h"
+#include "vtkSmartPointer.h"
+#include "vtkTextActor.h"
+#include "vtkTransform.h"
 
 class vtkResliceCursorCallback : public vtkCommand
 {
@@ -4815,6 +3999,7 @@ public:
     {
         return new vtkResliceCursorCallback;
     }
+
     void Execute(vtkObject* caller, unsigned long, void* callData) override
     {
         vtkImagePlaneWidget* ipw = dynamic_cast<vtkImagePlaneWidget*>(caller);
@@ -4842,7 +4027,7 @@ public:
         if (rcw)
         {
             vtkResliceCursorLineRepresentation* rep = dynamic_cast<vtkResliceCursorLineRepresentation*>(rcw->GetRepresentation());
-            vtkResliceCursor* rc = rep->GetResliceCursorActor()->GetCursorAlgorithm()->GetResliceCursor();
+            vtkResliceCursor* rc                    = rep->GetResliceCursorActor()->GetCursorAlgorithm()->GetResliceCursor();
             for (int i = 0; i < 3; i++)
             {
                 vtkPlaneSource* ps = static_cast<vtkPlaneSource*>(this->IPW[i]->GetPolyDataAlgorithm());
@@ -4853,7 +4038,11 @@ public:
         }
         this->RCW[0]->Render();
     }
-    vtkResliceCursorCallback() {}
+
+    vtkResliceCursorCallback()
+    {
+    }
+
     vtkImagePlaneWidget* IPW[3];
     vtkResliceCursorWidget* RCW[3];
 };
@@ -4902,7 +4091,7 @@ int main()
         planeWidget[i]->SetPicker(picker);
         planeWidget[i]->RestrictPlaneToVolumeOn();
         double color[3] = { 0, 0, 0 };
-        color[i] = 1;
+        color[i]        = 1;
         planeWidget[i]->GetPlaneProperty()->SetColor(color);
         planeWidget[i]->SetTexturePlaneProperty(ipwProp);
         planeWidget[i]->TextureInterpolateOff();
@@ -4920,23 +4109,23 @@ int main()
     planeWidget[1]->SetLookupTable(planeWidget[0]->GetLookupTable());
     planeWidget[2]->SetLookupTable(planeWidget[0]->GetLookupTable());
 
-    vtkSmartPointer<vtkResliceCursorCallback> cbk = vtkSmartPointer<vtkResliceCursorCallback>::New();
-    vtkSmartPointer< vtkResliceCursor > resliceCursor = vtkSmartPointer< vtkResliceCursor >::New();
+    vtkSmartPointer<vtkResliceCursorCallback> cbk   = vtkSmartPointer<vtkResliceCursorCallback>::New();
+    vtkSmartPointer<vtkResliceCursor> resliceCursor = vtkSmartPointer<vtkResliceCursor>::New();
     resliceCursor->SetCenter(reader->GetOutput()->GetCenter());
     resliceCursor->SetThickMode(0);
     resliceCursor->SetThickness(10, 10, 10);
     resliceCursor->SetImage(reader->GetOutput());
 
-    vtkSmartPointer< vtkResliceCursorWidget > resliceCursorWidget[3];
-    vtkSmartPointer< vtkResliceCursorThickLineRepresentation > resliceCursorRep[3];
+    vtkSmartPointer<vtkResliceCursorWidget> resliceCursorWidget[3];
+    vtkSmartPointer<vtkResliceCursorThickLineRepresentation> resliceCursorRep[3];
 
     double viewUp[3][3] = { { 0, 0, -1 }, { 0, 0, 1 }, { 0, 1, 0 } };
     for (int i = 0; i < 3; i++)
     {
-        resliceCursorWidget[i] = vtkSmartPointer< vtkResliceCursorWidget >::New();
+        resliceCursorWidget[i] = vtkSmartPointer<vtkResliceCursorWidget>::New();
         resliceCursorWidget[i]->SetInteractor(iren);
 
-        resliceCursorRep[i] = vtkSmartPointer< vtkResliceCursorThickLineRepresentation >::New();
+        resliceCursorRep[i] = vtkSmartPointer<vtkResliceCursorThickLineRepresentation>::New();
         resliceCursorWidget[i]->SetRepresentation(resliceCursorRep[i]);
         resliceCursorRep[i]->GetResliceCursorActor()->GetCursorAlgorithm()->SetResliceCursor(resliceCursor);
         resliceCursorRep[i]->GetResliceCursorActor()->GetCursorAlgorithm()->SetReslicePlaneNormal(i);
@@ -4952,7 +4141,7 @@ int main()
 
         ren[i]->GetActiveCamera()->SetFocalPoint(0, 0, 0);
         double camPos[3] = { 0, 0, 0 };
-        camPos[i] = 1;
+        camPos[i]        = 1;
         ren[i]->GetActiveCamera()->SetPosition(camPos);
         ren[i]->GetActiveCamera()->ParallelProjectionOn();
         ren[i]->GetActiveCamera()->SetViewUp(viewUp[i][0], viewUp[i][1], viewUp[i][2]);
@@ -4972,11 +4161,10 @@ int main()
     textActor->SetInput("横断面");
     textActor->GetProperty()->SetColor(0.0,1.0,0.0);*/
 
-
     ren[0]->SetBackground(0.3, 0.1, 0.1);
     ren[1]->SetBackground(0.1, 0.3, 0.1);
     ren[2]->SetBackground(0.1, 0.1, 0.3);
-    //ren[3]->AddActor(outlineActor);
+    // ren[3]->AddActor(outlineActor);
     ren[3]->SetBackground(0.1, 0.1, 0.1);
     renWin->SetSize(600, 600);
 
@@ -4992,7 +4180,7 @@ int main()
     ren[3]->GetActiveCamera()->Dolly(1.15);
     ren[3]->ResetCameraClippingRange();
 
-    vtkSmartPointer< vtkInteractorStyleImage > style = vtkSmartPointer< vtkInteractorStyleImage >::New();
+    vtkSmartPointer<vtkInteractorStyleImage> style = vtkSmartPointer<vtkInteractorStyleImage>::New();
     iren->SetInteractorStyle(style);
     iren->Initialize();
     iren->Start();
@@ -5005,6 +4193,7 @@ int main()
 #include <vtkActor.h>
 #include <vtkBorderRepresentation.h>
 #include <vtkBorderWidget.h>
+#include <vtkCallbackCommand.h>
 #include <vtkCommand.h>
 #include <vtkNamedColors.h>
 #include <vtkNew.h>
@@ -5018,35 +4207,34 @@ int main()
 #include <vtkSphereSource.h>
 #include <vtkWidgetCallbackMapper.h>
 #include <vtkWidgetEvent.h>
-#include <vtkCallbackCommand.h>
 
 namespace {
-    class vtkCustomBorderWidget : public vtkBorderWidget
-    {
-    public:
-        static vtkCustomBorderWidget* New();
-        vtkTypeMacro(vtkCustomBorderWidget, vtkBorderWidget);
+class vtkCustomBorderWidget : public vtkBorderWidget
+{
+public:
+    static vtkCustomBorderWidget* New();
+    vtkTypeMacro(vtkCustomBorderWidget, vtkBorderWidget);
 
-        //static void SelectAction(vtkAbstractWidget*);
-        //static void TranslateAction(vtkAbstractWidget*);
-        //static void EndSelectAction(vtkAbstractWidget*);
-        static void MoveAction(vtkAbstractWidget*);
-        //static void HoverLeaveAction(vtkAbstractWidget*);
+    // static void SelectAction(vtkAbstractWidget*);
+    // static void TranslateAction(vtkAbstractWidget*);
+    // static void EndSelectAction(vtkAbstractWidget*);
+    static void MoveAction(vtkAbstractWidget*);
+    // static void HoverLeaveAction(vtkAbstractWidget*);
 
-        static void EndSelectAction(vtkAbstractWidget* w);
+    static void EndSelectAction(vtkAbstractWidget* w);
 
-        vtkCustomBorderWidget();
-    };
+    vtkCustomBorderWidget();
+};
 
-    vtkStandardNewMacro(vtkCustomBorderWidget);
+vtkStandardNewMacro(vtkCustomBorderWidget);
 
 } // namespace
 
-//void SelectionChangedCallbackFunction(vtkObject* caller,
-//    long unsigned int eventId,
-//    void* clientData, void* callData) {}
+// void SelectionChangedCallbackFunction(vtkObject* caller,
+//     long unsigned int eventId,
+//     void* clientData, void* callData) {}
 
-int main(int, char* [])
+int main(int, char*[])
 {
     vtkNew<vtkNamedColors> colors;
 
@@ -5060,8 +4248,7 @@ int main(int, char* [])
 
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
-    actor->GetProperty()->SetColor(
-        colors->GetColor3d("DarkOliveGreen").GetData());
+    actor->GetProperty()->SetColor(colors->GetColor3d("DarkOliveGreen").GetData());
 
     // A renderer and render window
     vtkNew<vtkRenderer> renderer;
@@ -5088,9 +4275,9 @@ int main(int, char* [])
     renderWindow->Render();
     borderWidget->On();
 
-    //vtkNew<vtkCallbackCommand> selectionChangedCallback;
-    //selectionChangedCallback->SetCallback(SelectionChangedCallbackFunction);
-    //borderWidget->AddObserver(vtkWidgetEvent::Move, selectionChangedCallback);
+    // vtkNew<vtkCallbackCommand> selectionChangedCallback;
+    // selectionChangedCallback->SetCallback(SelectionChangedCallbackFunction);
+    // borderWidget->AddObserver(vtkWidgetEvent::Move, selectionChangedCallback);
 
     // Begin mouse interaction
     renderWindowInteractor->Start();
@@ -5099,99 +4286,96 @@ int main(int, char* [])
 }
 
 namespace {
-    vtkCustomBorderWidget::vtkCustomBorderWidget()
-    {
-        // 在此处设置了回调函数，才可以调用到action
-        this->CallbackMapper->SetCallbackMethod(vtkCommand::MiddleButtonReleaseEvent, vtkWidgetEvent::EndSelect, this, vtkCustomBorderWidget::EndSelectAction);
-        this->CallbackMapper->SetCallbackMethod(vtkCommand::MouseMoveEvent, vtkWidgetEvent::Move, this, vtkCustomBorderWidget::MoveAction);
-    }
+vtkCustomBorderWidget::vtkCustomBorderWidget()
+{
+    // 在此处设置了回调函数，才可以调用到action
+    this->CallbackMapper->SetCallbackMethod(
+        vtkCommand::MiddleButtonReleaseEvent, vtkWidgetEvent::EndSelect, this, vtkCustomBorderWidget::EndSelectAction);
+    this->CallbackMapper->SetCallbackMethod(vtkCommand::MouseMoveEvent, vtkWidgetEvent::Move, this, vtkCustomBorderWidget::MoveAction);
+}
 
-    void vtkCustomBorderWidget::EndSelectAction(vtkAbstractWidget* w)
-    {
-        vtkBorderWidget* borderWidget = dynamic_cast<vtkBorderWidget*>(w);
+void vtkCustomBorderWidget::EndSelectAction(vtkAbstractWidget* w)
+{
+    vtkBorderWidget* borderWidget = dynamic_cast<vtkBorderWidget*>(w);
 
-        // Get the actual box coordinates/planes
-        // vtkNew<vtkPolyData> polydata;
+    // Get the actual box coordinates/planes
+    // vtkNew<vtkPolyData> polydata;
 
-        // Get the bottom left corner
-        //auto lowerLeft =
-        //    static_cast<vtkBorderRepresentation*>(borderWidget->GetRepresentation())
-        //    ->GetPosition();
-        //std::cout << "Lower left: " << lowerLeft[0] << " " << lowerLeft[1]
-        //    << std::endl;
+    // Get the bottom left corner
+    // auto lowerLeft =
+    //    static_cast<vtkBorderRepresentation*>(borderWidget->GetRepresentation())
+    //    ->GetPosition();
+    // std::cout << "Lower left: " << lowerLeft[0] << " " << lowerLeft[1]
+    //    << std::endl;
 
-        //auto upperRight =
-        //    static_cast<vtkBorderRepresentation*>(borderWidget->GetRepresentation())
-        //    ->GetPosition2();
-        //std::cout << "Upper right: " << upperRight[0] << " " << upperRight[1]
-        //    << std::endl;
+    // auto upperRight =
+    //     static_cast<vtkBorderRepresentation*>(borderWidget->GetRepresentation())
+    //     ->GetPosition2();
+    // std::cout << "Upper right: " << upperRight[0] << " " << upperRight[1]
+    //     << std::endl;
 
-        vtkBorderWidget::EndSelectAction(w);
-    }
+    vtkBorderWidget::EndSelectAction(w);
+}
 
-    void vtkCustomBorderWidget::MoveAction(vtkAbstractWidget* w)
-    {
-        std::cout << "test\n";
-        vtkBorderWidget::MoveAction(w);
-    }
+void vtkCustomBorderWidget::MoveAction(vtkAbstractWidget* w)
+{
+    std::cout << "test\n";
+    vtkBorderWidget::MoveAction(w);
+}
 
-} // namespace```
+} // namespace
 
 #endif // TEST65
 
 #ifdef TEST66
 
-#include <vtkSmartPointer.h>
-#include <vtkPolyData.h>
-#include <vtkPoints.h>
-#include <vtkCellArray.h>
-#include <vtkPolyDataMapper.h>
 #include <vtkActor.h>
 #include <vtkCamera.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindowInteractor.h>
+#include <vtkCellArray.h>
 #include <vtkCommand.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
 #include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
 
-#include <iostream>
 #include <array>
+#include <iostream>
 
-namespace
+namespace {
+std::array<float, 4 * 3> vertices { 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0 };
+
+class MyCommand : public vtkCommand
 {
-    std::array<float, 4 * 3> vertices{
-        0,0,0,
-        1,0,0,
-        1,1,0,
-        0,1,0
-    };
+public:
+    static MyCommand* New();
 
-    class MyCommand : public vtkCommand
+    virtual void Execute(vtkObject* caller, unsigned long, void*)
     {
-    public:
-        static MyCommand* New();
+        std::cout << "command callback\n";
 
-        virtual void Execute(vtkObject* caller, unsigned long, void*)
+        if (m_actor)
         {
-            std::cout << "command callback\n";
-
-            if (m_actor)
-            {
-                m_actor->GetProperty()->SetColor(1, 0, 0);
-            }
+            m_actor->GetProperty()->SetColor(1, 0, 0);
         }
-        void SetActor(const vtkSmartPointer<vtkActor>& actor)
-        {
-            m_actor = actor;
-        }
-    private:
-        vtkSmartPointer<vtkActor> m_actor{ nullptr };
-    };
+    }
 
-    vtkStandardNewMacro(MyCommand);
-}
+    void SetActor(const vtkSmartPointer<vtkActor>& actor)
+    {
+        m_actor = actor;
+    }
 
-int main(int, char* [])
+private:
+    vtkSmartPointer<vtkActor> m_actor { nullptr };
+};
+
+vtkStandardNewMacro(MyCommand);
+} // namespace
+
+int main(int, char*[])
 {
     vtkNew<vtkPolyData> polyData;
     vtkNew<vtkPoints> points;
@@ -5202,7 +4386,7 @@ int main(int, char* [])
         points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
     }
 
-    cells->InsertNextCell({ 0,1,2,3 });
+    cells->InsertNextCell({ 0, 1, 2, 3 });
 
     polyData->SetPoints(points);
     polyData->SetPolys(cells);
@@ -5213,7 +4397,7 @@ int main(int, char* [])
     vtkNew<vtkActor> cubeActor;
     cubeActor->SetMapper(cubeMapper);
 
-    //renderer
+    // renderer
     vtkNew<vtkRenderer> renderer1;
     renderer1->AddActor(cubeActor);
     renderer1->ResetCamera();
@@ -5275,23 +4459,24 @@ int main(int, char* [])
 #include <vtkTransform.h>
 
 namespace {
-    class vtkMyCallback : public vtkCommand
+class vtkMyCallback : public vtkCommand
+{
+public:
+    static vtkMyCallback* New()
     {
-    public:
-        static vtkMyCallback* New()
-        {
-            return new vtkMyCallback;
-        }
-        virtual void Execute(vtkObject* caller, unsigned long, void*)
-        {
-            // Here we use the vtkBoxWidget to transform the underlying coneActor
-            // (by manipulating its transformation matrix).
-            vtkNew<vtkTransform> t;
-            vtkBoxWidget* widget = reinterpret_cast<vtkBoxWidget*>(caller);
-            widget->GetTransform(t);
-            widget->GetProp3D()->SetUserTransform(t);
-        }
-    };
+        return new vtkMyCallback;
+    }
+
+    virtual void Execute(vtkObject* caller, unsigned long, void*)
+    {
+        // Here we use the vtkBoxWidget to transform the underlying coneActor
+        // (by manipulating its transformation matrix).
+        vtkNew<vtkTransform> t;
+        vtkBoxWidget* widget = reinterpret_cast<vtkBoxWidget*>(caller);
+        widget->GetTransform(t);
+        widget->GetProp3D()->SetUserTransform(t);
+    }
+};
 } // namespace
 
 int main(int vtkNotUsed(argc), char* vtkNotUsed(argv)[])
@@ -5340,6 +4525,4 @@ int main(int vtkNotUsed(argc), char* vtkNotUsed(argv)[])
     return EXIT_SUCCESS;
 }
 
-
 #endif // TEST67
-
