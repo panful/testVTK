@@ -21,7 +21,9 @@
 * 41 vtkPointDataToCellData vtkCellCenters 顶点标量数据转单元数据
 * 42 vtkCellCenters 获取单元中心即格心，并用球体标注格心(矢量图）
 *
-* 501 拉格朗日粒子追踪
+* 500 粒子追踪（迹线）
+* 501 拉格朗日粒子追踪，官方示例
+* 502 获取生成的迹线（粒子追踪）对应的标量/矢量数据
 *
 * 600 OpenFOAM 文件读取
 * 601 vtkStreamTracer 流线图 展示流体流动的轨迹和流动方向
@@ -29,9 +31,10 @@
 * 603 流线生成需要的数据
 *
 * 701 vtkContourFilter 等值面 vtkSampleFunction使用采样函数提取等值面
+* 702 vtkFlyingEdges3D 从体素数据提取等值面(isosurfaces)
 */
 
-#define TEST603
+#define TEST502
 
 #ifdef TEST100
 
@@ -1594,8 +1597,8 @@ int main(int, char*[])
     glyph->SetInputData(polydata);             // 顶点数据，即矢量图每一个图案的位置
     glyph->SetSourceData(source->GetOutput()); // 资源数据，即矢量图的图案
 
-    glyph->SetScaleFactor(1.);                 // 缩放比例
-    glyph->SetClamping(true);                  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
+    glyph->SetScaleFactor(1.); // 缩放比例
+    glyph->SetClamping(true);  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
     glyph->SetRange(0, 5); // 箭头大小映射表，因为大小由向量决定，所以这里的范围应该为{0,所有点的向量模长最大值}，向量模长始终不小于0
 
     // 颜色
@@ -1775,8 +1778,8 @@ int main(int, char*[])
     glyph->SetInputData(polydata);             // 顶点数据，即矢量图每一个图案的位置
     glyph->SetSourceData(source->GetOutput()); // 资源数据，即矢量图的图案
 
-    glyph->SetScaleFactor(1.);                 // 缩放比例
-    glyph->SetClamping(true);                  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
+    glyph->SetScaleFactor(1.); // 缩放比例
+    glyph->SetClamping(true);  // 开启大小映射，开启后必须调用SetRange()，不然箭头大小只能在{0,1}之间映射
     glyph->SetRange(0, 5); // 箭头大小映射表，因为大小由向量决定，所以这里的范围应该为{0,所有点的向量模长最大值}，向量模长始终不小于0
 
     // 颜色
@@ -2761,6 +2764,154 @@ int main(int argc, char* argv[])
 }
 #endif // TEST42
 
+#ifdef TEST500
+
+#include "vtkActor.h"
+#include "vtkCellData.h"
+#include "vtkDataSetMapper.h"
+#include "vtkDoubleArray.h"
+#include "vtkImageData.h"
+#include "vtkInteractorStyleTrackballCamera.h"
+#include "vtkLagrangianMatidaIntegrationModel.h"
+#include "vtkLagrangianParticleTracker.h"
+#include "vtkPointData.h"
+#include "vtkPointSource.h"
+#include "vtkPolyDataMapper.h"
+#include "vtkRTAnalyticSource.h"
+#include "vtkRenderWindow.h"
+#include "vtkRenderWindowInteractor.h"
+#include "vtkRenderer.h"
+#include "vtkRungeKutta2.h"
+#include "vtkSphereSource.h"
+
+int main(int, char*[])
+{
+    //--------------------------------------------------------------------
+    // 种子点数据
+    vtkNew<vtkPointSource> seeds;
+    seeds->SetNumberOfPoints(10);
+    seeds->SetRadius(4);
+    seeds->Update();
+
+    vtkPolyData* seedPolyData = seeds->GetOutput();
+
+    vtkNew<vtkDoubleArray> partVel;
+    partVel->SetNumberOfComponents(3); // tuple3
+    partVel->SetNumberOfTuples(seedPolyData->GetNumberOfPoints());
+    partVel->SetName("InitialVelocity");
+    partVel->FillComponent(0, 2); // 将每个tuple3的第0个分量设置为2，每一个tuple3的值都一样
+    partVel->FillComponent(1, 5); // 将每个tuple3的第0个分量设置为5
+    partVel->FillComponent(2, 1); // 将每个tuple3的第0个分量设置为1
+
+    vtkNew<vtkDoubleArray> partDens;
+    partDens->SetNumberOfComponents(1);
+    partDens->SetNumberOfTuples(seedPolyData->GetNumberOfPoints());
+    partDens->SetName("ParticleDensity");
+    partDens->FillComponent(0, 1920);
+
+    vtkNew<vtkDoubleArray> partDiam;
+    partDiam->SetNumberOfComponents(1);
+    partDiam->SetNumberOfTuples(seedPolyData->GetNumberOfPoints());
+    partDiam->SetName("ParticleDiameter");
+    partDiam->FillComponent(0, 0.1);
+
+    seedPolyData->GetPointData()->AddArray(partVel);
+    seedPolyData->GetPointData()->AddArray(partDens);
+    seedPolyData->GetPointData()->AddArray(partDiam);
+
+    //---------------------------------------------------------------------------------
+    // 网格数据
+    vtkNew<vtkRTAnalyticSource> wavelet;
+    wavelet->Update();
+
+    vtkImageData* waveletImg = wavelet->GetOutput();
+
+    std::cout << waveletImg->GetNumberOfCells() << '\t' << waveletImg->GetNumberOfPoints() << '\n';
+
+    // 设置流场数据
+    vtkNew<vtkDoubleArray> flowVel;
+    flowVel->SetNumberOfComponents(3);
+    flowVel->SetNumberOfTuples(waveletImg->GetNumberOfCells());
+    flowVel->SetName("FlowVelocity");
+    flowVel->FillComponent(0, -0.3);
+    flowVel->FillComponent(1, -0.3);
+    flowVel->FillComponent(2, -0.3);
+
+    vtkNew<vtkDoubleArray> flowDens;
+    flowDens->SetNumberOfComponents(1);
+    flowDens->SetNumberOfTuples(waveletImg->GetNumberOfCells());
+    flowDens->SetName("FlowDensity");
+    flowDens->FillComponent(0, 1000);
+
+    vtkNew<vtkDoubleArray> flowDynVisc;
+    flowDynVisc->SetNumberOfComponents(1);
+    flowDynVisc->SetNumberOfTuples(waveletImg->GetNumberOfCells());
+    flowDynVisc->SetName("FlowDynamicViscosity");
+    flowDynVisc->FillComponent(0, 0.894);
+
+    // 给每一个单元设置速度、压力、流动阻力
+    waveletImg->GetCellData()->AddArray(flowVel);
+    waveletImg->GetCellData()->AddArray(flowDens);
+    waveletImg->GetCellData()->AddArray(flowDynVisc);
+
+    vtkNew<vtkRungeKutta2> integrator;
+    vtkNew<vtkLagrangianMatidaIntegrationModel> integrationModel;
+    integrationModel->SetInputArrayToProcess(0, 1, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "InitialVelocity");
+    integrationModel->SetInputArrayToProcess(3, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "FlowVelocity");
+    integrationModel->SetInputArrayToProcess(4, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "FlowDensity");
+    integrationModel->SetInputArrayToProcess(5, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "FlowDynamicViscosity");
+    integrationModel->SetInputArrayToProcess(6, 1, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "ParticleDiameter");
+    integrationModel->SetInputArrayToProcess(7, 1, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "ParticleDensity");
+
+    vtkNew<vtkLagrangianParticleTracker> tracker;
+    tracker->SetIntegrator(integrator);             // 设置求解器
+    tracker->SetIntegrationModel(integrationModel); // 积分模型
+    tracker->SetStepFactor(0.1);                    // 积分步长
+    tracker->SetStepFactorMin(0.1);                 // 最小积分步长
+    tracker->SetStepFactorMax(0.1);                 // 最大积分步长
+    tracker->SetCellLengthComputationMode(vtkLagrangianParticleTracker::STEP_CUR_CELL_VEL_DIR);
+    tracker->AdaptiveStepReintegrationOn();   // 是否自适应步长，默认false
+    tracker->GenerateParticlePathsOutputOn(); // 是否生成粒子路径（迹线），默认true
+    tracker->SetMaximumIntegrationTime(10.0); // 最大生成时间，默认-1，没有时间限制
+    tracker->SetMaximumNumberOfSteps(300);    // 最大步数，默认100，-1表示没有限制
+    tracker->SetInputData(waveletImg);        // 网格
+    tracker->SetSourceData(seedPolyData);     // 种子点
+    tracker->Update();
+
+    // tracker->Print(std::cout);
+    // tracker->GetOutput()->Print(std::cout);
+
+    //----------------------------------------------------------------------
+    // 绘制迹线
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(vtkPolyData::SafeDownCast(tracker->GetOutput()));
+    mapper->ScalarVisibilityOff();
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST500
+
 #ifdef TEST501
 
 // https://gitlab.kitware.com/vtk/vtk/-/blob/v9.2.0/Filters/FlowPaths/Testing/Cxx/TestLagrangianParticleTracker.cxx
@@ -2800,9 +2951,9 @@ int main(int, char*[])
     seeds->SetRadius(4);
     seeds->Update();
 
-    vtkPolyData* seedPD    = seeds->GetOutput();
-    vtkPointData* seedData = seedPD->GetPointData();
-    auto numOfPoints       = seedPD->GetNumberOfPoints();
+    vtkPolyData* seedPolyData = seeds->GetOutput();
+    vtkPointData* seedData    = seedPolyData->GetPointData();
+    auto numOfPoints          = seedPolyData->GetNumberOfPoints();
 
     // Create seed data
     vtkNew<vtkDoubleArray> partVel;
@@ -2920,7 +3071,7 @@ int main(int, char*[])
     ugFlow->AddInputData(waveletImg);
 
     vtkNew<vtkMultiBlockDataGroupFilter> groupSeed;
-    groupSeed->AddInputDataObject(seedPD);
+    groupSeed->AddInputDataObject(seedPolyData);
 
     // Create Integrator
     vtkNew<vtkRungeKutta2> integrator;
@@ -2962,8 +3113,8 @@ int main(int, char*[])
     tracker->SetMaximumNumberOfSteps(-1);
     tracker->SetMaximumIntegrationTime(10.0);
     tracker->Update();
-    tracker->SetInputData(waveletImg); // inputData
-    tracker->SetSourceData(seedPD);    // sourceData
+    tracker->SetInputData(waveletImg);    // inputData
+    tracker->SetSourceData(seedPolyData); // sourceData
     tracker->SetMaximumNumberOfSteps(300);
     tracker->SetMaximumIntegrationTime(-1.0);
     tracker->SetSurfaceConnection(groupSurface->GetOutputPort());
@@ -3036,6 +3187,186 @@ int main(int, char*[])
 
 #endif // TEST501
 
+#ifdef TEST502
+
+#include "vtkActor.h"
+#include "vtkCellData.h"
+#include "vtkDataSetMapper.h"
+#include "vtkDoubleArray.h"
+#include "vtkImageData.h"
+#include "vtkInteractorStyleTrackballCamera.h"
+#include "vtkLagrangianMatidaIntegrationModel.h"
+#include "vtkLagrangianParticleTracker.h"
+#include "vtkPointData.h"
+#include "vtkPointSource.h"
+#include "vtkPolyDataMapper.h"
+#include "vtkRTAnalyticSource.h"
+#include "vtkRenderWindow.h"
+#include "vtkRenderWindowInteractor.h"
+#include "vtkRenderer.h"
+#include "vtkRungeKutta2.h"
+#include "vtkSphereSource.h"
+#include <vtkLookupTable.h>
+#include <vtkProbeFilter.h>
+
+int main(int, char*[])
+{
+    //--------------------------------------------------------------------
+    // 种子点数据
+    vtkNew<vtkPointSource> seeds;
+    seeds->SetNumberOfPoints(10);
+    seeds->SetRadius(4);
+    seeds->Update();
+
+    vtkPolyData* seedPolyData = seeds->GetOutput();
+
+    vtkNew<vtkDoubleArray> partVel;
+    partVel->SetNumberOfComponents(3); // tuple3
+    partVel->SetNumberOfTuples(seedPolyData->GetNumberOfPoints());
+    partVel->SetName("InitialVelocity");
+    partVel->FillComponent(0, 2); // 将每个tuple3的第0个分量设置为2，每一个tuple3的值都一样
+    partVel->FillComponent(1, 5); // 将每个tuple3的第0个分量设置为5
+    partVel->FillComponent(2, 1); // 将每个tuple3的第0个分量设置为1
+
+    vtkNew<vtkDoubleArray> partDens;
+    partDens->SetNumberOfComponents(1);
+    partDens->SetNumberOfTuples(seedPolyData->GetNumberOfPoints());
+    partDens->SetName("ParticleDensity");
+    partDens->FillComponent(0, 1920);
+
+    vtkNew<vtkDoubleArray> partDiam;
+    partDiam->SetNumberOfComponents(1);
+    partDiam->SetNumberOfTuples(seedPolyData->GetNumberOfPoints());
+    partDiam->SetName("ParticleDiameter");
+    partDiam->FillComponent(0, 0.1);
+
+    seedPolyData->GetPointData()->AddArray(partVel);
+    seedPolyData->GetPointData()->AddArray(partDens);
+    seedPolyData->GetPointData()->AddArray(partDiam);
+
+    //---------------------------------------------------------------------------------
+    // 网格数据
+    vtkNew<vtkRTAnalyticSource> wavelet;
+    wavelet->Update();
+    vtkImageData* waveletImg = wavelet->GetOutput();
+
+    // 设置流场数据
+    vtkNew<vtkDoubleArray> flowVel;
+    flowVel->SetNumberOfComponents(3);
+    flowVel->SetNumberOfTuples(waveletImg->GetNumberOfCells());
+    flowVel->SetName("FlowVelocity");
+    flowVel->FillComponent(0, -0.3);
+    flowVel->FillComponent(1, -0.3);
+    flowVel->FillComponent(2, -0.3);
+
+    vtkNew<vtkDoubleArray> flowDens;
+    flowDens->SetNumberOfComponents(1);
+    flowDens->SetNumberOfTuples(waveletImg->GetNumberOfCells());
+    flowDens->SetName("FlowDensity");
+    flowDens->FillComponent(0, 1000);
+
+    vtkNew<vtkDoubleArray> flowDynVisc;
+    flowDynVisc->SetNumberOfComponents(1);
+    flowDynVisc->SetNumberOfTuples(waveletImg->GetNumberOfCells());
+    flowDynVisc->SetName("FlowDynamicViscosity");
+    flowDynVisc->FillComponent(0, 0.894);
+
+    // 给每一个单元设置速度、压力、流动阻力
+    waveletImg->GetCellData()->AddArray(flowVel);
+    waveletImg->GetCellData()->AddArray(flowDens);
+    waveletImg->GetCellData()->AddArray(flowDynVisc);
+
+    vtkNew<vtkRungeKutta2> integrator;
+    vtkNew<vtkLagrangianMatidaIntegrationModel> integrationModel;
+    integrationModel->SetInputArrayToProcess(0, 1, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "InitialVelocity");
+    integrationModel->SetInputArrayToProcess(3, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "FlowVelocity");
+    integrationModel->SetInputArrayToProcess(4, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "FlowDensity");
+    integrationModel->SetInputArrayToProcess(5, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "FlowDynamicViscosity");
+    integrationModel->SetInputArrayToProcess(6, 1, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "ParticleDiameter");
+    integrationModel->SetInputArrayToProcess(7, 1, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "ParticleDensity");
+
+    vtkNew<vtkLagrangianParticleTracker> tracker;
+    tracker->SetIntegrator(integrator);             // 设置求解器
+    tracker->SetIntegrationModel(integrationModel); // 积分模型
+    tracker->SetStepFactor(0.1);                    // 积分步长
+    tracker->SetStepFactorMin(0.1);                 // 最小积分步长
+    tracker->SetStepFactorMax(0.1);                 // 最大积分步长
+    tracker->SetCellLengthComputationMode(vtkLagrangianParticleTracker::STEP_CUR_CELL_VEL_DIR);
+    tracker->AdaptiveStepReintegrationOn();   // 是否自适应步长，默认false
+    tracker->GenerateParticlePathsOutputOn(); // 是否生成粒子路径（迹线），默认true
+    tracker->SetMaximumIntegrationTime(10.0); // 最大生成时间，默认-1，没有时间限制
+    tracker->SetMaximumNumberOfSteps(300);    // 最大步数，默认100，-1表示没有限制
+    tracker->SetInputData(waveletImg);        // 网格
+    tracker->SetSourceData(seedPolyData);     // 种子点
+    tracker->Update();
+
+    // tracker->Print(std::cout);
+    // tracker->GetOutput()->Print(std::cout);
+
+    //----------------------------------------------------------------------
+    // 使用探针获取迹线的每一个顶点在网格中的标量或矢量值
+    vtkNew<vtkPointSet> pointSet;
+    pointSet->CopyStructure(vtkPolyData::SafeDownCast(tracker->GetOutput())); // 迹线上的每一个顶点
+
+    vtkNew<vtkProbeFilter> probe;
+    probe->SetInputData(pointSet);
+    probe->SetSourceData(waveletImg);
+    probe->Update();
+    // probe->GetOutput()->Print(std::cout);
+
+    // Array 0 name = RTData
+    // Array 1 name = FlowDensity
+    // Array 2 name = FlowDynamicViscosity
+    // Array 3 name = FlowVelocity
+    // Array 4 name = vtkValidPointMask
+    const char* varName = "RTData";
+
+    // 获取生成的迹线的标量/矢量数据
+    auto pointArray = vtkPointSet::SafeDownCast(probe->GetOutput())->GetPointData()->GetArray(varName);
+    auto range      = pointArray->GetRange();
+    // pointArray->Print(std::cout);
+
+    // 给迹线的顶点设置标量值
+    auto trackerPolyData = vtkPolyData::SafeDownCast(tracker->GetOutput());
+    trackerPolyData->GetPointData()->AddArray(pointArray);
+    trackerPolyData->GetPointData()->SetActiveScalars(varName);
+
+    vtkNew<vtkLookupTable> lut;
+    lut->SetHueRange(0.67, 0);
+    lut->SetRange(range);
+    lut->Build();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(trackerPolyData);
+    mapper->ScalarVisibilityOn();
+    mapper->SetLookupTable(lut);
+    mapper->SetScalarRange(range);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST502
+
 #ifdef TEST600
 
 #include <vtkActor.h>
@@ -3065,8 +3396,8 @@ int main()
     vtkNew<vtkOpenFOAMReader> openFOAMReader;
     openFOAMReader->SetFileName("../resources/cavity/cavity.foam"); // 设置读取文件路径
     openFOAMReader->SetCreateCellToPoint(1);
-    openFOAMReader->SetSkipZeroTime(1);                             // 开启跳过0时刻
-    openFOAMReader->SetTimeValue(2.0);                              // 设置需要读取的时刻
+    openFOAMReader->SetSkipZeroTime(1); // 开启跳过0时刻
+    openFOAMReader->SetTimeValue(2.0);  // 设置需要读取的时刻
     openFOAMReader->Update();
 
     auto numOfBlocks = openFOAMReader->GetOutput()->GetNumberOfBlocks();
@@ -3145,8 +3476,8 @@ int main()
     vtkNew<vtkOpenFOAMReader> openFOAMReader;
     openFOAMReader->SetFileName("../resources/cavity/cavity.foam"); // 设置读取文件路径
     openFOAMReader->SetCreateCellToPoint(1);
-    openFOAMReader->SetSkipZeroTime(1);                             // 开启跳过0时刻
-    openFOAMReader->SetTimeValue(1.5);                              // 设置需要读取的时刻
+    openFOAMReader->SetSkipZeroTime(1); // 开启跳过0时刻
+    openFOAMReader->SetTimeValue(1.5);  // 设置需要读取的时刻
     openFOAMReader->Update();
 
     vtkUnstructuredGrid* block0 = vtkUnstructuredGrid::SafeDownCast(openFOAMReader->GetOutput()->GetBlock(0));
@@ -3448,8 +3779,8 @@ int main()
     vtkNew<vtkOpenFOAMReader> openFOAMReader;
     openFOAMReader->SetFileName("../resources/cavity/cavity.foam"); // 设置读取文件路径
     openFOAMReader->SetCreateCellToPoint(1);
-    openFOAMReader->SetSkipZeroTime(1);                             // 开启跳过0时刻
-    openFOAMReader->SetTimeValue(1.5);                              // 设置需要读取的时刻
+    openFOAMReader->SetSkipZeroTime(1); // 开启跳过0时刻
+    openFOAMReader->SetTimeValue(1.5);  // 设置需要读取的时刻
     openFOAMReader->Update();
 
     vtkUnstructuredGrid* block0 = vtkUnstructuredGrid::SafeDownCast(openFOAMReader->GetOutput()->GetBlock(0));
@@ -3648,8 +3979,8 @@ int main(int argc, char* argv[])
     vtkNew<vtkQuadric> quadric;
     quadric->SetCoefficients(.5, 1., .2, 0., .1, 0., 0., .2, 0., 0.); // 设置二次函数的9个参数
 
-    vtkNew<vtkSampleFunction> sampler;                                // 采样函数
-    sampler->SetSampleDimensions(30, 30, 30);                         // 设置精度
+    vtkNew<vtkSampleFunction> sampler;        // 采样函数
+    sampler->SetSampleDimensions(30, 30, 30); // 设置精度
     sampler->SetImplicitFunction(quadric);
     sampler->Update();
 
@@ -3697,3 +4028,96 @@ int main(int argc, char* argv[])
 }
 
 #endif // TEST701
+
+#ifdef TEST702
+
+#include <vtkActor.h>
+#include <vtkCylinder.h>
+#include <vtkFlyingEdges3D.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPointData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProbeFilter.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSampleFunction.h>
+#include <vtkSphere.h>
+
+// https://examples.vtk.org/site/Cxx/Visualization/IsosurfaceSampling/
+
+int main(int argc, char* argv[])
+{
+    int resolution = 50;
+    if (argc > 1)
+    {
+        resolution = atoi(argv[1]);
+    }
+
+    vtkNew<vtkNamedColors> colors;
+
+    // Create a sampled sphere.
+    vtkNew<vtkSphere> implicitSphere;
+    double radius = 1.0;
+    implicitSphere->SetRadius(radius);
+
+    vtkNew<vtkSampleFunction> sampledSphere;
+    sampledSphere->SetSampleDimensions(resolution, resolution, resolution);
+    double xMin = -radius * 2.0;
+    double xMax = radius * 2.0;
+    sampledSphere->SetModelBounds(xMin, xMax, xMin, xMax, xMin, xMax);
+    sampledSphere->SetImplicitFunction(implicitSphere);
+
+    vtkNew<vtkFlyingEdges3D> isoSphere;
+    isoSphere->SetValue(0, 1.0);
+    isoSphere->SetInputConnection(sampledSphere->GetOutputPort());
+
+    // Create a sampled cylinder.
+    vtkNew<vtkCylinder> implicitCylinder;
+    implicitCylinder->SetRadius(radius / 2.0);
+    vtkNew<vtkSampleFunction> sampledCylinder;
+    sampledCylinder->SetSampleDimensions(resolution, resolution, resolution);
+    sampledCylinder->SetModelBounds(xMin, xMax, xMin, xMax, xMin, xMax);
+    sampledCylinder->SetImplicitFunction(implicitCylinder);
+
+    // Probe cylinder with the sphere isosurface.
+    vtkNew<vtkProbeFilter> probeCylinder;
+    probeCylinder->SetInputConnection(0, isoSphere->GetOutputPort());
+    probeCylinder->SetInputConnection(1, sampledCylinder->GetOutputPort());
+    probeCylinder->Update();
+
+    // Restore the original normals.
+    probeCylinder->GetOutput()->GetPointData()->SetNormals(isoSphere->GetOutput()->GetPointData()->GetNormals());
+
+    std::cout << "Scalar range: " << probeCylinder->GetOutput()->GetScalarRange()[0] << ", " << probeCylinder->GetOutput()->GetScalarRange()[1]
+              << std::endl;
+
+    // Create a mapper and actor.
+    vtkNew<vtkPolyDataMapper> mapSphere;
+    mapSphere->SetInputConnection(probeCylinder->GetOutputPort());
+    mapSphere->SetScalarRange(probeCylinder->GetOutput()->GetScalarRange());
+
+    vtkNew<vtkActor> sphere;
+    sphere->SetMapper(mapSphere);
+
+    // Visualize
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetWindowName("IsosurfaceSampling");
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderer->AddActor(sphere);
+    renderer->SetBackground(colors->GetColor3d("AliceBlue").GetData());
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST702
