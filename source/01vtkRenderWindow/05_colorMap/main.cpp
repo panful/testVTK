@@ -34,7 +34,7 @@
 * 702 vtkFlyingEdges3D 从体素数据提取等值面(isosurfaces)
 */
 
-#define TEST502
+#define TEST601
 
 #ifdef TEST100
 
@@ -3521,22 +3521,6 @@ int main()
     double scalarRange[2] { 0.0 };
     streamlinedata->GetPointData()->GetScalars()->GetRange(scalarRange);
     std::cout << "point scalar:\t" << scalarRange[0] << '\t' << scalarRange[1] << '\n';
-    if (auto&& pv = streamlinedata->GetPointData()->GetVectors())
-    {
-        std::cout << "point vector\t" << pv->GetRange()[0] << '\t' << pv->GetRange()[1] << '\t' << pv->GetRange()[2] << '\n';
-    }
-    if (auto&& cs = streamlinedata->GetCellData()->GetScalars())
-    {
-        std::cout << "cell scalar:\t" << cs[0] << '\t' << cs[1] << '\n';
-    }
-    if (auto&& cv = streamlinedata->GetCellData()->GetVectors())
-    {
-        std::cout << "cell vector\t" << cv->GetRange()[0] << '\t' << cv->GetRange()[1] << '\t' << cv->GetRange()[2] << '\n';
-    }
-
-    // 生成流线 向量数据不是必须的，标量数据是必须的，待进一步验证
-    // streamlinedata->GetPointData()->SetVectors(nullptr);
-    // streamlinedata->GetPointData()->SetScalars(nullptr);
 
     vtkNew<vtkScalarBarActor> scalarBar;
     vtkNew<vtkLookupTable> pColorTable;
@@ -3789,6 +3773,8 @@ int main()
     auto vectors = block0->GetPointData()->GetVectors();
     auto scalars = block0->GetPointData()->GetScalars();
     std::cout << "Vectors name: " << vectors->GetName() << "\nScalars name: " << scalars->GetName() << '\n';
+
+    // 生成流线 向量数据是必须的，因为计算的是速度（矢量）的切线
 
     vtkNew<vtkUnstructuredGrid> grid;
     grid->SetPoints(block0->GetPoints());

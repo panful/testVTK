@@ -1,12 +1,122 @@
-/*
+/**
+ * 001.自定义 Filter 继承自 vtkPolyDataAlgorithm
  * 101.vtkProbeFilter 探针的基础使用
  * 102.vtkGlyph3D vtkProbeFilter vtkSampleFunction vtkThreshold
- * 
+ *
  * 201.vtkWarpScalar vtkWarpVector 根据标量或向量值在指定方向对顶点进行偏移
 
  */
 
-#define TEST102
+#define TEST003
+
+#ifdef TEST001
+
+#include <vtkActor.h>
+#include <vtkCellArray.h>
+#include <vtkInformation.h>
+#include <vtkInformationVector.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataAlgorithm.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkTubeFilter.h>
+
+class MyFilter : public vtkPolyDataAlgorithm
+{
+public:
+    vtkTypeMacro(MyFilter, vtkPolyDataAlgorithm);
+
+    static MyFilter* New();
+
+protected:
+    MyFilter()           = default;
+    ~MyFilter() override = default;
+
+    // int RequestInformation(vtkInformation* request, vtkInformationVector** inputVector, vtkInformationVector* outputVector) override
+    // {
+    // }
+
+    int RequestData(vtkInformation* request, vtkInformationVector** inputVector, vtkInformationVector* outputVector) override
+    {
+        // 获取输入数据
+        vtkInformation* inInfo = inputVector[0]->GetInformationObject(0);
+        vtkPolyData* inputData = vtkPolyData::SafeDownCast(inInfo->Get(vtkDataObject::DATA_OBJECT()));
+
+        // 创建输出数据
+        vtkInformation* outInfo = outputVector->GetInformationObject(0);
+        vtkPolyData* outputData = vtkPolyData::SafeDownCast(outInfo->Get(vtkDataObject::DATA_OBJECT()));
+
+        // 对输入的数据进行处理，并设置到输出数据中
+        outputData->DeepCopy(inputData);
+
+        return 1;
+    }
+
+    // int RequestUpdateExtent(vtkInformation*, vtkInformationVector**, vtkInformationVector*) override
+    // {
+    // }
+
+private:
+    MyFilter(const MyFilter&)       = delete;
+    void operator=(const MyFilter&) = delete;
+};
+
+vtkStandardNewMacro(MyFilter);
+
+int main()
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0.0, 0.0, 0.0);
+    points->InsertNextPoint(1.0, 0.0, 0.0);
+    points->InsertNextPoint(2.0, 1.0, 0.0);
+    points->InsertNextPoint(3.0, 1.0, 0.0);
+
+    vtkNew<vtkCellArray> cells;
+    cells->InsertNextCell({ 0, 1, 2, 3 });
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetLines(cells);
+
+    vtkNew<MyFilter> filter;
+    filter->SetInputData(polyData);
+    filter->Update();
+
+    //------------------------------------------------------------------------------
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(filter->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    //------------------------------------------------------------------------------
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST001
 
 #ifdef TEST101
 
@@ -328,4 +438,3 @@ int main(int, char*[])
 }
 
 #endif // TEST201
-
