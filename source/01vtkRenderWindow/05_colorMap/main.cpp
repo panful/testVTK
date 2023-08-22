@@ -3370,7 +3370,6 @@ int main(int, char*[])
 #ifdef TEST600
 
 #include <vtkActor.h>
-#include <vtkAppendPolyData.h>
 #include <vtkArrayCalculator.h>
 #include <vtkDataSetMapper.h>
 #include <vtkInteractorStyleTrackballCamera.h>
@@ -3449,7 +3448,6 @@ int main()
 #ifdef TEST601
 
 #include <vtkActor.h>
-#include <vtkAppendPolyData.h>
 #include <vtkArrayCalculator.h>
 #include <vtkCellData.h>
 #include <vtkDataSetMapper.h>
@@ -3736,7 +3734,6 @@ int main(int argc, char* argv[])
 #ifdef TEST603
 
 #include <vtkActor.h>
-#include <vtkAppendPolyData.h>
 #include <vtkArrayCalculator.h>
 #include <vtkCellData.h>
 #include <vtkDataSetMapper.h>

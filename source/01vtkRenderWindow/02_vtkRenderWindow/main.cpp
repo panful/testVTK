@@ -22,7 +22,7 @@
 09.绘制点，线，面，类似Opengl 顶点+索引的绘制方式
 10.2D网格绘制
 11.拟合样条曲线生成柱状体
-12.vtkAppendPolyData合并多个polydata
+12.
 13.多窗口使用相同的数据同一个相机（即多个窗口显示完全一样的东西，交互也是同步的）
 
 15.箭头，可以控制箭头的方向
@@ -1122,101 +1122,7 @@ int main(int, char*[])
 
 #endif // TEST11
 
-#ifdef TEST12
 
-// https://blog.csdn.net/qq_41023026/article/details/119776151
-
-#include "vtkActor.h"
-#include "vtkCutter.h"
-#include "vtkInteractorStyleTrackballCamera.h"
-#include "vtkPlane.h"
-#include "vtkPolyData.h"
-#include "vtkPolyDataMapper.h"
-#include "vtkPolyDataNormals.h"
-#include "vtkProperty.h"
-#include "vtkRenderWindow.h"
-#include "vtkRenderWindowInteractor.h"
-#include "vtkRenderer.h"
-#include "vtkSmartPointer.h"
-#include "vtkStripper.h"
-#include "vtkTriangleFilter.h"
-#include "vtkXMLPolyDataReader.h"
-
-#include "vtkAppendPolyData.h"
-#include "vtkCleanPolyData.h"
-#include "vtkConeSource.h"
-#include "vtkLineSource.h"
-#include "vtkTubeFilter.h"
-#include <vtkCubeSource.h>
-
-int main()
-{
-    vtkSmartPointer<vtkConeSource> coneSource = vtkSmartPointer<vtkConeSource>::New();
-    coneSource->SetCenter(0, 0, 0);
-    coneSource->SetRadius(2);
-    coneSource->SetHeight(10);
-    coneSource->SetResolution(50);
-    coneSource->Update();
-
-    // second
-    vtkSmartPointer<vtkLineSource> line = vtkSmartPointer<vtkLineSource>::New();
-    line->SetPoint1(1.0, 0, 0);
-    line->SetPoint2(0, 1.0, 20);
-
-    vtkSmartPointer<vtkTubeFilter> tube = vtkSmartPointer<vtkTubeFilter>::New();
-    tube->SetInputConnection(line->GetOutputPort());
-    tube->SetRadius(2);
-    tube->SetNumberOfSides(50);
-    tube->SetCapping(1);
-    tube->Update();
-
-    vtkNew<vtkCubeSource> cube;
-    cube->SetXLength(10);
-    cube->SetYLength(10);
-    cube->SetZLength(10);
-    cube->Update();
-
-    // combine two poly data
-    vtkSmartPointer<vtkAppendPolyData> appendFilter = vtkSmartPointer<vtkAppendPolyData>::New();
-    appendFilter->AddInputData(tube->GetOutput());
-    appendFilter->AddInputData(coneSource->GetOutput());
-    appendFilter->AddInputData(cube->GetOutput());
-    appendFilter->Update();
-
-    // Remove any duplicate points.
-    vtkSmartPointer<vtkCleanPolyData> cleanFilter = vtkSmartPointer<vtkCleanPolyData>::New();
-    cleanFilter->SetInputConnection(appendFilter->GetOutputPort());
-    cleanFilter->Update();
-
-    // Create a mapper and actor
-    vtkSmartPointer<vtkPolyDataMapper> appendmapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    appendmapper->SetInputConnection(cleanFilter->GetOutputPort());
-
-    vtkSmartPointer<vtkActor> appendactor = vtkSmartPointer<vtkActor>::New();
-    appendactor->SetMapper(appendmapper);
-    appendactor->GetProperty()->SetColor(1., 0., 0.);
-
-    // Create a renderer, render window, and interactor
-    vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
-
-    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
-
-    renderWindow->AddRenderer(renderer);
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-
-    // Add the actors to the scene
-    renderer->AddActor(appendactor);
-    renderer->SetBackground(.3, .2, .1); // Background color dark red
-
-    // Render and interact
-    renderWindow->Render();
-    renderWindowInteractor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST12
 
 #ifdef TEST13
 

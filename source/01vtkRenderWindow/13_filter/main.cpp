@@ -4,10 +4,14 @@
  * 102.vtkGlyph3D vtkProbeFilter vtkSampleFunction vtkThreshold
  *
  * 201.vtkWarpScalar vtkWarpVector 根据标量或向量值在指定方向对顶点进行偏移
-
+ *
+ * 301.vtkAppendPolyData 合并多个 vtkPolyData
+ * 302.合并带有Scalars、Vectors的vtkPolyData
+ * 303.使用不同方式设置Scalars数据时，合并后的polyData没有Scalars数据
+ *
  */
 
-#define TEST003
+#define TEST303
 
 #ifdef TEST001
 
@@ -438,3 +442,362 @@ int main(int, char*[])
 }
 
 #endif // TEST201
+
+#ifdef TEST301
+
+#include <vtkActor.h>
+#include <vtkAppendPolyData.h>
+#include <vtkConeSource.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+
+int main()
+{
+    vtkNew<vtkSphereSource> sphere;
+    sphere->SetCenter(0, 0, 0);
+    sphere->Update();
+    vtkNew<vtkConeSource> cone;
+    cone->SetCenter(1., 1., 1.);
+    cone->Update();
+    vtkNew<vtkCubeSource> cube;
+    cube->SetCenter(2., 2., 2.);
+    cube->Update();
+
+    std::cout << "Sphere\t points: " << sphere->GetOutput()->GetNumberOfPoints() << "\tcells: " << sphere->GetOutput()->GetNumberOfCells() << '\n';
+    std::cout << "Cone\t points: " << cone->GetOutput()->GetNumberOfPoints() << "\tcells: " << cone->GetOutput()->GetNumberOfCells() << '\n';
+    std::cout << "Cube\t points: " << cube->GetOutput()->GetNumberOfPoints() << "\tcells: " << cube->GetOutput()->GetNumberOfCells() << '\n';
+
+    // 将多个vtkPolyData合并为一个vtkPolyData
+    vtkNew<vtkAppendPolyData> appendPolyData;
+    appendPolyData->AddInputData(sphere->GetOutput());
+    appendPolyData->AddInputData(cone->GetOutput());
+    appendPolyData->AddInputData(cube->GetOutput());
+    appendPolyData->Update();
+
+    // 新生成的vtkPolyData的顶点、单元个数是原来的所有vtkPolyData的顶点、单元的个数之和
+    std::cout << "Append\t points: " << appendPolyData->GetOutput()->GetNumberOfPoints()
+              << "\tcells: " << appendPolyData->GetOutput()->GetNumberOfCells() << '\n';
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(appendPolyData->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(1, 0, 0);
+
+    //------------------------------------------------------------------------------
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST301
+
+#ifdef TEST302
+
+#include <vtkActor.h>
+#include <vtkAppendPolyData.h>
+#include <vtkCellArray.h>
+#include <vtkDoubleArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main()
+{
+    //----------------------------------------------------------------------
+    // PolyData0
+    vtkNew<vtkPoints> points0;
+    points0->InsertNextPoint(0.0, 0.0, 0.0);
+    points0->InsertNextPoint(1.0, 0.0, 0.0);
+    points0->InsertNextPoint(2.0, 1.0, 0.0);
+    points0->InsertNextPoint(3.0, 1.0, 0.0);
+
+    vtkNew<vtkCellArray> cells0;
+    cells0->InsertNextCell({ 0, 1, 2, 3 });
+
+    vtkNew<vtkDoubleArray> scalars0;
+    scalars0->SetName("Scalars");
+    scalars0->InsertNextValue(1.0);
+    scalars0->InsertNextValue(2.0);
+    scalars0->InsertNextValue(3.0);
+    scalars0->InsertNextValue(4.0);
+
+    vtkNew<vtkPolyData> polyData0;
+    polyData0->SetPoints(points0);
+    polyData0->SetLines(cells0);
+    polyData0->GetPointData()->AddArray(scalars0);
+    polyData0->GetPointData()->SetActiveScalars("Scalars");
+
+    //----------------------------------------------------------------------
+    // PolyData1
+    vtkNew<vtkPoints> points1;
+    points1->InsertNextPoint(0.0, 0.0, 1.0);
+    points1->InsertNextPoint(1.0, 0.0, 1.0);
+    points1->InsertNextPoint(2.0, 1.0, 1.0);
+    points1->InsertNextPoint(3.0, 1.0, 1.0);
+
+    vtkNew<vtkCellArray> cells1;
+    cells1->InsertNextCell({ 0, 1, 2, 3 });
+
+    vtkNew<vtkDoubleArray> scalars1;
+    scalars1->SetName("Scalars");
+    scalars1->InsertNextValue(4.0);
+    scalars1->InsertNextValue(3.0);
+    scalars1->InsertNextValue(2.0);
+    scalars1->InsertNextValue(1.0);
+
+    vtkNew<vtkPolyData> polyData1;
+    polyData1->SetPoints(points1);
+    polyData1->SetLines(cells1);
+    polyData1->GetPointData()->AddArray(scalars1);
+    polyData1->GetPointData()->SetActiveScalars("Scalars");
+
+    //----------------------------------------------------------------------
+    // PolyData2
+    vtkNew<vtkPoints> points2;
+    points2->InsertNextPoint(0.0, 0.0, 2.0);
+    points2->InsertNextPoint(1.0, 0.0, 2.0);
+    points2->InsertNextPoint(2.0, 1.0, 2.0);
+    points2->InsertNextPoint(3.0, 1.0, 2.0);
+
+    vtkNew<vtkCellArray> cells2;
+    cells2->InsertNextCell({ 0, 1, 2, 3 });
+
+    vtkNew<vtkDoubleArray> scalars2;
+    scalars2->SetName("Scalars");
+    scalars2->InsertNextValue(4.0);
+    scalars2->InsertNextValue(2.0);
+    scalars2->InsertNextValue(2.0);
+    scalars2->InsertNextValue(4.0);
+
+    vtkNew<vtkPolyData> polyData2;
+    polyData2->SetPoints(points2);
+    polyData2->SetLines(cells2);
+    polyData2->GetPointData()->AddArray(scalars2);
+    polyData2->GetPointData()->SetActiveScalars("Scalars");
+
+    //----------------------------------------------------------------------
+    // 合并vtkPolyData
+    vtkNew<vtkAppendPolyData> appendPolyData;
+    appendPolyData->AddInputData(polyData0);
+    appendPolyData->AddInputData(polyData1);
+    appendPolyData->AddInputData(polyData2);
+    appendPolyData->Update();
+
+    vtkNew<vtkLookupTable> lut;
+    lut->SetHueRange(0.67, 0.0);
+    lut->SetRange(1, 4);
+    lut->Build();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(appendPolyData->GetOutput());
+    mapper->SetLookupTable(lut);
+    mapper->ScalarVisibilityOn();
+    mapper->SetScalarRange(1, 4);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    //------------------------------------------------------------------------------
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST302
+
+#ifdef TEST303
+
+#include <vtkActor.h>
+#include <vtkAppendPolyData.h>
+#include <vtkCellArray.h>
+#include <vtkDoubleArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main()
+{
+    //----------------------------------------------------------------------
+    // PolyData0
+    vtkNew<vtkPoints> points0;
+    points0->InsertNextPoint(0.0, 0.0, 0.0);
+    points0->InsertNextPoint(1.0, 0.0, 0.0);
+    points0->InsertNextPoint(2.0, 1.0, 0.0);
+    points0->InsertNextPoint(3.0, 1.0, 0.0);
+
+    vtkNew<vtkCellArray> cells0;
+    cells0->InsertNextCell({ 0, 1, 2, 3 });
+
+    vtkNew<vtkDoubleArray> scalars0;
+    scalars0->SetName("Scalars");
+    scalars0->InsertNextValue(1.0);
+    scalars0->InsertNextValue(2.0);
+    scalars0->InsertNextValue(3.0);
+    scalars0->InsertNextValue(4.0);
+
+    vtkNew<vtkPolyData> polyData0;
+    polyData0->SetPoints(points0);
+    polyData0->SetLines(cells0);
+    polyData0->GetPointData()->AddArray(scalars0);
+    polyData0->GetPointData()->SetActiveScalars("Scalars");
+    std::cout << "polyData0\t Scalars:" << polyData0->GetPointData()->GetScalars()->GetNumberOfValues() << '\n';
+
+    //----------------------------------------------------------------------
+    // PolyData1
+    vtkNew<vtkPoints> points1;
+    points1->InsertNextPoint(0.0, 0.0, 1.0);
+    points1->InsertNextPoint(1.0, 0.0, 1.0);
+    points1->InsertNextPoint(2.0, 1.0, 1.0);
+    points1->InsertNextPoint(3.0, 1.0, 1.0);
+
+    vtkNew<vtkCellArray> cells1;
+    cells1->InsertNextCell({ 0, 1, 2, 3 });
+
+    vtkNew<vtkDoubleArray> scalars1;
+    scalars1->SetName("Scalars");
+    scalars1->InsertNextValue(4.0);
+    scalars1->InsertNextValue(3.0);
+    scalars1->InsertNextValue(2.0);
+    scalars1->InsertNextValue(1.0);
+
+    vtkNew<vtkPolyData> polyData1;
+    polyData1->SetPoints(points1);
+    polyData1->SetLines(cells1);
+    polyData1->GetPointData()->AddArray(scalars1);
+    polyData1->GetPointData()->SetActiveScalars("Scalars");
+    std::cout << "polyData1\t Scalars:" << polyData1->GetPointData()->GetScalars()->GetNumberOfValues() << '\n';
+
+    //----------------------------------------------------------------------
+    // PolyData2
+    vtkNew<vtkPoints> points2;
+    points2->InsertNextPoint(0.0, 0.0, 2.0);
+    points2->InsertNextPoint(1.0, 0.0, 2.0);
+    points2->InsertNextPoint(2.0, 1.0, 2.0);
+    points2->InsertNextPoint(3.0, 1.0, 2.0);
+
+    vtkNew<vtkCellArray> cells2;
+    cells2->InsertNextCell({ 0, 1, 2, 3 });
+
+    vtkNew<vtkDoubleArray> scalars2;
+    // scalars2->SetName("Scalars");
+    scalars2->InsertNextValue(4.0);
+    scalars2->InsertNextValue(2.0);
+    scalars2->InsertNextValue(2.0);
+    scalars2->InsertNextValue(4.0);
+
+    vtkNew<vtkPolyData> polyData2;
+    polyData2->SetPoints(points2);
+    polyData2->SetLines(cells2);
+    polyData2->GetPointData()->SetScalars(scalars2);
+    //polyData2->GetPointData()->AddArray(scalars2);
+    //polyData2->GetPointData()->SetActiveScalars("Scalars");
+    std::cout << "polyData2\t Scalars:" << polyData2->GetPointData()->GetScalars()->GetNumberOfValues() << '\n';
+
+    //----------------------------------------------------------------------
+    // 合并vtkPolyData
+    // polyData2使用SetScalars()设置Scalars数据，其他两个使用AddArray()设置Scalars数据
+    // 只要不同的vtkPolyData的Scalars数据的名称相同就能合并，名称不同时才不能合并(SetName()的参数相同)
+    // 和使用SetScalars还是AddArray没有关系
+    vtkNew<vtkAppendPolyData> appendPolyData;
+    appendPolyData->AddInputData(polyData0);
+    appendPolyData->AddInputData(polyData1);
+    appendPolyData->AddInputData(polyData2);
+    appendPolyData->Update();
+
+    if (auto scalars = appendPolyData->GetOutput()->GetPointData()->GetScalars())
+    {
+        std::cout << "Append\t Scalars:" << scalars->GetNumberOfValues() << '\n';
+    }
+    else
+    {
+        std::cout << "Append PolyData does not have Scalars data\n";
+    }
+
+    vtkNew<vtkLookupTable> lut;
+    lut->SetHueRange(0.67, 0.0);
+    lut->SetRange(1, 4);
+    lut->Build();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(appendPolyData->GetOutput());
+    mapper->SetLookupTable(lut);
+    mapper->ScalarVisibilityOn();
+    mapper->SetScalarRange(1, 4);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    //------------------------------------------------------------------------------
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST303
