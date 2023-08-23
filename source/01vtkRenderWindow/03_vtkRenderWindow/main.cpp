@@ -25,7 +25,7 @@
 24.多边形转三角形 vtkTriangleFilter https://kitware.github.io/vtk-examples/site/Cxx/PolyData/PolygonalSurfaceContourLineInterpolator/
 25.让一个模型始终在其他模型的上层 重叠的面旋转时会闪烁 https://www.weiy.city/2020/03/make-model-always-on-top/
 26.在曲面上画线 TEST24绘制最短路径就是用的该方法 https://kitware.github.io/vtk-examples/site/Cxx/PolyData/PolygonalSurfacePointPlacer/
-27 vtkContourTriangulator https://kitware.github.io/vtk-examples/site/Cxx/Modelling/ContourTriangulator/
+27 
 28 vtkStripper https://kitware.github.io/vtk-examples/site/Cxx/Visualization/LabelContours/
 29.自定义方法填充线框生成面，闭合线框生成三角面(一个三角面只能由三条线构成，即生成最小的所有三角面）
 30.vtkDelaunay2D 三角剖分 TEST42 表面重建 https://zhuanlan.zhihu.com/p/459884570
@@ -3162,102 +3162,6 @@ int main(int, char* [])
 
 #endif // TEST26
 
-#ifdef TEST27
-
-#include <vtkActor.h>
-#include <vtkCamera.h>
-#include <vtkContourTriangulator.h>
-#include <vtkDataSetMapper.h>
-#include <vtkMarchingSquares.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPNGReader.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-
-int main(int argc, char* argv[])
-{
-    std::string inputFileName;
-    if (argc > 1)
-    {
-        inputFileName = argv[1];
-    }
-    else
-    {
-        cout << "Usage: " << argv[0]
-            << " png_file [iso value] e.g. fullhead15.png 500" << endl;
-        return EXIT_FAILURE;
-    }
-    int isoValue = 500;
-    if (argc > 2)
-    {
-        isoValue = atoi(argv[2]);
-    }
-
-    vtkNew<vtkNamedColors> colors;
-
-    vtkNew<vtkPNGReader> reader;
-    if (!reader->CanReadFile(inputFileName.c_str()))
-    {
-        std::cerr << "Error: Could not read " << inputFileName << ".\n";
-        return EXIT_FAILURE;
-    }
-    reader->SetFileName(inputFileName.c_str());
-    reader->Update();
-
-    vtkNew<vtkMarchingSquares> iso;
-    iso->SetInputConnection(reader->GetOutputPort());
-    iso->SetValue(0, isoValue);
-
-    vtkNew<vtkDataSetMapper> isoMapper;
-    isoMapper->SetInputConnection(iso->GetOutputPort());
-    isoMapper->ScalarVisibilityOff();
-
-    vtkNew<vtkActor> isoActor;
-    isoActor->SetMapper(isoMapper);
-    isoActor->GetProperty()->SetColor(
-        colors->GetColor3d("MediumOrchid").GetData());
-
-    vtkNew<vtkContourTriangulator> poly;
-    poly->SetInputConnection(iso->GetOutputPort());
-
-    vtkNew<vtkDataSetMapper> polyMapper;
-    polyMapper->SetInputConnection(poly->GetOutputPort());
-    polyMapper->ScalarVisibilityOff();
-
-    vtkNew<vtkActor> polyActor;
-    polyActor->SetMapper(polyMapper);
-    polyActor->GetProperty()->SetColor(colors->GetColor3d("Gray").GetData());
-
-    // Standard rendering classes
-    vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkRenderWindow> renWin;
-    renWin->SetMultiSamples(0);
-    renWin->AddRenderer(renderer);
-    renWin->SetWindowName("ContourTriangulator");
-
-    vtkNew<vtkRenderWindowInteractor> iren;
-    iren->SetRenderWindow(renWin);
-
-    renderer->AddActor(polyActor);
-    renderer->AddActor(isoActor);
-    renderer->SetBackground(colors->GetColor3d("DarkSlateGray").GetData());
-    renWin->SetSize(300, 300);
-
-    vtkCamera* camera = renderer->GetActiveCamera();
-    renderer->ResetCamera();
-    camera->Azimuth(180);
-
-    renWin->Render();
-    iren->Initialize();
-    iren->Start();
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST27
 
 #ifdef TEST28
 
