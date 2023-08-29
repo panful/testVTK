@@ -7,10 +7,11 @@
  * 2. 非结构cgns
  * 3. FLUENT *.cas *.dat 只绘制图形，不映射流场数据 FLUENT控制台使用 f c n wcd fileName 导出 fileName.cas和fileName.dat
  * 4. FLUENT *.cas *.dat 将流场数据映射到颜色
- * 5. 构造vtkUnstructuredGrid，四面体、六面体、棱柱、棱锥等图形
+ * 5. 构造 vtkUnstructuredGrid，四面体、六面体、棱柱、棱锥等图形
+ * 6. 读写 vtkUnstructuredGrid vtkPolyData
  */
 
-#define TEST5
+#define TEST6
 
 #ifdef TEST1
 
@@ -439,3 +440,117 @@ int main()
 }
 
 #endif // TEST5
+
+#ifdef TEST6
+
+#include <iostream>
+#include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkDataSetMapper.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkMultiBlockDataSet.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkPolyDataReader.h>
+#include <vtkPolyDataWriter.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkUnstructuredGrid.h>
+#include <vtkUnstructuredGridReader.h>
+#include <vtkUnstructuredGridWriter.h>
+
+vtkSmartPointer<vtkUnstructuredGrid> usgWR()
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0, 0, 0);
+    points->InsertNextPoint(2, 0, 0);
+    points->InsertNextPoint(1, 0, 2);
+    points->InsertNextPoint(1, 2, 1);
+
+    vtkNew<vtkUnstructuredGrid> usg;
+    usg->SetPoints(points);
+
+    // 四面体
+    vtkIdType ids_tetra[] { 0, 1, 2, 3 };
+    usg->InsertNextCell(VTK_TETRA, 4, ids_tetra);
+
+    vtkNew<vtkUnstructuredGridWriter> usgWriter;
+    usgWriter->SetFileName("usg.vtk");
+    usgWriter->SetInputData(usg);
+    usgWriter->Write();
+
+    vtkNew<vtkUnstructuredGridReader> usgReader;
+    usgReader->SetFileName("usg.vtk");
+    usgReader->Update();
+
+    return usgReader->GetOutput();
+}
+
+vtkSmartPointer<vtkPolyData> polyDataWR()
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(3, 0, 0);
+    points->InsertNextPoint(5, 0, 0);
+    points->InsertNextPoint(4, 2, 0);
+
+    vtkNew<vtkCellArray> cells;
+    cells->InsertNextCell({ 0, 1, 2 });
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+
+    vtkNew<vtkPolyDataWriter> polyDataWriter;
+    polyDataWriter->SetFileName("polyData.vtk");
+    polyDataWriter->SetInputData(polyData);
+    polyDataWriter->Write();
+
+    vtkNew<vtkPolyDataReader> polyDataReader;
+    polyDataReader->SetFileName("polyData.vtk");
+    polyDataReader->Update();
+
+    return polyDataReader->GetOutput();
+}
+
+int main()
+{
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(usgWR());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkPolyDataMapper> mapper2;
+    mapper2->SetInputData(polyDataWR());
+
+    vtkNew<vtkActor> actor2;
+    actor2->SetMapper(mapper2);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->AddActor(actor2);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->SetSize(800, 600);
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST6
