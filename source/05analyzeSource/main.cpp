@@ -1,4 +1,4 @@
-
+﻿
 /*
  * 1. 整个渲染的流程 生成vbo和ibo DrawCall
  * 2. shader源码的生成、修改、编译、uniform的设置
@@ -10,12 +10,10 @@
  * 8. 多个vtkRenderer，多个图层，让后面的vtkRenderer始终在之前的上面
  * 9. vtk自定义的始终在最上层的图元
  * 10.拾取vtkProp vtkPropPicker
- *
- *
- * 66. 交叉图形的混合透明度
+ * 11.顺序无关透明
  */
 
-#define TEST10
+#define TEST11
 
 #ifdef TEST1
 
@@ -36,7 +34,7 @@
  vtkRenderWindow::Render()->vtkRenderer::Render()->vtkActor::Render()->vtkMapper::Render()
 
  vtkOpenGLRenderer.cxx                  [298]   UpdateGeometry()
- vtkOpenGLPolyDataMapper.cxx            [3845]  BuildBufferObjects()
+ vtkOpenGLPolyDataMapper.cxx            [3845]  BuildBufferObjects() 顶点着色器的输入 vertexMC normalMC scalarColor tcoord tangentMC
 
 创建VBO IBO，加载顶点、拓扑数据
  vtkOpenGLVertexBufferObjectGroup.cxx   [322]   BuildAllVBOs()
@@ -493,6 +491,19 @@ vtkStandardNewMacro(MyStyle);
 
 // 设置纹理环绕方式为ClampToEdge或ClampToBorder(根据OpenGL版本设置)
 // [3868] void vtkOpenGLPolyDataMapper::BuildBufferObjects
+
+/*
+ * 1.每个顶点设置标量值且关闭（Mapper默认关闭） InterpolateScalarsBeforeMapping
+ * vtkUnsignedCharArray* vtkMapper::MapScalars      将每个顶点的标量值映射为 uchar 类型的颜色值
+ * void vtkOpenGLPolyDataMapper::BuildBufferObjects 顶点的颜色值会被当作顶点属性 scalarColor 输入到顶点着色器
+ *
+ * 2.每个顶点设置标量值且开启 InterpolateScalarsBeforeMapping
+ * 顶点着色器输入 tcoord 通过在片段着色器中使用纹理映射图元颜色
+ *
+ * 当 Mapper 修改时，例如修改当前激活的颜色映射Array，会调用以下函数判断是否需要重新生成VBO
+ * bool vtkOpenGLPolyDataMapper::GetNeedToRebuildBufferObjects
+ * 再调用 BuildBufferObjects 重新生成VBO 最后通过glBufferData提交数据
+ */
 
 int main(int, char*[])
 {
@@ -1009,9 +1020,7 @@ int main(int argc, char* argv[])
 
 #endif // TEST10
 
-
-
-#ifdef TEST66
+#ifdef TEST11
 
 #include <vtkActor.h>
 #include <vtkCamera.h>
@@ -1031,7 +1040,6 @@ int main(int argc, char* argv[])
  * 调用glDepthMask(GL_TRUE)先渲染不透明的vtkActor，再使用顺序无关透明渲染透明的vtkActor
  * uniform opacityUniform
  * gl_FragDepth
- *
  */
 
 int main()
@@ -1200,4 +1208,4 @@ int main()
     return 0;
 }
 
-#endif // TEST66
+#endif // TEST11
