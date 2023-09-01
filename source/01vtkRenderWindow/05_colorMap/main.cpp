@@ -1,4 +1,4 @@
-/*
+﻿/*
  * 100 上下左右四视图，格点、格心数据，线框、面显示模式的区别
  * 101 色卡 vtkScalarBarActor 颜色查找表 vtkLookupTable
  * 102 vtkScalarBarWidget 拖动色卡，获取色卡色带部分的具体位置，用来标记某一个颜色条
@@ -1916,6 +1916,8 @@ int main(int, char*[])
 #include "vtkRenderer.h"
 #include "vtkRungeKutta2.h"
 #include "vtkSphereSource.h"
+
+// paraview 粒子追踪 https://blog.csdn.net/dsfsdffgfd/article/details/81781189
 
 int main(int, char*[])
 {

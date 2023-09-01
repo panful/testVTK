@@ -44,9 +44,6 @@
 
 38.plot https://kitware.github.io/vtk-examples/site/Cxx/Plotting/LinePlot/
 
-40.
-41.
-42.
 43.reverse access ,从经过算法(vtkAlgorithm,vtkPolyDataAlgorithm)变换的数据中获取源数据（vtkPolyData,vtkDataSet）
 44.vtkChart https://kitware.github.io/vtk-examples/site/Cxx/DataStructures/OctreeTimingDemo/
 45.从Actor中获取polyData，并修改polyData的属性会改变原来Actor的状态，深拷贝可以不改变源Actor状态
@@ -67,7 +64,7 @@
 
 */
 
-#define TEST40
+#define TEST66
 
 // 在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 // #include <vtkAutoInit.h>
