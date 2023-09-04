@@ -2,8 +2,9 @@
  * 001.自定义 Filter 继承自 vtkPolyDataAlgorithm
  * 002.从经过 Filter 变换后的数据获取原始数据
  *
- * 101.vtkProbeFilter 探针的基础使用
+ * 101.vtkProbeFilter 探针的基础使用，探针某些时候插值的结果并不准确
  * 102.vtkGlyph3D vtkProbeFilter vtkSampleFunction vtkThreshold
+ * 103 vtkPointInterpolator 插值，类似探针，比探针结果更准确
  *
  * 201.vtkWarpScalar vtkWarpVector 根据标量或向量值在指定方向对顶点进行偏移
  *
@@ -16,7 +17,7 @@
  * 403 vtkCellCenters 获取单元中心即格心，并用球体标注格心
  */
 
-#define TEST002
+#define TEST103
 
 #ifdef TEST001
 
@@ -476,6 +477,145 @@ int main(int argc, char* argv[])
 }
 
 #endif // TEST102
+
+#ifdef TEST103
+
+#include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkCellDataToPointData.h>
+#include <vtkDoubleArray.h>
+#include <vtkGaussianKernel.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLinearKernel.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPointInterpolator.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main(int, char*[])
+{
+    // 顶点
+    vtkNew<vtkPoints> points;
+    for (size_t i = 0; i < 10; i++)
+    {
+        points->InsertNextPoint(i, 0, 0);
+        points->InsertNextPoint(i, 1, 0);
+        points->InsertNextPoint(i, 2, 0);
+        points->InsertNextPoint(i, 3, 0);
+    }
+
+    // 拓扑
+    vtkNew<vtkCellArray> cells;
+    for (long long i = 0; i < 33; i += 4)
+    {
+        cells->InsertNextCell({ i + 0, i + 1, i + 5, i + 4 });
+        cells->InsertNextCell({ i + 1, i + 2, i + 6, i + 5 });
+        cells->InsertNextCell({ i + 2, i + 3, i + 7, i + 6 });
+    }
+
+    // 标量值
+    vtkNew<vtkDoubleArray> scalars;
+    scalars->SetName("Scalars"); // 名称必须设置
+    for (int i = 0; i < cells->GetNumberOfCells(); i++)
+    {
+        scalars->InsertNextValue(i);
+    }
+
+    vtkNew<vtkPolyData> poly;
+    poly->SetPoints(points);
+    poly->SetPolys(cells);
+    poly->GetCellData()->AddArray(scalars); // 原始数据必须使用 AddArray 添加Scalars/Vectors
+    poly->GetCellData()->SetActiveScalars("Scalars");
+
+    vtkNew<vtkCellDataToPointData> c2p;
+    c2p->SetInputData(poly);
+    c2p->Update();
+
+    //--------------------------------------------------------------------------
+    // 需要插值的点
+    vtkNew<vtkPoints> filterPoints;
+    filterPoints->InsertNextPoint(1., 1., 0);
+    filterPoints->InsertNextPoint(2., 1., 0);
+    filterPoints->InsertNextPoint(3., 1., 0);
+    filterPoints->InsertNextPoint(4., 1., 0);
+    filterPoints->InsertNextPoint(5., 1., 0);
+    filterPoints->InsertNextPoint(6., 1., 0);
+    filterPoints->InsertNextPoint(7., 1., 0);
+    filterPoints->InsertNextPoint(8., 1., 0);
+
+    vtkNew<vtkPolyData> seeds;
+    seeds->SetPoints(filterPoints);
+
+    // 高斯核
+    vtkNew<vtkGaussianKernel> gaussianKernel;
+    gaussianKernel->SetSharpness(2.0);
+    gaussianKernel->SetRadius(2.0);
+
+    // 线性插值核
+    vtkNew<vtkLinearKernel> linearKernel;
+    linearKernel->SetKernelFootprintToNClosest(); // 使用N个最接近的点插值
+    linearKernel->SetNumberOfPoints(4);           // 最接近点的个数
+
+    vtkNew<vtkPointInterpolator> filter;
+    filter->SetInputData(seeds);
+    filter->SetSourceData(c2p->GetOutput()); // 必须使用pointData的Scalars/Vectors
+    filter->SetKernel(linearKernel);         // 设置插值内核，默认是vtkLinearKernel
+    filter->Update();
+
+    auto out = filter->GetOutput();
+    // out->Print(std::cout);
+
+    double range[2] {};
+    auto filterScalars = out->GetPointData()->GetArray("Scalars");
+    filterScalars->GetRange(range);
+    std::cout << "Range: " << range[0] << '\t' << range[1] << '\n';
+
+    // 插值得到的标量值
+    for (vtkIdType i = 0; i < filterScalars->GetNumberOfValues(); ++i)
+    {
+        std::cout << i << '\t' << filterScalars->GetVariantValue(i).ToDouble() << '\n';
+    }
+
+    //--------------------------------------------------------------------------
+    vtkNew<vtkLookupTable> hueLut;
+    hueLut->SetHueRange(0.67, 0.0);
+    hueLut->Build();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(poly);
+    mapper->SetScalarRange(range);
+    mapper->SetLookupTable(hueLut);
+    mapper->ScalarVisibilityOn();
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST103
 
 #ifdef TEST201
 

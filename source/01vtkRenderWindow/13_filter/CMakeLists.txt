@@ -15,6 +15,7 @@ find_package(VTK
         loguru
         ParallelMPI
         ImagingHybrid # vtkSampleFunction
+        FiltersPoints  # vtkPointInterpolator
     QUIET
 )
 
