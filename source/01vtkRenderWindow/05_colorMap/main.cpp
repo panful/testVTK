@@ -25,13 +25,14 @@
  * 602 流线、流管、流面
  * 603 流线生成需要的数据
  *
+ * 700 vtkContourFilter 等值线
  * 701 vtkContourFilter 等值面 vtkSampleFunction使用采样函数提取等值面
  * 702 vtkFlyingEdges3D 从体素数据提取等值面(isosurfaces)
  * 703 vtkContourTriangulator 将等值线包裹的区域转换为三角形网格
  * 704 vtkBandedPolyDataContourFilter 生成带状轮廓，将顶点的数据(Scalars)处于某一指定范围的区域生成多个单元（多边形带）
  */
 
-#define TEST704
+#define TEST700
 
 #ifdef TEST100
 
@@ -3003,6 +3004,129 @@ int main()
 
 #endif // TEST603
 
+#ifdef TEST700
+
+#include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkCellDataToPointData.h>
+#include <vtkContourFilter.h>
+#include <vtkDoubleArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkScalarBarActor.h>
+#include <vtkSmartPointer.h>
+
+int main(int, char*[])
+{
+    constexpr vtkIdType numOfCells { 5 };
+
+    vtkNew<vtkPoints> points;
+    for (vtkIdType i = 0; i < numOfCells; ++i)
+    {
+        points->InsertNextPoint(-1.0 * (i + 1), -1.0 * (i + 1), 0.0);
+        points->InsertNextPoint(1.0 * (i + 1), -1.0 * (i + 1), 0.0);
+        points->InsertNextPoint(1.0 * (i + 1), 1.0 * (i + 1), 0.0);
+        points->InsertNextPoint(-1.0 * (i + 1), 1.0 * (i + 1), 0.0);
+    }
+
+    vtkNew<vtkCellArray> cells;
+    cells->InsertNextCell({ 0, 1, 2, 3 });
+    for (vtkIdType i = 0; i < numOfCells - 1; ++i)
+    {
+        vtkIdType index = i * 4;
+        cells->InsertNextCell({ index + 0, index + 4 + 0, index + 5 + 0, index + 1 + 0 });
+        cells->InsertNextCell({ index + 1, index + 4 + 1, index + 5 + 1, index + 1 + 1 });
+        cells->InsertNextCell({ index + 2, index + 4 + 2, index + 5 + 2, index + 1 + 2 });
+        cells->InsertNextCell({ index + 3, index + 4 + 3, index + 5 - 1, index + 1 - 1 });
+    }
+
+    vtkNew<vtkDoubleArray> scalars;
+    scalars->InsertNextValue(0.0);
+    for (vtkIdType i = 0; i < numOfCells - 1; ++i)
+    {
+        scalars->InsertNextValue(static_cast<double>(i + 1));
+        scalars->InsertNextValue(static_cast<double>(i + 1));
+        scalars->InsertNextValue(static_cast<double>(i + 1));
+        scalars->InsertNextValue(static_cast<double>(i + 1));
+    }
+
+    double range[2] {};
+    scalars->GetRange(range);
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+    polyData->GetCellData()->SetScalars(scalars);
+
+    vtkNew<vtkCellDataToPointData> c2p;
+    c2p->SetInputData(polyData);
+    c2p->PassCellDataOff();
+    c2p->Update();
+
+    vtkPolyData::SafeDownCast(c2p->GetOutput())->SetPolys(nullptr);
+    c2p->GetOutput()->Print(std::cout);
+
+    vtkNew<vtkLookupTable> hueLut;
+    hueLut->SetNumberOfColors(20);
+    hueLut->SetNumberOfTableValues(20);
+    hueLut->SetHueRange(0.0, 0.67);
+    hueLut->Build();
+
+    // 输入数据必须是格点，即顶点上有Scalars/Vectors数据
+    vtkNew<vtkContourFilter> filter;
+    filter->SetInputData(c2p->GetOutput());
+    filter->GenerateValues(10, range);
+    filter->Update();
+
+    auto out = filter->GetOutput();
+    //out->Print(std::cout);
+
+    //---------------------------------------------------------
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(out);
+    mapper->ScalarVisibilityOn();
+    mapper->SetLookupTable(hueLut);
+    mapper->InterpolateScalarsBeforeMappingOn();
+    mapper->SetScalarRange(range);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    //---------------------------------------------------------
+    vtkNew<vtkScalarBarActor> scalarBar;
+    scalarBar->SetLookupTable(hueLut);
+    scalarBar->SetMaximumNumberOfColors(20);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->AddActor2D(scalarBar);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->SetSize(800, 600);
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST700
+
 #ifdef TEST701
 
 #include <vtkActor.h>
@@ -3053,17 +3177,14 @@ int main(int argc, char* argv[])
     pl3d_output->GetScalarRange(scalarRange);
     std::cout << "scalar range:\t" << scalarRange[0] << '\t' << scalarRange[1] << '\n';
 
-    vtkNew<vtkRenderer> renderer;
-
     //----------------------------------------------------------------
     // 显示整个网格
-    // vtkNew<vtkDataSetMapper> mapper;
-    // mapper->SetInputData(pl3d_output);
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(pl3d_output);
 
-    // vtkNew<vtkActor> actor;
-    // actor->SetMapper(mapper);
-    // actor->GetProperty()->SetRepresentationToWireframe();
-    // renderer->AddActor(actor);
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetRepresentationToWireframe();
 
     //----------------------------------------------------------------
     // 提取轮廓线
@@ -3076,11 +3197,11 @@ int main(int argc, char* argv[])
 
     vtkNew<vtkActor> outLineActor;
     outLineActor->SetMapper(outLineMapper);
-    renderer->AddActor(outLineActor);
 
     //----------------------------------------------------------------
     // 等值面
     vtkNew<vtkContourFilter> contour;
+    contour->GenerateTrianglesOff();
     contour->SetInputData(pl3d_output);
     contour->GenerateValues(5, scalarRange); // 设置在scalarRange范围内提取5个等值面
     contour->Update();
@@ -3090,7 +3211,6 @@ int main(int argc, char* argv[])
 
     vtkNew<vtkActor> contourActor;
     contourActor->SetMapper(contourMapper);
-    renderer->AddActor(contourActor);
 
     //----------------------------------------------------------------
     // 使用函数提取等值面
@@ -3112,7 +3232,6 @@ int main(int argc, char* argv[])
 
     vtkNew<vtkActor> contourFunctionActor;
     contourFunctionActor->SetMapper(contourFunctionMapper);
-    // renderer->AddActor(contourFunctionActor);
 
     //----------------------------------------------------------------
     // 提取平面
@@ -3126,6 +3245,13 @@ int main(int argc, char* argv[])
 
     vtkNew<vtkActor> planeActor;
     planeActor->SetMapper(planeMapper);
+
+    //----------------------------------------------------------------
+    vtkNew<vtkRenderer> renderer;
+    // renderer->AddActor(outLineActor);
+    renderer->AddActor(contourActor);
+    // renderer->AddActor(actor);
+    // renderer->AddActor(contourFunctionActor);
     // renderer->AddActor(planeActor);
 
     //-----------------------------------------------------------------
