@@ -972,6 +972,8 @@ vtkStandardNewMacro(MyStyle);
 // [666]  vtkHardwareSelector::GetPixelInformation 将拾取到的颜色转换为vtkProp以及ID
 // [416]  void vtkSelection::SetNode(const std::string& name, vtkSelectionNode* node) // 将拾取到的vtkProp保存起来
 
+// 如果拾取的是顶点、单元等其他类型，会使用着色器的gl_VertexID和gl_PrimitiveID变量
+
 int main(int argc, char* argv[])
 {
     vtkNew<vtkRenderer> renderer;
