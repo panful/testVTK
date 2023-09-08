@@ -1,16 +1,16 @@
-/*
+/**
  * 1. 使用vtk自带模型
  * 2. 自定义vtkPolyData
+ * 3. 自定义交互器Style
  */
 
-#define TEST2
+#define TEST3
 
 #ifdef TEST1
 
 #include <vtkActor.h>
-#include <vtkCamera.h>
 #include <vtkCubeSource.h>
-#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
@@ -23,40 +23,27 @@ int main(int, char*[])
     vtkNew<vtkCubeSource> source;
     source->Update();
 
-    // mapper
     vtkNew<vtkPolyDataMapper> mapper;
     mapper->SetInputData(source->GetOutput());
 
-    // actor
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
     actor->GetProperty()->SetColor(0, 1, 0);
 
-    // camera
-    vtkNew<vtkCamera> camera;
-    camera->SetPosition(1, 1, 1);
-    camera->SetFocalPoint(0, 0, 0);
-
-    // renderer
     vtkNew<vtkRenderer> renderer;
     renderer->AddActor(actor);
-    renderer->SetActiveCamera(camera);
     renderer->ResetCamera();
 
-    // RenderWindow
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
-    renWin->SetSize(600, 600);
+    renWin->SetSize(800, 600);
 
-    // RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
 
-    // interactor syle
-    vtkNew<vtkInteractorStyleRubberBand3D> style;
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
     iren->SetInteractorStyle(style);
 
-    // render
     renWin->Render();
     iren->Start();
 
@@ -68,9 +55,8 @@ int main(int, char*[])
 #ifdef TEST2
 
 #include <vtkActor.h>
-#include <vtkCamera.h>
 #include <vtkCellArray.h>
-#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
@@ -79,72 +65,41 @@ int main(int, char*[])
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 
-#include <array>
-#include <iostream>
-
-// 四条线段组成一个正方形
-namespace {
-std::array<float, 4 * 3> vertices {
-    0, 0, 0,
-    1, 0, 0,
-    1, 1, 0,
-    0, 1, 0
-};
-
-std::array<long long, 4 * 2> indices {
-    0, 1,
-    1, 2,
-    2, 3,
-    3, 0
-};
-}
-
 int main()
 {
-    vtkNew<vtkPolyData> polyData;
     vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0, 0, 0);
+    points->InsertNextPoint(2, 0, 0);
+    points->InsertNextPoint(1, 2, 0);
+
     vtkNew<vtkCellArray> cells;
+    cells->InsertNextCell({ 0, 1, 2 });
 
-    for (size_t i = 0; i < vertices.size(); i += 3)
-    {
-        points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
-    }
-    for (size_t i = 0; i < indices.size(); i += 2)
-    {
-        cells->InsertNextCell({ indices[i], indices[i + 1] });
-    }
-
+    vtkNew<vtkPolyData> polyData;
     polyData->SetPoints(points);
-    polyData->SetLines(cells);
+    polyData->SetPolys(cells);
 
-    // mapper
     vtkNew<vtkPolyDataMapper> mapper;
     mapper->SetInputData(polyData);
 
-    // actor
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
     actor->GetProperty()->SetColor(0, 1, 0);
 
-    // renderer
     vtkNew<vtkRenderer> renderer;
     renderer->AddActor(actor);
     renderer->ResetCamera();
 
-    // RenderWindow
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
     renWin->SetSize(600, 600);
 
-    // RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
 
-    // interactor syle
-    vtkNew<vtkInteractorStyleRubberBand3D> style;
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
     iren->SetInteractorStyle(style);
 
-    // 数据交互
     renWin->Render();
     iren->Start();
 
@@ -152,3 +107,66 @@ int main()
 }
 
 #endif // TEST2
+
+#ifdef TEST3
+
+#include <vtkActor.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+namespace {
+class Style : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static Style* New();
+    vtkTypeMacro(Style, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnLeftButtonDown() override
+    {
+        std::cout << "left button down\n";
+        Superclass::OnLeftButtonDown();
+    }
+};
+
+vtkStandardNewMacro(Style);
+} // namespace
+
+int main(int, char*[])
+{
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<Style> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST1
