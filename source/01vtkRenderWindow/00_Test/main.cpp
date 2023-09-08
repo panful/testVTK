@@ -1,12 +1,12 @@
 
 /**
  * 1. 引用计数 主动释放vtk智能指针
- * 2.
- * 3. vtk智能指针的使用
+ * 2. vtk智能指针的使用
+ * 3. vtkNew 和 vtkSmartPointer 函数参数为智能指针
  * 4. AddObserver 使用lambda表达式和继承自vtkCommand
  */
 
-#define TEST4
+#define TEST3
 
 #ifdef TEST1
 
@@ -90,14 +90,11 @@ int main(int, char*[])
 }
 #endif // TEST1
 
-#ifdef TEST3
+#ifdef TEST2
 
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
 #include <vtkSmartPointer.h>
-
-#include <iostream>
-#include <vector>
 
 namespace {
 
@@ -193,6 +190,86 @@ int main(int, char*[])
         vtkSmartPointer<Test> t = Test::New();
     }
 
+    return 0;
+}
+#endif // TEST2
+
+#ifdef TEST3
+
+#include <vtkNew.h>
+#include <vtkObjectFactory.h>
+#include <vtkSmartPointer.h>
+
+namespace {
+
+class Test : public vtkObject
+{
+public:
+    static Test* New();
+    vtkTypeMacro(Test, vtkObject);
+
+protected:
+    Test()
+    {
+        std::cout << "construct\tref count:" << this->GetReferenceCount() << '\n'; // 1
+    }
+
+    ~Test() override
+    {
+        std::cout << "destruct\tref count:" << this->GetReferenceCount() << '\n'; // 0
+    }
+
+private:
+    Test(const Test&)            = delete;
+    Test& operator=(const Test&) = delete;
+};
+
+vtkStandardNewMacro(Test);
+} // namespace
+
+void Param1(const vtkSmartPointer<Test>& t)
+{
+    // 传递vtkSmartPointer此处是1，传递vtkNew此处是2
+    std::cout << "const vtkSmartPointer<Test>&\tref count\t" << t->GetReferenceCount() << '\n';
+}
+
+void Param2(vtkSmartPointer<Test> t)
+{
+    // 传递vtkSmartPointer和vtkNew此处都是2
+    std::cout << "vtkSmartPointer<Test>\t\tref count\t" << t->GetReferenceCount() << '\n';
+}
+
+// vtkNew           就好像是 std::unique_ptr
+// vtkSmartPointer  就好像是 std::shared_ptr
+// vtkNew 可以隐式转换为 vtkSmartPointer 
+// vtkNew 更轻量
+
+int main(int, char*[])
+{
+    std::cout << "-------------------------\n";
+    {
+        vtkSmartPointer<Test> t = vtkSmartPointer<Test>::New();
+        Param1(t);
+        std::cout << "+++++\n";
+    }
+    std::cout << "-------------------------\n";
+    {
+        vtkSmartPointer<Test> t = vtkSmartPointer<Test>::New();
+        Param2(t);
+        std::cout << "+++++\n";
+    }
+    std::cout << "-------------------------\n";
+    {
+        vtkNew<Test> t;
+        Param1(t);
+        std::cout << "+++++\n";
+    }
+    std::cout << "-------------------------\n";
+    {
+        vtkNew<Test> t;
+        Param2(t);
+        std::cout << "+++++\n";
+    }
     std::cout << "-------------------------\n";
 
     return 0;
