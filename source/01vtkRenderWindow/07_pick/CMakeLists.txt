@@ -3,6 +3,7 @@ set(target_name "01_07_pick")
 find_package(VTK
     COMPONENTS
         CommonCore
+        CommonColor
         CommonDataModel
         FiltersSources
         InteractionStyle
@@ -15,8 +16,6 @@ find_package(VTK
         ParallelMPI
         RenderingAnnotation # vtkAxesActor
         InteractionWidgets  # vtkOrientationMarkerWidget
-        FiltersExtraction   # vtkExtractPolyDataGeometry
-        FiltersGeometry     # vtkDataSetSurfaceFilter
     QUIET
 )
 

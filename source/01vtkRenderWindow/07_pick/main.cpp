@@ -12,7 +12,8 @@
  *
  * 31. 拾取vtkAssembly的指定Actor
  *
- * 41. 拾取事件回调函数
+ * 41. 拾取事件回调函数 vtkCommand::EndPickEvent
+ * 42. 高亮拾取到的图元 HighlightProp
  *
  * vtkScenePicker  vtkHardwarePicker
  * vtkResliceCursorPicker vtkVolumePicker vtkZSpaceHardwarePicker vtkVRHardwarePicker
@@ -20,7 +21,7 @@
  * 多图层拾取 01_03_TEST45
  */
 
-#define TEST7
+#define TEST42
 
 #ifdef TEST1
 
@@ -1449,3 +1450,97 @@ int main(int, char*[])
 }
 
 #endif // TEST41
+
+#ifdef TEST42
+
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkPropPicker.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+
+namespace {
+
+class Style : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static Style* New();
+    vtkTypeMacro(Style, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnLeftButtonDown() override
+    {
+        if (this->CurrentRenderer)
+        {
+            int pos[2] {};
+            this->GetInteractor()->GetEventPosition(pos);
+
+            vtkNew<vtkPropPicker> picker;
+            if (0 != picker->Pick(pos[0], pos[1], 0, this->CurrentRenderer) && picker->GetActor())
+            {
+                // 高亮拾取到的图元
+                this->HighlightProp(picker->GetActor());
+            }
+            else
+            {
+                // 如果没有拾取到任何图元，将之前的高亮图元恢复颜色
+                this->HighlightProp(nullptr);
+            }
+        }
+
+        Superclass::OnLeftButtonDown();
+    }
+};
+
+vtkStandardNewMacro(Style);
+
+} // namespace
+
+int main(int, char*[])
+{
+    vtkNew<vtkRenderer> renderer;
+
+    for (int i = 0; i < 5; ++i)
+    {
+        for (int j = 0; j < 5; ++j)
+        {
+            vtkNew<vtkSphereSource> source;
+            source->SetCenter(static_cast<double>(i), static_cast<double>(j), 0.0);
+            source->SetRadius(0.2);
+            source->Update();
+
+            vtkNew<vtkPolyDataMapper> mapper;
+            mapper->SetInputData(source->GetOutput());
+
+            vtkNew<vtkActor> actor;
+            actor->SetMapper(mapper);
+
+            renderer->AddActor(actor);
+        }
+    }
+
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<Style> style;
+    style->SetCurrentRenderer(renderer);
+    style->SetPickColor(1, 0, 0); // 设置拾取标记颜色，拾取标记只能是一个包围盒边框
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST42
