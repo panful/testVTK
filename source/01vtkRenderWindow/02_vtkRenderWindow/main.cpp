@@ -47,7 +47,6 @@
 43.reverse access ,从经过算法(vtkAlgorithm,vtkPolyDataAlgorithm)变换的数据中获取源数据（vtkPolyData,vtkDataSet）
 44.vtkChart https://kitware.github.io/vtk-examples/site/Cxx/DataStructures/OctreeTimingDemo/
 45.从Actor中获取polyData，并修改polyData的属性会改变原来Actor的状态，深拷贝可以不改变源Actor状态
-46.vtkCellLocator 寻找最近点 一个点到网格上最近距离的点 https://blog.csdn.net/minmindianzi/article/details/103474941
 
 51.利用vtk橡皮筋交互模式，实现鼠标绘制矩形
 
@@ -2935,91 +2934,6 @@ int main(int, char*[])
 
 #endif // TEST45
 
-#ifdef TEST46
-
-#include <vtkActor.h>
-#include <vtkCellLocator.h>
-#include <vtkCoordinate.h>
-#include <vtkGenericCell.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSmartPointer.h>
-#include <vtkSphereSource.h>
-
-int main(int, char*[])
-{
-    auto sphereSource = vtkSmartPointer<vtkSphereSource>::New();
-    sphereSource->Update();
-
-    // Create the tree
-    auto cellLocator = vtkSmartPointer<vtkCellLocator>::New();
-    cellLocator->SetDataSet(sphereSource->GetOutput());
-    cellLocator->BuildLocator();
-
-    double testPoint[3] = { 0.6, 0.5, 0.0 };
-
-    // Find the closest points to TestPoint
-    auto assistCell = vtkSmartPointer<vtkGenericCell>::New();
-    double closestPoint[3];   // the coordinates of the closest point will be returned here
-    double closestPointDist2; // the squared distance to the closest point will be returned here
-    vtkIdType cellId;         // the cell id of the cell containing the closest point will be returned here
-    int subId;
-    cellLocator->FindClosestPoint(testPoint, closestPoint, assistCell, cellId, subId, closestPointDist2);
-
-    std::cout << "Coordinates of closest point: " << closestPoint[0] << " " << closestPoint[1] << " " << closestPoint[2] << std::endl;
-    std::cout << "Squared distance to closest point: " << closestPointDist2 << std::endl;
-    std::cout << "CellId: " << cellId << std::endl;
-
-    auto testSource = vtkSmartPointer<vtkSphereSource>::New();
-    testSource->SetRadius(0.01);
-    testSource->SetCenter(testPoint);
-    testSource->Update();
-
-    auto pointSource = vtkSmartPointer<vtkSphereSource>::New();
-    pointSource->SetRadius(0.01);
-    pointSource->SetCenter(closestPoint);
-    pointSource->Update();
-
-    vtkSmartPointer<vtkPolyDataMapper> sphereMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    sphereMapper->SetInputConnection(sphereSource->GetOutputPort());
-    vtkSmartPointer<vtkPolyDataMapper> testMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    testMapper->SetInputConnection(testSource->GetOutputPort());
-    vtkSmartPointer<vtkPolyDataMapper> pointMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    pointMapper->SetInputConnection(pointSource->GetOutputPort());
-
-    auto sphereActor = vtkSmartPointer<vtkActor>::New();
-    sphereActor->SetMapper(sphereMapper);
-    sphereActor->GetProperty()->EdgeVisibilityOn();
-    auto pointActor = vtkSmartPointer<vtkActor>::New();
-    pointActor->SetMapper(pointMapper);
-    pointActor->GetProperty()->SetColor(1, 0, 0);
-    auto testActor = vtkSmartPointer<vtkActor>::New();
-    testActor->SetMapper(testMapper);
-    testActor->GetProperty()->SetColor(0, 1, 0);
-
-    auto render = vtkSmartPointer<vtkRenderer>::New();
-    render->AddActor(sphereActor);
-    render->AddActor(pointActor);
-    render->AddActor(testActor);
-
-    auto renWin = vtkSmartPointer<vtkRenderWindow>::New();
-    renWin->SetSize(640, 480);
-    renWin->AddRenderer(render);
-
-    auto interactor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
-    interactor->SetRenderWindow(renWin);
-
-    renWin->Render();
-    interactor->Initialize();
-    interactor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST46
 
 #ifdef TEST51
 
