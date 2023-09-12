@@ -20,13 +20,14 @@
  * 501. vtkExtractGeometry vtkExtractPolyDataGeometry 提取被视锥体包围(或没有包围)的单元格
  * 502. vtkClipPolyData 一般用于裁剪输入平面的一侧，保留另一侧
  * 503. vtkExtractCells 提取指定单元，类似设置间隔
+ * 504. vtkSelectPolyData 选择多边形网格的一部分，生成选择标量
  *
  * 601. vtkDataSetSurfaceFilter 将 vtkUnstructuredGrid 转换为 vtkPolyData，还可以将体网格转换为表面数据，从而简化模型
  * 602. vtkGeometryFilter 从数据集中提取边界，可以将任何数据转换为多边形数据，类似vtkDataSetSurfaceFilter
  *
  */
 
-#define TEST602
+#define TEST504
 
 #ifdef TEST001
 
@@ -1797,6 +1798,78 @@ int main(int, char*[])
 }
 
 #endif // TEST503
+
+#ifdef TEST504
+
+#include <vtkClipPolyData.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSelectPolyData.h>
+#include <vtkSphereSource.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkSphereSource> sphereSource;
+    sphereSource->SetPhiResolution(10);
+    sphereSource->SetThetaResolution(10);
+    sphereSource->SetRadius(1.0);
+    sphereSource->Update();
+
+    vtkNew<vtkPoints> selectionPoints;
+    selectionPoints->InsertNextPoint(-1, -1, 1);
+    selectionPoints->InsertNextPoint(1, -1, 1);
+    selectionPoints->InsertNextPoint(1, 1, 1);
+    selectionPoints->InsertNextPoint(-1, 1, 1);
+
+    // 指定选择的区域
+    vtkNew<vtkSelectPolyData> loop;
+    loop->SetInputConnection(sphereSource->GetOutputPort());
+    loop->SetLoop(selectionPoints);
+    loop->GenerateUnselectedOutputOff();
+    loop->GenerateSelectionScalarsOn();
+    loop->SetSelectionModeToSmallestRegion();
+    loop->InsideOutOn();
+    loop->Update();
+
+    std::cout << "Number of output port\t" << loop->GetNumberOfOutputPorts() << '\n';
+
+    vtkNew<vtkClipPolyData> clip;
+    clip->SetInputConnection(loop->GetOutputPort());
+
+    vtkNew<vtkPolyDataMapper> clipMapper;
+    clipMapper->SetInputConnection(clip->GetOutputPort());
+    //clipMapper->SetInputConnection(loop->GetOutputPort(2));
+    clipMapper->ScalarVisibilityOff();
+
+    vtkNew<vtkActor> clipActor;
+    clipActor->SetMapper(clipMapper);
+    clipActor->GetProperty()->SetColor(0, 1, 0);
+    clipActor->GetProperty()->EdgeVisibilityOn();
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(clipActor);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+
+    vtkNew<vtkRenderWindowInteractor> interactor;
+    interactor->SetRenderWindow(renderWindow);
+    interactor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    interactor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST504
 
 #ifdef TEST601
 

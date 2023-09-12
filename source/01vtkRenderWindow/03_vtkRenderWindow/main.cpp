@@ -35,7 +35,7 @@
 34.vtkElevationFilter 沿指定方向生成Scalars https://kitware.github.io/vtk-examples/site/Cxx/Visualization/ProjectSphere/
 35
 36.vtkLODProp3D 对于绘制大型网格可以提高渲染效率
-37.vtkLODActor 加载大型网格  vtkSelectPolyData 多边形剪切
+
 38.vtkDataSet 和 vtkPolyData
 39.vtkPolyData设置多种单元(line poly...)，获取单元返回的顺序，设置单元的标量
 40.
@@ -4327,103 +4327,6 @@ namespace {
 
 #endif // TEST36
 
-#ifdef TEST37
-
-#include <vtkClipPolyData.h>
-#include <vtkLODActor.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSelectPolyData.h>
-#include <vtkSphereSource.h>
-
-int main(int, char* [])
-{
-    vtkNew<vtkSphereSource> sphereSource;
-    sphereSource->SetPhiResolution(50);
-    sphereSource->SetThetaResolution(100);
-    sphereSource->Update();
-
-    vtkNew<vtkPoints> selectionPoints;
-    selectionPoints->InsertNextPoint(-0.16553, 0.135971, 0.451972);
-    selectionPoints->InsertNextPoint(-0.0880123, -0.134952, 0.4747);
-    selectionPoints->InsertNextPoint(0.00292618, -0.134604, 0.482459);
-    selectionPoints->InsertNextPoint(0.0641941, 0.067112, 0.490947);
-    selectionPoints->InsertNextPoint(0.15577, 0.0734765, 0.469245);
-    selectionPoints->InsertNextPoint(0.166667, -0.129217, 0.454622);
-    selectionPoints->InsertNextPoint(0.241259, -0.123363, 0.420581);
-    selectionPoints->InsertNextPoint(0.240334, 0.0727106, 0.432555);
-    selectionPoints->InsertNextPoint(0.308529, 0.0844311, 0.384357);
-    selectionPoints->InsertNextPoint(0.32672, -0.121674, 0.359187);
-    selectionPoints->InsertNextPoint(0.380721, -0.117342, 0.302527);
-    selectionPoints->InsertNextPoint(0.387804, 0.0455074, 0.312375);
-    selectionPoints->InsertNextPoint(0.43943, -0.111673, 0.211707);
-    selectionPoints->InsertNextPoint(0.470984, -0.0801913, 0.147919);
-    selectionPoints->InsertNextPoint(0.436777, 0.0688872, 0.233021);
-    selectionPoints->InsertNextPoint(0.44874, 0.188852, 0.109882);
-    selectionPoints->InsertNextPoint(0.391352, 0.254285, 0.176943);
-    selectionPoints->InsertNextPoint(0.373274, 0.154162, 0.294296);
-    selectionPoints->InsertNextPoint(0.274659, 0.311654, 0.276609);
-    selectionPoints->InsertNextPoint(0.206068, 0.31396, 0.329702);
-    selectionPoints->InsertNextPoint(0.263789, 0.174982, 0.387308);
-    selectionPoints->InsertNextPoint(0.213034, 0.175485, 0.417142);
-    selectionPoints->InsertNextPoint(0.169113, 0.261974, 0.390286);
-    selectionPoints->InsertNextPoint(0.102552, 0.25997, 0.414814);
-    selectionPoints->InsertNextPoint(0.131512, 0.161254, 0.454705);
-    selectionPoints->InsertNextPoint(0.000192443, 0.156264, 0.475307);
-    selectionPoints->InsertNextPoint(-0.0392091, 0.000251724, 0.499943);
-    selectionPoints->InsertNextPoint(-0.096161, 0.159646, 0.46438);
-
-    // 指定选择的区域
-    vtkNew<vtkSelectPolyData> loop;
-    loop->SetInputConnection(sphereSource->GetOutputPort());
-    loop->SetLoop(selectionPoints);
-    loop->GenerateSelectionScalarsOn(); // 生成选择标量
-    loop->SetSelectionModeToSmallestRegion(); // negative scalars inside
-
-    vtkNew<vtkClipPolyData> clip;
-    clip->SetInputConnection(loop->GetOutputPort());
-
-    vtkNew<vtkPolyDataMapper> clipMapper;
-    clipMapper->SetInputConnection(clip->GetOutputPort());
-    clipMapper->ScalarVisibilityOff();
-
-    vtkNew<vtkProperty> backProp;
-    backProp->SetColor(1, 0, 0);
-
-    vtkNew<vtkLODActor> clipActor;
-    //clipActor->SetNumberOfCloudPoints(100000); // 设置最大点数
-    clipActor->SetMapper(clipMapper);    // 设置低细节级别的 Mapper
-    //clipActor->AddLODMapper(clipMapper); // 添加高细节级别的 Mapper
-    clipActor->SetBackfaceProperty(backProp);
-    clipActor->GetProperty()->SetColor(0, 1, 0);
-
-    vtkNew<vtkRenderer> renderer;
-
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("SelectPolyData");
-
-    vtkNew<vtkRenderWindowInteractor> interactor;
-    interactor->SetRenderWindow(renderWindow);
-
-    // Add the actors to the renderer, set the background and size
-    renderer->AddActor(clipActor);
-    renderer->SetBackground(.1, .2, .3);
-
-    renderWindow->SetSize(800, 600);
-
-    renderWindow->Render();
-    interactor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST37
 
 #ifdef TEST38
 
