@@ -18,6 +18,7 @@ find_package(VTK
         #IOCGNS             # CGNS需要在生成VTK时选择
         IOGeometry          # vtkFLUENTReader
         RenderingAnnotation # vtkScalarBarActor
+        IOXML               # vtkXMLUnstructuredGridReader
     QUIET
 )
 

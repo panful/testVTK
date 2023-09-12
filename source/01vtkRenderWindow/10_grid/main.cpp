@@ -2,16 +2,17 @@
 // cgns文件下载地址：https://cgns.github.io/CGNSFiles.html
 //
 
-/*
+/**
  * 1. 结构cgns
  * 2. 非结构cgns
  * 3. FLUENT *.cas *.dat 只绘制图形，不映射流场数据 FLUENT控制台使用 f c n wcd fileName 导出 fileName.cas和fileName.dat
  * 4. FLUENT *.cas *.dat 将流场数据映射到颜色
  * 5. 构造 vtkUnstructuredGrid，四面体、六面体、棱柱、棱锥等图形
  * 6. 读写 vtkUnstructuredGrid vtkPolyData
+ * 7. *.vtu XML格式的非结构网格读取
  */
 
-#define TEST6
+#define TEST7
 
 #ifdef TEST1
 
@@ -554,3 +555,57 @@ int main()
 }
 
 #endif // TEST6
+
+#ifdef TEST7
+
+#include <vtkActor.h>
+#include <vtkDataSetMapper.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkXMLUnstructuredGridReader.h>
+
+#include <iostream>
+#include <string>
+
+int main(int argc, char* argv[])
+{
+    std::string inputFilename = "../resources/Disc_BiQuadraticQuads_0_0.vtu";
+
+    // Read a xml unstructured grid dataset
+    vtkNew<vtkXMLUnstructuredGridReader> reader;
+    reader->SetFileName(inputFilename.c_str());
+    reader->Update();
+
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputConnection(reader->GetOutputPort());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(1, 0, 0);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST7
