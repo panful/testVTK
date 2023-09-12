@@ -1,23 +1,32 @@
 /**
- * 001.自定义 Filter 继承自 vtkPolyDataAlgorithm
- * 002.从经过 Filter 变换后的数据获取原始数据
+ * 001. 自定义 Filter 继承自 vtkPolyDataAlgorithm
+ * 002. 从经过 Filter 变换后的数据获取原始数据
  *
- * 101.vtkProbeFilter 探针的基础使用，探针某些时候插值的结果并不准确
- * 102.vtkGlyph3D vtkProbeFilter vtkSampleFunction vtkThreshold
- * 103 vtkPointInterpolator 插值，类似探针，比探针结果更准确
+ * 101. vtkProbeFilter 探针的基础使用，探针某些时候插值的结果并不准确
+ * 102. vtkGlyph3D vtkProbeFilter vtkSampleFunction vtkThreshold
+ * 103. vtkPointInterpolator 插值，类似探针，比探针结果更准确
  *
- * 201.vtkWarpScalar vtkWarpVector 根据标量或向量值在指定方向对顶点进行偏移
+ * 201. vtkWarpScalar vtkWarpVector 根据标量或向量值在指定方向对顶点进行偏移
+ * 202. vtkShrinkFilter 收缩单元格 vtkShrinkPolyData
  *
- * 301.vtkAppendPolyData 合并多个 vtkPolyData
- * 302.合并带有Scalars、Vectors的vtkPolyData
- * 303.使用不同方式设置Scalars数据时，合并后的polyData没有Scalars数据
+ * 301. vtkAppendPolyData 合并多个 vtkPolyData
+ * 302. 合并带有Scalars、Vectors的vtkPolyData
+ * 303. 使用不同方式设置Scalars数据时，合并后的polyData没有Scalars数据
  *
- * 401 vtkCellDataToPointData 单元数据转顶点数据
- * 402 vtkPointDataToCellData 顶点数据转单元数据
- * 403 vtkCellCenters 获取单元中心即格心，并用球体标注格心
+ * 401. vtkCellDataToPointData 单元数据转顶点数据
+ * 402. vtkPointDataToCellData 顶点数据转单元数据
+ * 403. vtkCellCenters 获取单元中心即格心，并用球体标注格心
+ *
+ * 501. vtkExtractGeometry vtkExtractPolyDataGeometry 提取被视锥体包围(或没有包围)的单元格
+ * 502. vtkClipPolyData 一般用于裁剪输入平面的一侧，保留另一侧
+ * 503. vtkExtractCells 提取指定单元，类似设置间隔
+ *
+ * 601. vtkDataSetSurfaceFilter 将 vtkUnstructuredGrid 转换为 vtkPolyData，还可以将体网格转换为表面数据，从而简化模型
+ * 602. vtkGeometryFilter 从数据集中提取边界，可以将任何数据转换为多边形数据，类似vtkDataSetSurfaceFilter
+ *
  */
 
-#define TEST103
+#define TEST602
 
 #ifdef TEST001
 
@@ -720,6 +729,76 @@ int main(int, char*[])
 }
 
 #endif // TEST201
+
+#ifdef TEST202
+
+#include <vtkActor.h>
+#include <vtkCubeSource.h>
+#include <vtkDataSetMapper.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkShrinkFilter.h>
+#include <vtkSphereSource.h>
+
+// 会有z冲突现象
+
+int main(int, char*[])
+{
+    // vtkNew<vtkSphereSource> source;
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(1, 0, 0);
+    actor->GetProperty()->EdgeVisibilityOn();
+
+    // 将单元格收缩到其质心（单元的质心），通过收缩因子控制收缩多少
+    // 新生成的几何数据，原来连接起来的单元将会断开
+    vtkNew<vtkShrinkFilter> shrink;
+    shrink->SetInputConnection(source->GetOutputPort());
+    shrink->SetShrinkFactor(.5); // 收缩因子，越小则生成的单元越小
+
+    vtkNew<vtkDataSetMapper> mapper2;
+    mapper2->SetInputConnection(shrink->GetOutputPort());
+
+    vtkNew<vtkProperty> back;
+    back->SetColor(1, 0, 0);
+
+    vtkNew<vtkActor> actor2;
+    actor2->SetMapper(mapper2);
+    actor2->GetProperty()->SetColor(0, 1, 0);
+
+    //-------------------------------------------------------------------------
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->AddActor(actor2);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TESt202
 
 #ifdef TEST301
 
@@ -1447,3 +1526,460 @@ int main(int, char*[])
 }
 
 #endif // TEST403
+
+#ifdef TEST501
+
+#include <vtkActor.h>
+#include <vtkAreaPicker.h>
+#include <vtkDataSetMapper.h>
+#include <vtkExtractGeometry.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkObjectFactory.h>
+#include <vtkPlanes.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+#include <vtkUnstructuredGrid.h>
+
+namespace {
+class MyStyle : public vtkInteractorStyleRubberBand3D
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleRubberBand3D);
+
+    virtual void OnLeftButtonUp() override
+    {
+        vtkInteractorStyleRubberBand3D::OnLeftButtonUp();
+
+        if (this->CurrentRenderer)
+        {
+            auto x0 = this->StartPosition[0];
+            auto y0 = this->StartPosition[1];
+            auto x1 = this->EndPosition[0];
+            auto y1 = this->EndPosition[1];
+
+            std::cout << "-------------------------------------------\nstart\t" << x0 << '\t' << y0 << "\nend\t" << x1 << '\t' << y1 << '\n';
+
+            vtkNew<vtkAreaPicker> picker;
+            vtkNew<vtkDataSetMapper> mapper;
+            if (0 != picker->AreaPick(x0, y0, x1, y1, this->CurrentRenderer))
+            {
+                auto planes = picker->GetFrustum();
+
+                // 提取输入的polyData被视锥体包围或没有包围的单元格
+                // 可能会提取到背面的单元，可以利用远近剔除背面的面
+                vtkNew<vtkExtractGeometry> extract;
+                extract->SetInputData(m_polyData);
+                extract->SetImplicitFunction(planes);
+                extract->ExtractInsideOn();        // 提取内部还是外部
+                extract->ExtractBoundaryCellsOn(); // 是否提取没有被完全包围的单元（单元一部分在视锥体内部），默认关闭
+                extract->ExtractOnlyBoundaryCellsOn(); // 仅提取一部分位于视锥体内部一部分在外部的单元
+                extract->Update();
+
+                std::cout << "-- origin\npoints\t" << m_polyData->GetNumberOfPoints() << "\ncells\t" << m_polyData->GetNumberOfCells() << '\n';
+                std::cout << "-- extract\npoints\t" << extract->GetOutput()->GetNumberOfPoints() << "\ncells\t"
+                          << extract->GetOutput()->GetNumberOfCells() << '\n';
+
+                mapper->SetInputData(extract->GetOutput());
+                mapper->SetResolveCoincidentTopologyToPolygonOffset(); // 始终显示在球的上层
+                mapper->SetRelativeCoincidentTopologyPolygonOffsetParameters(0, -1.e6);
+            }
+
+            m_extractActor->SetMapper(mapper);
+        }
+
+        this->Interactor->Render();
+    }
+
+    void SetPolyData(const vtkSmartPointer<vtkPolyData>& poly)
+    {
+        m_polyData = poly;
+        m_extractActor->GetProperty()->SetColor(1, 0, 0);
+        this->CurrentRenderer->AddActor(m_extractActor);
+    }
+
+private:
+    vtkSmartPointer<vtkPolyData> m_polyData {};
+    vtkSmartPointer<vtkActor> m_extractActor { vtkSmartPointer<vtkActor>::New() };
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+int main(int, char*[])
+{
+    vtkNew<vtkSphereSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+    mapper->ScalarVisibilityOff();
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetColor(0., 1., 0.);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<MyStyle> style;
+    style->SetCurrentRenderer(renderer);
+    style->SetPolyData(source->GetOutput());
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST501
+
+#ifdef TEST502
+
+#include <vtkActor.h>
+#include <vtkClipPolyData.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPlane.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkSphereSource> source;
+    source->Update();
+
+    // 裁剪的平面
+    // Origin是经过的点，Normal表示该平面垂直于此方向
+    vtkNew<vtkPlane> clipPlane;
+    clipPlane->SetNormal(1.0, 0.0, 0.0);
+    clipPlane->SetOrigin(0.0, 0.0, 0.0);
+
+    vtkNew<vtkClipPolyData> clipper;
+    clipper->SetInputConnection(source->GetOutputPort());
+    clipper->SetClipFunction(clipPlane);
+    clipper->SetValue(0.0); // 隐式函数裁剪、标量裁剪的值
+    clipper->GenerateClippedOutputOn();
+
+    vtkNew<vtkPolyDataMapper> superquadricMapper;
+    superquadricMapper->SetInputConnection(clipper->GetOutputPort());
+
+    vtkNew<vtkActor> superquadricActor;
+    superquadricActor->SetMapper(superquadricMapper);
+
+    vtkNew<vtkProperty> backFaces;
+    backFaces->SetColor(1, 0, 0);
+
+    superquadricActor->SetBackfaceProperty(backFaces);
+
+    vtkNew<vtkPolyDataMapper> clippedAwayMapper;
+    clippedAwayMapper->SetInputData(clipper->GetClippedOutput());
+    clippedAwayMapper->ScalarVisibilityOff();
+
+    vtkNew<vtkActor> clippedAwayActor;
+    clippedAwayActor->SetMapper(clippedAwayMapper);
+    clippedAwayActor->GetProperty()->SetColor(1, 1, 0);
+    clippedAwayActor->GetProperty()->SetOpacity(0.3);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(superquadricActor);
+    renderer->AddActor(clippedAwayActor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST502
+
+#ifdef TEST503
+
+#include <vtkActor.h>
+#include <vtkDataSetMapper.h>
+#include <vtkExtractCells.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+#include <vtkUnstructuredGrid.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkSphereSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+    mapper->ScalarVisibilityOff();
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetColor(0., 1., 0.);
+
+    vtkNew<vtkIdList> idList;
+    for (vtkIdType i = 0; i < source->GetOutput()->GetNumberOfCells(); ++i)
+    {
+        if (0 == i % 2)
+        {
+            // 提取单元id为偶数的所有单元，即每隔一个单元提取一次
+            idList->InsertNextId(i);
+        }
+    }
+
+    vtkNew<vtkExtractCells> extract;
+    extract->SetInputData(source->GetOutput());
+    extract->SetCellList(idList);
+    extract->Update();
+
+    std::cout << "origin cells\t" << source->GetOutput()->GetNumberOfCells() << '\n';
+    std::cout << "extract cells\t" << extract->GetOutput()->GetNumberOfCells() << '\n';
+
+    vtkNew<vtkDataSetMapper> mapper2;
+    mapper2->SetInputData(extract->GetOutput());
+    mapper2->SetResolveCoincidentTopologyToPolygonOffset(); // 始终显示在球的上层
+    mapper2->SetRelativeCoincidentTopologyPolygonOffsetParameters(0, -1.e6);
+
+    vtkNew<vtkActor> actor2;
+    actor2->SetMapper(mapper2);
+    actor2->GetProperty()->SetColor(1., 0., 0.);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->AddActor(actor2);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST503
+
+#ifdef TEST601
+
+#include <vtkActor.h>
+#include <vtkDataSetMapper.h>
+#include <vtkDataSetSurfaceFilter.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPoints.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkUnstructuredGrid.h>
+
+int main()
+{
+    vtkNew<vtkPoints> points;
+    // 0,1,2
+    points->InsertNextPoint(0, 0, 0);
+    points->InsertNextPoint(2, 0, 0);
+    points->InsertNextPoint(1, 2, 0);
+
+    // 3,4,5,6
+    points->InsertNextPoint(3, 0, 0);
+    points->InsertNextPoint(5, 0, 0);
+    points->InsertNextPoint(4, 0, 2);
+    points->InsertNextPoint(4, 2, 1);
+
+    // 7,8,9,10,11,12,13,14
+    points->InsertNextPoint(6, 0, 0);
+    points->InsertNextPoint(8, 0, 0);
+    points->InsertNextPoint(8, 0, 2);
+    points->InsertNextPoint(6, 0, 2);
+    points->InsertNextPoint(6, 2, 0);
+    points->InsertNextPoint(9, 2, 0);
+    points->InsertNextPoint(9, 2, 3);
+    points->InsertNextPoint(6, 2, 3);
+
+    vtkNew<vtkUnstructuredGrid> usg;
+    usg->SetPoints(points);
+
+    // 三角形
+    vtkIdType ids_triangle[] { 0, 1, 2 };
+    usg->InsertNextCell(VTK_TRIANGLE, 3, ids_triangle);
+
+    // 四面体
+    vtkIdType ids_tetra[] { 3, 4, 5, 6 };
+    usg->InsertNextCell(VTK_TETRA, 4, ids_tetra);
+
+    // 六面体
+    vtkIdType ids_hexahedron[] { 7, 8, 9, 10, 11, 12, 13, 14 };
+    usg->InsertNextCell(VTK_HEXAHEDRON, 8, ids_hexahedron);
+
+    vtkNew<vtkDataSetSurfaceFilter> filter;
+    filter->SetInputData(usg);
+    filter->Update();
+
+    auto output = filter->GetOutput();
+
+    std::cout << "UnstructuredGrid\nPoints\t" << usg->GetNumberOfPoints() << "\nCells\t" << usg->GetNumberOfCells() << '\n';
+    std::cout << "DataSetSurfaceFilter\nPoints\t" << output->GetNumberOfPoints() << "\nCells\t" << output->GetNumberOfCells() << '\n';
+
+    vtkNew<vtkDataSetMapper> mapper;
+    // mapper->SetInputData(usg);
+    mapper->SetInputData(output);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(1, 0, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->SetSize(800, 600);
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST601
+
+#ifdef TEST602
+
+#include <vtkActor.h>
+#include <vtkDataSetMapper.h>
+#include <vtkGeometryFilter.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPoints.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkUnstructuredGrid.h>
+
+int main()
+{
+    vtkNew<vtkPoints> points;
+    // 0,1,2
+    points->InsertNextPoint(0, 0, 0);
+    points->InsertNextPoint(2, 0, 0);
+    points->InsertNextPoint(1, 2, 0);
+
+    // 3,4,5,6
+    points->InsertNextPoint(3, 0, 0);
+    points->InsertNextPoint(5, 0, 0);
+    points->InsertNextPoint(4, 0, 2);
+    points->InsertNextPoint(4, 2, 1);
+
+    // 7,8,9,10,11,12,13,14
+    points->InsertNextPoint(6, 0, 0);
+    points->InsertNextPoint(8, 0, 0);
+    points->InsertNextPoint(8, 0, 2);
+    points->InsertNextPoint(6, 0, 2);
+    points->InsertNextPoint(6, 2, 0);
+    points->InsertNextPoint(9, 2, 0);
+    points->InsertNextPoint(9, 2, 3);
+    points->InsertNextPoint(6, 2, 3);
+
+    vtkNew<vtkUnstructuredGrid> usg;
+    usg->SetPoints(points);
+
+    // 三角形
+    vtkIdType ids_triangle[] { 0, 1, 2 };
+    usg->InsertNextCell(VTK_TRIANGLE, 3, ids_triangle);
+
+    // 四面体
+    vtkIdType ids_tetra[] { 3, 4, 5, 6 };
+    usg->InsertNextCell(VTK_TETRA, 4, ids_tetra);
+
+    // 六面体
+    vtkIdType ids_hexahedron[] { 7, 8, 9, 10, 11, 12, 13, 14 };
+    usg->InsertNextCell(VTK_HEXAHEDRON, 8, ids_hexahedron);
+
+    vtkNew<vtkGeometryFilter> filter;
+    filter->SetInputData(usg);
+    filter->Update();
+
+    auto output = filter->GetOutput();
+
+    std::cout << "UnstructuredGrid\nPoints\t" << usg->GetNumberOfPoints() << "\nCells\t" << usg->GetNumberOfCells() << '\n';
+    std::cout << "PolyData\nPoints\t" << output->GetNumberOfPoints() << "\nCells\t" << output->GetNumberOfCells() << '\n';
+
+    vtkNew<vtkDataSetMapper> mapper;
+    // mapper->SetInputData(usg);
+    mapper->SetInputData(output);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(1, 0, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->SetSize(800, 600);
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST602

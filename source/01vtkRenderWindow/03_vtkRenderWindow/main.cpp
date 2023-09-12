@@ -20,7 +20,7 @@
 19.
 20.按钮 vtkButtonWidget
 21.vtkFeatureEdges 封闭性检测 TEST16 标注边界的类型  https://kitware.github.io/vtk-examples/site/Cxx/Meshes/BoundaryEdges/
-22.给一个没有封闭的图元加一个盖子，让它封闭 https://kitware.github.io/vtk-examples/site/Cxx/Meshes/CapClip/
+22.
 23.线条生成三角面  vtkStripper https://kitware.github.io/vtk-examples/site/Cxx/Meshes/CapClip/
 24.多边形转三角形 vtkTriangleFilter https://kitware.github.io/vtk-examples/site/Cxx/PolyData/PolygonalSurfaceContourLineInterpolator/
 25.让一个模型始终在其他模型的上层 重叠的面旋转时会闪烁 https://www.weiy.city/2020/03/make-model-always-on-top/
@@ -2386,124 +2386,6 @@ int main(int, char* [])
 
 #endif // TEST21
 
-#ifdef TEST22
-
-#include <vtkActor.h>
-#include <vtkCamera.h>
-#include <vtkClipPolyData.h>
-#include <vtkDataSetMapper.h>
-#include <vtkFeatureEdges.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPlane.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSmartPointer.h>
-#include <vtkSphereSource.h>
-#include <vtkStripper.h>
-#include <vtkXMLPolyDataReader.h>
-
-int main(int argc, char* argv[])
-{
-    // Define colors
-    vtkNew<vtkNamedColors> colors;
-    auto backgroundColor = colors->GetColor3d("steel_blue");
-    auto boundaryColor = colors->GetColor3d("banana");
-    auto clipColor = colors->GetColor3d("tomato");
-
-    // PolyData to process
-    vtkNew<vtkSphereSource> source;
-    source->SetThetaResolution(20);
-    source->SetPhiResolution(11);
-    source->Update();
-    auto polyData = source->GetOutput();
-
-    vtkNew<vtkPlane> plane;
-    plane->SetOrigin(polyData->GetCenter());
-    plane->SetNormal(1.0, -1.0, -1.0);
-
-    vtkNew<vtkClipPolyData> clipper;
-    clipper->SetInputData(polyData);
-    clipper->SetClipFunction(plane);
-    clipper->SetValue(0);
-    clipper->Update();
-
-    polyData = clipper->GetOutput();
-
-    vtkNew<vtkDataSetMapper> clipMapper;
-    clipMapper->SetInputData(polyData);
-
-    vtkNew<vtkActor> clipActor;
-    clipActor->SetMapper(clipMapper);
-    clipActor->GetProperty()->SetDiffuseColor(clipColor.GetData());
-    clipActor->GetProperty()->SetInterpolationToFlat();
-    clipActor->GetProperty()->EdgeVisibilityOn();
-
-    // Now extract feature edges
-    vtkNew<vtkFeatureEdges> boundaryEdges;
-    boundaryEdges->SetInputData(polyData);
-    boundaryEdges->BoundaryEdgesOn();
-    boundaryEdges->FeatureEdgesOff();
-    boundaryEdges->NonManifoldEdgesOff();
-    boundaryEdges->ManifoldEdgesOff();
-
-    vtkNew<vtkStripper> boundaryStrips;
-    boundaryStrips->SetInputConnection(boundaryEdges->GetOutputPort());
-    boundaryStrips->Update();
-
-    // Change the polylines into polygons
-    vtkNew<vtkPolyData> boundaryPoly;
-    boundaryPoly->SetPoints(boundaryStrips->GetOutput()->GetPoints());
-    boundaryPoly->SetPolys(boundaryStrips->GetOutput()->GetLines());
-
-    vtkNew<vtkPolyDataMapper> boundaryMapper;
-    boundaryMapper->SetInputData(boundaryPoly);
-
-    vtkNew<vtkActor> boundaryActor;
-    boundaryActor->SetMapper(boundaryMapper);
-    boundaryActor->GetProperty()->SetDiffuseColor(boundaryColor.GetData());
-
-    // Create graphics stuff
-    //
-    vtkNew<vtkRenderer> renderer;
-    renderer->SetBackground(backgroundColor.GetData());
-    renderer->UseHiddenLineRemovalOn();
-
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetSize(640, 480);
-
-    vtkNew<vtkRenderWindowInteractor> interactor;
-    interactor->SetRenderWindow(renderWindow);
-
-    // Add the actors to the renderer, set the background and size
-    //
-    renderer->AddActor(clipActor);
-    renderer->AddActor(boundaryActor);
-
-    // Generate an interesting view
-    //
-    renderer->ResetCamera();
-    renderer->GetActiveCamera()->Azimuth(30);
-    renderer->GetActiveCamera()->Elevation(30);
-    renderer->GetActiveCamera()->Dolly(1.2);
-    renderer->ResetCameraClippingRange();
-
-    renderWindow->Render();
-    renderWindow->SetWindowName("CapClip");
-    renderWindow->Render();
-
-    interactor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-
-#endif // TEST22
 
 #ifdef TEST23
 
