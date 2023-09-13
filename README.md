@@ -25,7 +25,7 @@ vtk: vtk-config.cmake所在路径添加到环境变量 VTK_DIR
 vtk函数测试
 01. 引用计数
 ### 01_Template
-使用vtkRenderWindow渲染的最简单代码
+使用vtkRenderWindow渲染的最简单示例代码
 ### 02_vtkRenderWindow
 
 ### 03_vtkRenderWindow
@@ -37,24 +37,25 @@ vtk函数测试
 - 颜色映射表
 - 色卡
 - 云图
-- 矢量图
+- 矢量图（箭头图）
 - 流线图
-- 迹线图
-- 粒子追踪
+- 迹线图（粒子追踪）
 ### 06_parallelProcess
-- 并行
+- 并行处理数据、并行渲染
 - 多线程
 - MPI
 ### 07_pick
-- 物体拾取、图元拾取、点拾取
+- 物体拾取、图元拾取、点拾取、单元拾取
+- GPU拾取、CPU拾取
 - 多窗口拾取
 - 多图层拾取
 ### 08_interactor
 - 交互器Style
+- 定时器
 ### 09_image
 - 图片保存、加载、裁剪、混合
 - 像素转换
-- 矢量图
+- 矢量图片
 ### 10_grid
 - 加载各种类型的网格
 - 非结构、结构网格
@@ -63,7 +64,23 @@ vtk函数测试
 ### 12_shadow_lighting
 - 光照
 - 阴影
-
+### 13_filter
+- 插值
+- 提取网格、裁剪网格
+- 格心格点数据互相转换
+- 合并网格
+### 14_view
+- 窗口
+- 场景图
+### 15_algorithm
+- 图形学常见算法
+- 八叉树
+- KD树
+- BSP树
+### 16_geometry
+- vtk自带的几何模型
+- 球体、立方体、圆锥、圆柱、箭头
+- 超椭球体
 
 ## (02)vtkQWidget
 使用QWidget渲染
