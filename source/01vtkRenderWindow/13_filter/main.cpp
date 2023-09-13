@@ -8,6 +8,8 @@
  *
  * 201. vtkWarpScalar vtkWarpVector 根据标量或向量值在指定方向对顶点进行偏移
  * 202. vtkShrinkFilter 收缩单元格 vtkShrinkPolyData
+ * 203. vtkElevationFilter 沿指定方向生成Scalars，可以将输入数据的标量值作为高程，也可以设置变换函数定义高程变化
+ * 204. vtkSimpleElevationFilter 用于简单的高程变换
  *
  * 301. vtkAppendPolyData 合并多个 vtkPolyData
  * 302. 合并带有Scalars、Vectors的vtkPolyData
@@ -27,7 +29,7 @@
  *
  */
 
-#define TEST504
+#define TEST204
 
 #ifdef TEST001
 
@@ -800,6 +802,196 @@ int main(int, char*[])
 }
 
 #endif // TESt202
+
+#ifdef TEST203
+
+#include <vtkActor.h>
+#include <vtkElevationFilter.h>
+#include <vtkParametricFunctionSource.h>
+#include <vtkParametricSuperEllipsoid.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProjectSphereFilter.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+// https://kitware.github.io/vtk-examples/site/Cxx/Visualization/ProjectSphere/
+
+int main(int, char*[])
+{
+    // 超椭球体
+    vtkNew<vtkParametricSuperEllipsoid> surface;
+    surface->SetN1(2.0);
+    surface->SetN2(0.5);
+
+    vtkNew<vtkParametricFunctionSource> source;
+    source->SetParametricFunction(surface);
+    source->Update();
+
+    // 高程图，用于生成标量值，将2维数据转换为三维
+    vtkNew<vtkElevationFilter> elevationFilter;
+    elevationFilter->SetInputConnection(source->GetOutputPort());
+    elevationFilter->SetLowPoint(0.0, 0.0, -1.);
+    elevationFilter->SetHighPoint(0.0, 0.0, 1.);
+    elevationFilter->Update();
+
+    vtkNew<vtkPolyData> pd1;
+    pd1->DeepCopy(elevationFilter->GetOutput());
+
+    // 展开球体
+    vtkNew<vtkProjectSphereFilter> sphereProject1;
+    sphereProject1->SetInputConnection(elevationFilter->GetOutputPort());
+    sphereProject1->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper1;
+    mapper1->SetInputConnection(sphereProject1->GetOutputPort());
+    mapper1->SetScalarRange(sphereProject1->GetOutput()->GetPointData()->GetScalars()->GetRange());
+    vtkNew<vtkActor> actor1;
+    actor1->SetMapper(mapper1);
+
+    vtkNew<vtkPolyDataMapper> mapper2;
+    mapper2->SetInputData(pd1);
+    mapper2->SetScalarRange(pd1->GetPointData()->GetScalars()->GetRange());
+    vtkNew<vtkActor> actor2;
+    actor2->SetMapper(mapper2);
+
+    std::cout << "left range\t" << pd1->GetPointData()->GetScalars()->GetRange()[0] << '\t' << pd1->GetPointData()->GetScalars()->GetRange()[1]
+              << "\nright range\t" << sphereProject1->GetOutput()->GetPointData()->GetScalars()->GetRange()[0] << '\t'
+              << sphereProject1->GetOutput()->GetPointData()->GetScalars()->GetRange()[1] << '\n';
+
+    double leftViewport[4]  = { 0.0, 0.0, 0.5, 1.0 };
+    double rightViewport[4] = { 0.5, 0.0, 1.0, 1.0 };
+
+    vtkNew<vtkRenderer> rightRenderer;
+    rightRenderer->SetViewport(rightViewport);
+    rightRenderer->SetBackground(.3, .2, .1);
+    rightRenderer->AddActor(actor1);
+
+    vtkNew<vtkRenderer> leftRenderer;
+    leftRenderer->SetViewport(leftViewport);
+    leftRenderer->SetBackground(.1, .2, .3);
+    leftRenderer->AddActor(actor2);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(leftRenderer);
+    renderWindow->AddRenderer(rightRenderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST203
+
+#ifdef TEST204
+
+#include <vtkActor.h>
+#include <vtkDelaunay2D.h>
+#include <vtkFloatArray.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSimpleElevationFilter.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkPoints> points;
+
+    unsigned int GridSize = 10;
+    for (unsigned int x = 0; x < GridSize; x++)
+    {
+        for (unsigned int y = 0; y < GridSize; y++)
+        {
+            points->InsertNextPoint(x, y, (x + y) / (y + 1));
+            std::cout << x << " " << y << " " << (x + y) / (y + 1) << std::endl;
+        }
+    }
+
+    double bounds[6];
+    points->GetBounds(bounds);
+
+    vtkNew<vtkPolyData> inputPolyData;
+    inputPolyData->SetPoints(points);
+
+    vtkNew<vtkDelaunay2D> delaunay;
+    delaunay->SetInputData(inputPolyData);
+    delaunay->Update();
+
+    vtkNew<vtkSimpleElevationFilter> elevationFilter;
+    elevationFilter->SetInputConnection(delaunay->GetOutputPort());
+    elevationFilter->SetVector(0.0, 0.0, 1);
+    elevationFilter->Update();
+
+    vtkNew<vtkPolyData> output;
+    output->ShallowCopy(dynamic_cast<vtkPolyData*>(elevationFilter->GetOutput()));
+
+    vtkFloatArray* elevation = dynamic_cast<vtkFloatArray*>(output->GetPointData()->GetArray("Elevation"));
+
+    vtkNew<vtkLookupTable> colorLookupTable;
+    colorLookupTable->SetTableRange(bounds[4], bounds[5]);
+    colorLookupTable->Build();
+
+    vtkNew<vtkUnsignedCharArray> colors;
+    colors->SetNumberOfComponents(3);
+    colors->SetName("Colors");
+
+    for (vtkIdType i = 0; i < output->GetNumberOfPoints(); i++)
+    {
+        double val = elevation->GetValue(i);
+        // std::cout << "val: " << val << std::endl;
+
+        double dcolor[3];
+        colorLookupTable->GetColor(val, dcolor);
+        std::cout << "dcolor: " << dcolor[0] << " " << dcolor[1] << " " << dcolor[2] << std::endl;
+
+        unsigned char color[3];
+        for (unsigned int j = 0; j < 3; j++)
+        {
+            color[j] = 255 * dcolor[j] / 1.0;
+        }
+        std::cout << "color: " << (int)color[0] << " " << (int)color[1] << " " << (int)color[2] << std::endl;
+
+        colors->InsertNextTypedTuple(color);
+    }
+
+    output->GetPointData()->AddArray(colors);
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(output);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+#endif // TEST204
 
 #ifdef TEST301
 
@@ -1842,7 +2034,7 @@ int main(int, char*[])
 
     vtkNew<vtkPolyDataMapper> clipMapper;
     clipMapper->SetInputConnection(clip->GetOutputPort());
-    //clipMapper->SetInputConnection(loop->GetOutputPort(2));
+    // clipMapper->SetInputConnection(loop->GetOutputPort(2));
     clipMapper->ScalarVisibilityOff();
 
     vtkNew<vtkActor> clipActor;

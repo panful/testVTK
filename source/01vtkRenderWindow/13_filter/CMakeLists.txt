@@ -18,6 +18,7 @@ find_package(VTK
         FiltersPoints       # vtkPointInterpolator
         FiltersGeometry     # vtkDataSetSurfaceFilter
         FiltersExtraction   # vtkExtractPolyDataGeometry
+        CommonComputationalGeometry   # vtkParametricSuperEllipsoid
     QUIET
 )
 

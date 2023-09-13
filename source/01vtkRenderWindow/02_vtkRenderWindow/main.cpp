@@ -1610,7 +1610,6 @@ int main(int, char*[])
 #include <vtkColorSeries.h>
 #include <vtkConeSource.h>
 #include <vtkCubeSource.h>
-#include <vtkElevationFilter.h>
 #include <vtkGenericOpenGLRenderWindow.h>
 #include <vtkInteractorStyleRubberBand3D.h>
 #include <vtkLookupTable.h>
