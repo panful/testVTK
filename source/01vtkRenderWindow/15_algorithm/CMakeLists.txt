@@ -14,6 +14,7 @@ find_package(VTK
         loguru
         ParallelMPI
         FiltersSources      # vtkCubeSource
+        FiltersExtraction   # vtkExtractCells
     QUIET
 )
 
