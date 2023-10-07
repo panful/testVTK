@@ -11,7 +11,7 @@
 10.
 11.获取OpenGL版本  https://gitlab.kitware.com/vtk/vtk/-/blob/v9.1.0/Rendering/OpenGL2/Testing/Cxx/TestWindowBlits.cxx
 12.网格中心vtkCenterOfMass
-13.多边形每条边的外法向量 https://zhuanlan.zhihu.com/p/272517099
+13.
 14.从输入的多个polydata获取交集并集差集vtkBooleanOperationPolyDataFilter
 15.vtkOrientationMarkerWidget左键事件屏蔽对父窗口的响应
 16.网格模型的特征边与封闭性检测 https://www.cnblogs.com/ybqjymy/p/14241831.html
@@ -1345,134 +1345,6 @@ int main(int, char* [])
 }
 
 #endif // TEST12
-
-#ifdef TEST13
-
-#include <vtkPolyData.h>
-#include <vtkPoints.h>
-#include <vtkCellArray.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkActor.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindow.h>
-#include <vtkProperty.h>
-#include <vtkCamera.h>
-#include <vtkRenderWindowInteractor.h>
-
-#include <vtkCellCenters.h>
-#include <vtkGlyph3D.h>
-#include <vtkArrowSource.h>
-#include <vtkFloatArray.h>
-#include <vtkPointData.h>
-
-#include <array>
-#include <iostream>
-
-namespace
-{
-    std::array<float, 4 * 2> vertices{
-        0,0,
-        1,0,
-        1,1,
-        0,1
-    };
-
-    std::array<long long, 4 * 2> indices{
-        0,1,
-        2,1, // 1,2,
-        2,3,
-        3,0
-    };
-}
-
-int main()
-{
-    vtkNew<vtkPolyData> polyData;
-    vtkNew<vtkPoints> points;
-    vtkNew<vtkCellArray> cells;
-
-    for (size_t i = 0; i < vertices.size(); i += 2)
-    {
-        points->InsertNextPoint(vertices[i], vertices[i + 1], 0.0f);
-    }
-    for (size_t i = 0; i < indices.size(); i += 2)
-    {
-        cells->InsertNextCell({ indices[i],indices[i + 1] });
-    }
-
-    polyData->SetPoints(points);
-    polyData->SetLines(cells);
-
-    // 取单元的中心
-    vtkNew<vtkCellCenters> cellCenters;
-    cellCenters->SetInputData(polyData);
-    cellCenters->Update();
-
-    // 设置单元的法向量
-    vtkNew<vtkFloatArray> centerVectors;
-    centerVectors->SetNumberOfComponents(3);
-    for (size_t i = 0; i < polyData->GetNumberOfCells(); ++i)
-    {
-        vtkNew<vtkIdList> pts;
-        polyData->GetCellPoints(i, pts);
-
-        auto x0 = vertices[pts->GetId(0) * 2 + 0];
-        auto y0 = vertices[pts->GetId(0) * 2 + 1];
-        auto x1 = vertices[pts->GetId(1) * 2 + 0];
-        auto y1 = vertices[pts->GetId(1) * 2 + 1];
-
-        // 逆时针多边形的外法线
-        centerVectors->InsertNextTuple3(y1 - y0, x0 - x1, .0);
-    }
-    cellCenters->GetOutput()->GetPointData()->SetVectors(centerVectors);
-
-    vtkNew<vtkArrowSource> arrow;
-    vtkNew<vtkGlyph3D> glyph;
-    glyph->SetInputData(cellCenters->GetOutput());
-    glyph->SetSourceConnection(arrow->GetOutputPort());
-    glyph->SetScaleModeToDataScalingOff();
-    glyph->SetVectorModeToUseVector();
-    glyph->Update();
-
-    //mapper
-    vtkNew<vtkPolyDataMapper> glyphMapper;
-    glyphMapper->SetInputConnection(glyph->GetOutputPort());
-
-    vtkNew<vtkPolyDataMapper> polyDataMapper;
-    polyDataMapper->SetInputData(polyData);
-
-    //actor
-    vtkNew<vtkActor> glyphActor;
-    glyphActor->SetMapper(glyphMapper);
-    glyphActor->GetProperty()->SetColor(0, 1, 0);
-
-    vtkNew<vtkActor> polyDataActor;
-    polyDataActor->SetMapper(polyDataMapper);
-    polyDataActor->GetProperty()->SetColor(1, 0, 0);
-
-    //renderer
-    vtkNew<vtkRenderer> renderer;
-    renderer->AddActor(polyDataActor);
-    renderer->AddActor(glyphActor);
-    renderer->ResetCamera();
-
-    //RenderWindow
-    vtkNew<vtkRenderWindow> renWin;
-    renWin->AddRenderer(renderer);
-    renWin->SetSize(600, 600);
-
-    //RenderWindowInteractor
-    vtkNew<vtkRenderWindowInteractor> iren;
-    iren->SetRenderWindow(renWin);
-
-    //数据交互
-    renWin->Render();
-    iren->Start();
-
-    return 0;
-}
-
-#endif // TEST13
 
 #ifdef TEST14
 
