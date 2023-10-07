@@ -14,11 +14,12 @@ find_package(VTK
         RenderingOpenGL2
         loguru
         ParallelMPI
-        ImagingHybrid       # vtkSampleFunction
-        FiltersPoints       # vtkPointInterpolator
-        FiltersGeometry     # vtkDataSetSurfaceFilter
-        FiltersExtraction   # vtkExtractPolyDataGeometry
-        CommonComputationalGeometry   # vtkParametricSuperEllipsoid
+        ImagingHybrid                   # vtkSampleFunction
+        FiltersPoints                   # vtkPointInterpolator
+        FiltersGeometry                 # vtkDataSetSurfaceFilter
+        FiltersExtraction               # vtkExtractPolyDataGeometry
+        CommonComputationalGeometry     # vtkParametricSuperEllipsoid
+        IOLegacy                        # vtkDataObjectWriter
     QUIET
 )
 

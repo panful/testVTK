@@ -10,9 +10,11 @@
  * 5. 构造 vtkUnstructuredGrid，四面体、六面体、棱柱、棱锥等图形
  * 6. 读写 vtkUnstructuredGrid vtkPolyData
  * 7. *.vtu XML格式的非结构网格读取
+ * 8. vtkPolyData vtkDataSet vtkUnstructuredGrid vtkStructuredGrid 互相转换
+ * 9. vtkPolyData 设置多种单元(line poly...)，获取单元的索引
  */
 
-#define TEST7
+#define TEST9
 
 #ifdef TEST1
 
@@ -609,3 +611,126 @@ int main(int argc, char* argv[])
 }
 
 #endif // TEST7
+
+#ifdef TEST8
+
+// vtkPolyData 的使用
+// https://zhuanlan.zhihu.com/p/336743251
+
+// vtkDataSet 的使用
+// http://t.zoukankan.com/ybqjymy-p-14241014.html
+
+// vtkUnstructuredGrid 的使用以及vtk单元类型枚举
+// https://blog.csdn.net/liushao1031177/article/details/120708061
+
+// vtkStructuredGrid 官方示例
+// https://kitware.github.io/vtk-examples/site/Cxx/StructuredGrid/SGrid/
+
+#include <iostream>
+
+int main()
+{
+    std::cout << "please see 13_filter\n";
+
+    // 13_filter TEST601 vtkDataSetSurfaceFilter      将 vtkUnstructuredGrid 转换为 vtkPolyData
+    // 13_filter TEST603 vtkDataSetToDataObjectFilter 将数据集(vtkDataSet)转换为数据对象(vtkDataObject)，然后写入文本文件
+}
+
+#endif // TEST8
+
+#ifdef TEST9
+
+#include <vtkActor.h>
+#include <vtkCellArray.h>
+#include <vtkCellData.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main()
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0, 0, 0); // 第一条线段
+    points->InsertNextPoint(0, 1, 0);
+    points->InsertNextPoint(1, 0, 0); // 第一个三角形
+    points->InsertNextPoint(2, 0, 0);
+    points->InsertNextPoint(2, 1, 0);
+    points->InsertNextPoint(3, 0, 0); // 第二条线段
+    points->InsertNextPoint(3, 1, 0);
+    points->InsertNextPoint(4, 0, 0); // 第二个三角形
+    points->InsertNextPoint(5, 0, 0);
+    points->InsertNextPoint(5, 1, 0);
+    points->InsertNextPoint(6, 0, 0); // 单独的顶点
+    points->InsertNextPoint(6, 1, 0); // 单独的顶点
+
+    vtkNew<vtkCellArray> verts;
+    vtkNew<vtkCellArray> lines;
+    vtkNew<vtkCellArray> triangles;
+
+    vtkIdType pt0Id = 10;
+    vtkIdType pt1Id = 11;
+    verts->InsertNextCell(1,&pt0Id);
+    verts->InsertNextCell(1,&pt1Id);
+    lines->InsertNextCell({ 0, 1 });
+    lines->InsertNextCell({ 5, 6 });
+    triangles->InsertNextCell({ 2, 3, 4 });
+    triangles->InsertNextCell({ 7, 8, 9 });
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+
+    polyData->SetPolys(triangles);
+    polyData->SetLines(lines);
+    polyData->SetVerts(verts);
+
+    // 单元的索引和调用SetPolys() SetLines() SetVerts()的顺序无关
+    // 固定顺序依次为：Verts Lines Polys Strips
+    for (vtkIdType i = 0; i < polyData->GetNumberOfCells(); ++i)
+    {
+        vtkNew<vtkIdList> pts;
+        polyData->GetCellPoints(i, pts);
+
+        std::cout << "Cell: " << i << "  npts: " << pts->GetNumberOfIds() << "  points: ";
+        for (vtkIdType j = 0; j < pts->GetNumberOfIds(); ++j)
+        {
+            std::cout << pts->GetId(j) << '\t';
+        }
+        std::cout << '\n';
+    }
+
+    //-----------------------------------------------
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+    actor->GetProperty()->SetPointSize(3);
+    actor->GetProperty()->SetLineWidth(3);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST9

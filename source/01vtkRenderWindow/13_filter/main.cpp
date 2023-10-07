@@ -26,10 +26,11 @@
  *
  * 601. vtkDataSetSurfaceFilter 将 vtkUnstructuredGrid 转换为 vtkPolyData，还可以将体网格转换为表面数据，从而简化模型
  * 602. vtkGeometryFilter 从数据集中提取边界，可以将任何数据转换为多边形数据，类似vtkDataSetSurfaceFilter
- *
+ * 603. vtkDataSetToDataObjectFilter 将数据集(vtkDataSet)转换为数据对象(vtkDataObject)
+ * 604. vtkDataObjectToDataSetFilter 将数据对象(vtkDataObject)转换为数据集(vtkDataSet) vtkFieldDataToAttributeDataFilter
  */
 
-#define TEST204
+#define TEST604
 
 #ifdef TEST001
 
@@ -2248,3 +2249,193 @@ int main()
 }
 
 #endif // TEST602
+
+#ifdef TEST603
+
+#include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkDataObjectWriter.h>
+#include <vtkDataSetMapper.h>
+#include <vtkDataSetToDataObjectFilter.h>
+#include <vtkDoubleArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkUnstructuredGrid.h>
+
+int main()
+{
+    vtkNew<vtkPoints> points;
+    // 0,1,2
+    points->InsertNextPoint(0, 0, 0);
+    points->InsertNextPoint(2, 0, 0);
+    points->InsertNextPoint(1, 2, 0);
+
+    // 3,4,5,6
+    points->InsertNextPoint(3, 0, 0);
+    points->InsertNextPoint(5, 0, 0);
+    points->InsertNextPoint(4, 0, 2);
+    points->InsertNextPoint(4, 2, 1);
+
+    // 7,8,9,10,11,12,13,14
+    points->InsertNextPoint(6, 0, 0);
+    points->InsertNextPoint(8, 0, 0);
+    points->InsertNextPoint(8, 0, 2);
+    points->InsertNextPoint(6, 0, 2);
+    points->InsertNextPoint(6, 2, 0);
+    points->InsertNextPoint(9, 2, 0);
+    points->InsertNextPoint(9, 2, 3);
+    points->InsertNextPoint(6, 2, 3);
+
+    vtkNew<vtkUnstructuredGrid> usg;
+    usg->SetPoints(points);
+
+    // 三角形
+    vtkIdType ids_triangle[] { 0, 1, 2 };
+    usg->InsertNextCell(VTK_TRIANGLE, 3, ids_triangle);
+
+    // 四面体
+    vtkIdType ids_tetra[] { 3, 4, 5, 6 };
+    usg->InsertNextCell(VTK_TETRA, 4, ids_tetra);
+
+    // 六面体
+    vtkIdType ids_hexahedron[] { 7, 8, 9, 10, 11, 12, 13, 14 };
+    usg->InsertNextCell(VTK_HEXAHEDRON, 8, ids_hexahedron);
+
+    // 顶点Scalar数据
+    vtkNew<vtkDoubleArray> ptScalars0;
+    ptScalars0->SetName("ptScalars0");
+    vtkNew<vtkDoubleArray> ptScalars1;
+    ptScalars1->SetName("ptScalars1");
+    for (vtkIdType i = 0; i < usg->GetNumberOfPoints(); ++i)
+    {
+        ptScalars0->InsertNextValue(static_cast<double>(i));
+        ptScalars1->InsertNextValue(static_cast<double>(i * 2));
+    }
+    usg->GetPointData()->AddArray(ptScalars0);
+    usg->GetPointData()->AddArray(ptScalars1);
+
+    // 单元Vector数据
+    vtkNew<vtkDoubleArray> cellVectors0;
+    cellVectors0->SetName("cellVectors0");
+    cellVectors0->SetNumberOfComponents(3);
+    vtkNew<vtkDoubleArray> cellVectors1;
+    cellVectors1->SetName("cellVectors1");
+    cellVectors1->SetNumberOfComponents(3);
+    for (vtkIdType i = 0; i < usg->GetNumberOfCells(); ++i)
+    {
+        cellVectors0->InsertNextTuple3(static_cast<double>(i), 0., 0.);
+        cellVectors1->InsertNextTuple3(0., static_cast<double>(i), 0.);
+    }
+    usg->GetCellData()->AddArray(cellVectors0);
+    usg->GetCellData()->AddArray(cellVectors1);
+
+    // 将DataSet转换为DataObject
+    vtkNew<vtkDataSetToDataObjectFilter> filter;
+    filter->CellDataOn(); // 打开数据集(DataSet)单元数据(Cell)到数据对象(DataObject)的转换，默认开启
+    filter->GeometryOn();
+    filter->TopologyOn();
+    filter->FieldDataOn();
+    filter->PointDataOn();
+    filter->ModernTopologyOn();
+    filter->LegacyTopologyOn();
+    filter->SetInputData(usg);
+    filter->Update();
+
+    // 将数据对象写入文件
+    vtkNew<vtkDataObjectWriter> writer;
+    writer->SetFileName("dataObject.txt");
+    writer->SetInputData(filter->GetOutput());
+    writer->Write();
+
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(usg);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(1, 0, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->SetSize(800, 600);
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST603
+
+#ifdef TEST604
+
+// 官方示例 https://examples.vtk.org/site/Cxx/Modelling/FinanceFieldData/
+
+#include <vtkActor.h>
+#include <vtkCellArray.h>
+#include <vtkDataObjectReader.h>
+#include <vtkDataObjectToDataSetFilter.h>
+#include <vtkDoubleArray.h>
+#include <vtkFieldDataToAttributeDataFilter.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main()
+{
+    vtkNew<vtkDataObjectReader> reader;
+    reader->SetFileName("../resources/dataObject.txt");
+    reader->Update();
+
+    auto nFieldData = reader->GetNumberOfFieldDataInFile();
+    auto nScalars   = reader->GetNumberOfScalarsInFile();
+    auto nNormals   = reader->GetNumberOfNormalsInFile();
+    auto nVectors   = reader->GetNumberOfVectorsInFile();
+
+    std::cout << "NumberOfFieldData\t" << nFieldData << "\nNumberOfScalars\t" << nScalars << "\nNumberOfNormals\t" << nNormals
+              << "\nNumberOfVectors\t" << nVectors << '\n';
+
+    auto fieldData = nFieldData > 0 ? reader->GetFieldDataNameInFile(0) : "nullptr";
+    auto scalars   = nScalars > 0 ? reader->GetScalarsNameInFile(0) : "nullptr";
+    auto normals   = nNormals > 0 ? reader->GetNormalsNameInFile(0) : "nullptr";
+    auto vectors   = nVectors > 0 ? reader->GetVectorsNameInFile(0) : "nullptr";
+
+    std::cout << "FieldData\t " << fieldData << "\nScalars\t" << scalars << "\nNormals\t" << normals << "\nVectors\t" << vectors << "\n";
+
+    // reader->Read();
+    // reader->ReadCellData();
+    // reader->ReadPoints();
+    // reader->ReadArray();
+
+    // 顶点和单元
+    // vtkNew<vtkDataObjectToDataSetFilter> filter;
+    // filter->SetPointComponent();
+    // filter->SetCellConnectivityComponent();
+    // filter->SetCellTypeComponent();
+
+    // 顶点和单元格的属性数据
+    // vtkNew<vtkFieldDataToAttributeDataFilter> fd2ad;
+    // fd2ad->SetScalarComponent();
+    // fd2ad->SetVectorComponent();
+    // fd2ad->SetNormalComponent();
+}
+
+#endif // TEST604

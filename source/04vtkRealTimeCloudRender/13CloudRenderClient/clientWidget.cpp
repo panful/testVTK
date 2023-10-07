@@ -97,7 +97,7 @@ void VTKWidget::OnWrite()
         }
     }
 
-    image.save("C:\\Users\\yangpan\\Desktop\\out.bmp");
+    image.save("out.bmp");
 }
 
 
