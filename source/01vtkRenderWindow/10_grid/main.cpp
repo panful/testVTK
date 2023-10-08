@@ -3,20 +3,23 @@
 //
 
 /**
- * 1. 结构cgns
- * 2. 非结构cgns
- * 3. FLUENT *.cas *.dat 只绘制图形，不映射流场数据 FLUENT控制台使用 f c n wcd fileName 导出 fileName.cas和fileName.dat
- * 4. FLUENT *.cas *.dat 将流场数据映射到颜色
- * 5. 构造 vtkUnstructuredGrid，四面体、六面体、棱柱、棱锥等图形
- * 6. 读写 vtkUnstructuredGrid vtkPolyData
- * 7. *.vtu XML格式的非结构网格读取
- * 8. vtkPolyData vtkDataSet vtkUnstructuredGrid vtkStructuredGrid 互相转换
- * 9. vtkPolyData 设置多种单元(line poly...)，获取单元的索引
+ * 101. 结构cgns
+ * 102. 非结构cgns
+ *
+ * 201. FLUENT *.cas *.dat 只绘制图形，不映射流场数据 FLUENT控制台使用 f c n wcd fileName 导出 fileName.cas和fileName.dat
+ * 202. FLUENT *.cas *.dat 将流场数据映射到颜色
+ *
+ * 301. 构造 vtkUnstructuredGrid，四面体、六面体、棱柱、棱锥等图形
+ * 302. 读写 vtkUnstructuredGrid vtkPolyData
+ * 303. *.vtu XML格式的非结构网格读取
+ *
+ * 401. vtkPolyData vtkDataSet vtkUnstructuredGrid vtkStructuredGrid 互相转换
+ * 402. vtkPolyData 设置多种单元(line poly...)，获取单元的索引
  */
 
-#define TEST9
+#define TEST301
 
-#ifdef TEST1
+#ifdef TEST101
 
 #include <vtkActor.h>
 #include <vtkCGNSReader.h>
@@ -88,9 +91,9 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 
-#endif // TEST1
+#endif // TEST101
 
-#ifdef TEST2
+#ifdef TEST102
 
 #include <vtkActor.h>
 #include <vtkCGNSReader.h>
@@ -162,9 +165,9 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 
-#endif // TEST2
+#endif // TEST102
 
-#ifdef TEST3
+#ifdef TEST201
 
 #include <iostream>
 #include <vtkActor.h>
@@ -231,9 +234,9 @@ int main()
     return EXIT_SUCCESS;
 }
 
-#endif // TEST3
+#endif // TEST201
 
-#ifdef TEST4
+#ifdef TEST202
 
 #include <iostream>
 #include <vtkActor.h>
@@ -334,9 +337,9 @@ int main()
     return EXIT_SUCCESS;
 }
 
-#endif // TEST4
+#endif // TEST202
 
-#ifdef TEST5
+#ifdef TEST301
 
 #include <iostream>
 #include <vtkActor.h>
@@ -415,6 +418,19 @@ int main()
     vtkIdType ids_pyramid[] { 21, 22, 23, 24, 25 };
     usg->InsertNextCell(VTK_PYRAMID, 5, ids_pyramid);
 
+    // 大多数几何单元只需要隐式定义的几何类型和一组点及其顺序，对于非多面体单元类型，npts是单元格中唯一点的数目；
+    // int type:                单元类型
+    // vtkIdType npts:          几何点个数
+    // const vtkIdType ptIds[]：几何点的ID数组
+    // vtkIdType InsertNextCell(int type, vtkIdType npts, const vtkIdType ptIds[])
+
+    // 用于创建多面体的接口
+    // npts     单元中几何点的数量;
+    // pts      单元点ID的列表;
+    // nfaces   单元中的面数;
+    // faces    多个面的信息流[numFace0Pts，id1，id2，id3，numFace1Pts，id1，id2，id3，…];
+    // vtkIdType InsertNextCell(int type, vtkIdType npts, const vtkIdType ptIds[], vtkIdType nfaces, const vtkIdType faces[])
+
     vtkNew<vtkDataSetMapper> mapper;
     mapper->SetInputData(usg);
 
@@ -442,9 +458,9 @@ int main()
     return EXIT_SUCCESS;
 }
 
-#endif // TEST5
+#endif // TEST301
 
-#ifdef TEST6
+#ifdef TEST302
 
 #include <iostream>
 #include <vtkActor.h>
@@ -556,9 +572,9 @@ int main()
     return EXIT_SUCCESS;
 }
 
-#endif // TEST6
+#endif // TEST302
 
-#ifdef TEST7
+#ifdef TEST303
 
 #include <vtkActor.h>
 #include <vtkDataSetMapper.h>
@@ -610,9 +626,9 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 
-#endif // TEST7
+#endif // TEST303
 
-#ifdef TEST8
+#ifdef TEST401
 
 // vtkPolyData 的使用
 // https://zhuanlan.zhihu.com/p/336743251
@@ -634,11 +650,13 @@ int main()
 
     // 13_filter TEST601 vtkDataSetSurfaceFilter      将 vtkUnstructuredGrid 转换为 vtkPolyData
     // 13_filter TEST603 vtkDataSetToDataObjectFilter 将数据集(vtkDataSet)转换为数据对象(vtkDataObject)，然后写入文本文件
+
+    // vtkPolyDataToUnstructuredGrid
 }
 
-#endif // TEST8
+#endif // TEST401
 
-#ifdef TEST9
+#ifdef TEST402
 
 #include <vtkActor.h>
 #include <vtkCellArray.h>
@@ -674,8 +692,8 @@ int main()
 
     vtkIdType pt0Id = 10;
     vtkIdType pt1Id = 11;
-    verts->InsertNextCell(1,&pt0Id);
-    verts->InsertNextCell(1,&pt1Id);
+    verts->InsertNextCell(1, &pt0Id);
+    verts->InsertNextCell(1, &pt1Id);
     lines->InsertNextCell({ 0, 1 });
     lines->InsertNextCell({ 5, 6 });
     triangles->InsertNextCell({ 2, 3, 4 });
@@ -733,4 +751,4 @@ int main()
     return 0;
 }
 
-#endif // TEST9
+#endif // TEST402

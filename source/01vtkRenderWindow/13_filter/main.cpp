@@ -30,7 +30,7 @@
  * 604. vtkDataObjectToDataSetFilter 将数据对象(vtkDataObject)转换为数据集(vtkDataSet) vtkFieldDataToAttributeDataFilter
  */
 
-#define TEST604
+#define TEST603
 
 #ifdef TEST001
 
@@ -2258,6 +2258,8 @@ int main()
 #include <vtkDataSetMapper.h>
 #include <vtkDataSetToDataObjectFilter.h>
 #include <vtkDoubleArray.h>
+#include <vtkFieldData.h>
+#include <vtkFieldDataToAttributeDataFilter.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkPointData.h>
 #include <vtkPoints.h>
@@ -2272,25 +2274,25 @@ int main()
 {
     vtkNew<vtkPoints> points;
     // 0,1,2
-    points->InsertNextPoint(0, 0, 0);
-    points->InsertNextPoint(2, 0, 0);
-    points->InsertNextPoint(1, 2, 0);
+    points->InsertNextPoint(0., 0., 0.);
+    points->InsertNextPoint(2., 0., 0.);
+    points->InsertNextPoint(1., 2., 0.);
 
     // 3,4,5,6
-    points->InsertNextPoint(3, 0, 0);
-    points->InsertNextPoint(5, 0, 0);
-    points->InsertNextPoint(4, 0, 2);
-    points->InsertNextPoint(4, 2, 1);
+    points->InsertNextPoint(3., 0., 0.);
+    points->InsertNextPoint(5., 0., 0.);
+    points->InsertNextPoint(4., 0., 2.);
+    points->InsertNextPoint(4., 2., 1.);
 
     // 7,8,9,10,11,12,13,14
-    points->InsertNextPoint(6, 0, 0);
-    points->InsertNextPoint(8, 0, 0);
-    points->InsertNextPoint(8, 0, 2);
-    points->InsertNextPoint(6, 0, 2);
-    points->InsertNextPoint(6, 2, 0);
-    points->InsertNextPoint(9, 2, 0);
-    points->InsertNextPoint(9, 2, 3);
-    points->InsertNextPoint(6, 2, 3);
+    points->InsertNextPoint(6., 0., 0.);
+    points->InsertNextPoint(8., 0., 0.);
+    points->InsertNextPoint(8., 0., 2.);
+    points->InsertNextPoint(6., 0., 2.);
+    points->InsertNextPoint(6., 2., 0.);
+    points->InsertNextPoint(9., 2., 0.);
+    points->InsertNextPoint(9., 2., 3.);
+    points->InsertNextPoint(6., 2., 3.);
 
     vtkNew<vtkUnstructuredGrid> usg;
     usg->SetPoints(points);
@@ -2346,6 +2348,21 @@ int main()
     filter->LegacyTopologyOn();
     filter->SetInputData(usg);
     filter->Update();
+
+    auto fieldData = filter->GetOutput()->GetFieldData();
+    for (vtkIdType i = 0; i < fieldData->GetNumberOfArrays(); ++i)
+    {
+        auto arrayName = fieldData->GetArrayName(i);
+        std::cout << "array " << i << " name: " << std::left << std::setw(20) << arrayName;
+
+        auto arr = fieldData->GetArray(arrayName);
+        std::cout << "type: " << std::setw(10) << arr->GetDataTypeAsString();
+
+        auto pFloat = reinterpret_cast<float*>(arr->GetVoidPointer(0));
+        auto size   = arr->GetNumberOfTuples();
+        auto ncom   = arr->GetNumberOfComponents();
+        std::cout << "size: " << std::setw(3) << size << "component: " << std::setw(3) << ncom << std::endl;
+    }
 
     // 将数据对象写入文件
     vtkNew<vtkDataObjectWriter> writer;
