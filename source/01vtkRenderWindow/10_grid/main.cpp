@@ -12,6 +12,7 @@
  * 301. 构造 vtkUnstructuredGrid，四面体、六面体、棱柱、棱锥等图形
  * 302. 读写 vtkUnstructuredGrid vtkPolyData
  * 303. *.vtu XML格式的非结构网格读取
+ * 304. 使用SetCells构造 vtkUnstructuredGrid 的单元
  *
  * 401. vtkPolyData vtkDataSet vtkUnstructuredGrid vtkStructuredGrid 互相转换
  * 402. vtkPolyData 设置多种单元(line poly...)，获取单元的索引
@@ -671,54 +672,30 @@ int main()
     points->InsertNextPoint(9., 2., 3.);
     points->InsertNextPoint(6., 2., 3.);
 
+    // 单元类型
+    std::vector<int> cellTypes { VTK_TRIANGLE, VTK_TETRA, VTK_HEXAHEDRON };
+    // 每个单元的顶点个数
+    std::vector<int> cellNpts { 3, 4, 8 };
+    // 每个单元的顶点索引
+    std::vector<vtkIdType> cellIndices { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+
+    vtkNew<vtkCellArray> cells;
+    size_t index { 0 };
+    for (size_t i = 0; i < cellNpts.size(); ++i)
+    {
+        cells->InsertNextCell(cellNpts[i]);
+        for (size_t j = index; j < index + cellNpts[i]; ++j)
+        {
+            cells->InsertCellPoint(cellIndices[j]);
+        }
+        index += cellNpts[i];
+    }
+
     vtkNew<vtkUnstructuredGrid> usg;
     usg->SetPoints(points);
-
-    // 三角形
-    vtkIdType ids_triangle[] { 0, 1, 2 };
-    usg->InsertNextCell(VTK_TRIANGLE, 3, ids_triangle);
-
-    // 四面体
-    vtkIdType ids_tetra[] { 3, 4, 5, 6 };
-    usg->InsertNextCell(VTK_TETRA, 4, ids_tetra);
-
-    // 六面体
-    vtkIdType ids_hexahedron[] { 7, 8, 9, 10, 11, 12, 13, 14 };
-    usg->InsertNextCell(VTK_HEXAHEDRON, 8, ids_hexahedron);
-
-    // 顶点Scalar数据
-    vtkNew<vtkDoubleArray> ptScalars0;
-    ptScalars0->SetName("ptScalars0");
-    vtkNew<vtkDoubleArray> ptScalars1;
-    ptScalars1->SetName("ptScalars1");
-    for (vtkIdType i = 0; i < usg->GetNumberOfPoints(); ++i)
-    {
-        ptScalars0->InsertNextValue(static_cast<double>(i));
-        ptScalars1->InsertNextValue(static_cast<double>(i * 2));
-    }
-    usg->GetPointData()->AddArray(ptScalars0);
-    usg->GetPointData()->AddArray(ptScalars1);
-
-    // 单元Vector数据
-    vtkNew<vtkDoubleArray> cellVectors0;
-    cellVectors0->SetName("cellVectors0");
-    cellVectors0->SetNumberOfComponents(3);
-    vtkNew<vtkDoubleArray> cellVectors1;
-    cellVectors1->SetName("cellVectors1");
-    cellVectors1->SetNumberOfComponents(3);
-    for (vtkIdType i = 0; i < usg->GetNumberOfCells(); ++i)
-    {
-        cellVectors0->InsertNextTuple3(static_cast<double>(i), 0., 0.);
-        cellVectors1->InsertNextTuple3(0., static_cast<double>(i), 0.);
-    }
-    usg->GetCellData()->AddArray(cellVectors0);
-    usg->GetCellData()->AddArray(cellVectors1);
+    usg->SetCells(cellTypes.data(), cells);
 
     //-------------------------------------------------------------------
-
-
-
-
     vtkNew<vtkDataSetMapper> mapper;
     mapper->SetInputData(usg);
 
