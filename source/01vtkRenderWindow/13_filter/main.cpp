@@ -30,7 +30,7 @@
  * 604. vtkDataObjectToDataSetFilter 将数据对象(vtkDataObject)转换为数据集(vtkDataSet) vtkFieldDataToAttributeDataFilter
  */
 
-#define TEST603
+#define TEST604
 
 #ifdef TEST001
 
@@ -2331,8 +2331,9 @@ int main()
     cellVectors1->SetNumberOfComponents(3);
     for (vtkIdType i = 0; i < usg->GetNumberOfCells(); ++i)
     {
-        cellVectors0->InsertNextTuple3(static_cast<double>(i), 0., 0.);
-        cellVectors1->InsertNextTuple3(0., static_cast<double>(i), 0.);
+        auto val = static_cast<double>(i);
+        cellVectors0->InsertNextTuple3(val, val, val);
+        cellVectors1->InsertNextTuple3(val * 2, val * 2, val * 2);
     }
     usg->GetCellData()->AddArray(cellVectors0);
     usg->GetCellData()->AddArray(cellVectors1);
@@ -2406,10 +2407,15 @@ int main()
 
 #include <vtkActor.h>
 #include <vtkCellArray.h>
+#include <vtkCellData.h>
 #include <vtkDataObjectReader.h>
 #include <vtkDataObjectToDataSetFilter.h>
+#include <vtkDataSet.h>
+#include <vtkDataSetMapper.h>
 #include <vtkDoubleArray.h>
 #include <vtkFieldDataToAttributeDataFilter.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPointData.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
@@ -2420,39 +2426,85 @@ int main()
 {
     vtkNew<vtkDataObjectReader> reader;
     reader->SetFileName("../resources/dataObject.txt");
+    reader->ReadAllColorScalarsOn();
+    reader->ReadAllFieldsOn();
+    reader->ReadAllScalarsOn();
+    reader->ReadAllNormalsOn();
+    reader->ReadAllVectorsOn();
     reader->Update();
+    // reader->Print(std::cout);
 
-    auto nFieldData = reader->GetNumberOfFieldDataInFile();
-    auto nScalars   = reader->GetNumberOfScalarsInFile();
-    auto nNormals   = reader->GetNumberOfNormalsInFile();
-    auto nVectors   = reader->GetNumberOfVectorsInFile();
+    auto nFieldData    = reader->GetNumberOfFieldDataInFile();
+    auto fieldDataName = reader->GetFieldDataNameInFile(0);
 
-    std::cout << "NumberOfFieldData\t" << nFieldData << "\nNumberOfScalars\t" << nScalars << "\nNumberOfNormals\t" << nNormals
-              << "\nNumberOfVectors\t" << nVectors << '\n';
+    // 顶点、单元数据
+    vtkNew<vtkDataObjectToDataSetFilter> do2ds;
+    do2ds->SetInputData(reader->GetOutput());
+    do2ds->SetDataSetTypeToUnstructuredGrid();
+    do2ds->SetPointComponent(0, "Points", 0);
+    do2ds->SetPointComponent(1, "Points", 0);
+    do2ds->SetPointComponent(2, "Points", 0);
+    do2ds->SetCellTypeComponent("CellTypes", 0);
+    do2ds->SetCellConnectivityComponent("Cells", 0); // {n0,p0,p1,p2,n1,p3,p4,p5...} n表示单元的顶点个数，p表示构成单元的顶点索引
+    do2ds->Update();
+    // do2ds->GetOutput()->Print(std::cout);
 
-    auto fieldData = nFieldData > 0 ? reader->GetFieldDataNameInFile(0) : "nullptr";
-    auto scalars   = nScalars > 0 ? reader->GetScalarsNameInFile(0) : "nullptr";
-    auto normals   = nNormals > 0 ? reader->GetNormalsNameInFile(0) : "nullptr";
-    auto vectors   = nVectors > 0 ? reader->GetVectorsNameInFile(0) : "nullptr";
+    // 顶点属性数据
+    vtkNew<vtkFieldDataToAttributeDataFilter> fd2ad;
+    fd2ad->SetInputData(do2ds->GetOutput());
+    fd2ad->SetOutputAttributeDataToPointData();
+    fd2ad->SetScalarComponent(0, "ptScalars1", 0);
+    fd2ad->Update();
 
-    std::cout << "FieldData\t " << fieldData << "\nScalars\t" << scalars << "\nNormals\t" << normals << "\nVectors\t" << vectors << "\n";
+    auto scalars = fd2ad->GetOutput()->GetPointData()->GetScalars();
+    std::cout << "Point scalars:\n";
+    for (vtkIdType i = 0; i < scalars->GetNumberOfTuples(); ++i)
+    {
+        std::cout << scalars->GetTuple1(i) << ' ';
+    }
+    std::cout << std::endl;
 
-    // reader->Read();
-    // reader->ReadCellData();
-    // reader->ReadPoints();
-    // reader->ReadArray();
+    // 单元属性数据
+    vtkNew<vtkFieldDataToAttributeDataFilter> fd2adCell;
+    fd2adCell->SetInputData(do2ds->GetOutput());
+    fd2adCell->SetOutputAttributeDataToCellData();
+    fd2adCell->SetVectorComponent(0, "cellVectors1", 0);
+    fd2adCell->SetVectorComponent(1, "cellVectors1", 0);
+    fd2adCell->SetVectorComponent(2, "cellVectors1", 0);
+    fd2adCell->Update();
 
-    // 顶点和单元
-    // vtkNew<vtkDataObjectToDataSetFilter> filter;
-    // filter->SetPointComponent();
-    // filter->SetCellConnectivityComponent();
-    // filter->SetCellTypeComponent();
+    auto vectors = fd2adCell->GetOutput()->GetCellData()->GetVectors();
+    std::cout << "Cell Vectors:\n";
+    for (vtkIdType i = 0; i < vectors->GetNumberOfTuples(); ++i)
+    {
+        auto vec = vectors->GetTuple3(i);
+        std::cout << i << " : " << vec[0] << ' ' << vec[1] << ' ' << vec[2] << '\n';
+    }
 
-    // 顶点和单元格的属性数据
-    // vtkNew<vtkFieldDataToAttributeDataFilter> fd2ad;
-    // fd2ad->SetScalarComponent();
-    // fd2ad->SetVectorComponent();
-    // fd2ad->SetNormalComponent();
+    //----------------------------------------------------------
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(do2ds->GetOutput());
+    mapper->ScalarVisibilityOff();
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(1, 0, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> interactor;
+    interactor->SetRenderWindow(renderWindow);
+    interactor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    interactor->Start();
 }
 
 #endif // TEST604

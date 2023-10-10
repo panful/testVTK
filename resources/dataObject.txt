@@ -27,8 +27,8 @@ ptScalars1 1 15 double
 0 2 4 6 8 10 12 14 16 
 18 20 22 24 26 28 
 cellVectors0 3 3 double
-0 0 0 1 0 0 2 0 0 
+0 0 0 1 1 1 2 2 2 
 
 cellVectors1 3 3 double
-0 0 0 0 1 0 0 2 0 
+0 0 0 2 2 2 4 4 4 
 

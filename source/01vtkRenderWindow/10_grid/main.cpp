@@ -17,7 +17,7 @@
  * 402. vtkPolyData 设置多种单元(line poly...)，获取单元的索引
  */
 
-#define TEST301
+#define TEST304
 
 #ifdef TEST101
 
@@ -627,6 +627,127 @@ int main(int argc, char* argv[])
 }
 
 #endif // TEST303
+
+#ifdef TEST304
+
+#include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkDataSetMapper.h>
+#include <vtkDoubleArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkUnstructuredGrid.h>
+
+int main()
+{
+    vtkNew<vtkPoints> points;
+    points->SetDataTypeToFloat();
+    points->Allocate(15);
+
+    // 0,1,2
+    points->InsertNextPoint(0., 0., 0.);
+    points->InsertNextPoint(2., 0., 0.);
+    points->InsertNextPoint(1., 2., 0.);
+
+    // 3,4,5,6
+    points->InsertNextPoint(3., 0., 0.);
+    points->InsertNextPoint(5., 0., 0.);
+    points->InsertNextPoint(4., 0., 2.);
+    points->InsertNextPoint(4., 2., 1.);
+
+    // 7,8,9,10,11,12,13,14
+    points->InsertNextPoint(6., 0., 0.);
+    points->InsertNextPoint(8., 0., 0.);
+    points->InsertNextPoint(8., 0., 2.);
+    points->InsertNextPoint(6., 0., 2.);
+    points->InsertNextPoint(6., 2., 0.);
+    points->InsertNextPoint(9., 2., 0.);
+    points->InsertNextPoint(9., 2., 3.);
+    points->InsertNextPoint(6., 2., 3.);
+
+    vtkNew<vtkUnstructuredGrid> usg;
+    usg->SetPoints(points);
+
+    // 三角形
+    vtkIdType ids_triangle[] { 0, 1, 2 };
+    usg->InsertNextCell(VTK_TRIANGLE, 3, ids_triangle);
+
+    // 四面体
+    vtkIdType ids_tetra[] { 3, 4, 5, 6 };
+    usg->InsertNextCell(VTK_TETRA, 4, ids_tetra);
+
+    // 六面体
+    vtkIdType ids_hexahedron[] { 7, 8, 9, 10, 11, 12, 13, 14 };
+    usg->InsertNextCell(VTK_HEXAHEDRON, 8, ids_hexahedron);
+
+    // 顶点Scalar数据
+    vtkNew<vtkDoubleArray> ptScalars0;
+    ptScalars0->SetName("ptScalars0");
+    vtkNew<vtkDoubleArray> ptScalars1;
+    ptScalars1->SetName("ptScalars1");
+    for (vtkIdType i = 0; i < usg->GetNumberOfPoints(); ++i)
+    {
+        ptScalars0->InsertNextValue(static_cast<double>(i));
+        ptScalars1->InsertNextValue(static_cast<double>(i * 2));
+    }
+    usg->GetPointData()->AddArray(ptScalars0);
+    usg->GetPointData()->AddArray(ptScalars1);
+
+    // 单元Vector数据
+    vtkNew<vtkDoubleArray> cellVectors0;
+    cellVectors0->SetName("cellVectors0");
+    cellVectors0->SetNumberOfComponents(3);
+    vtkNew<vtkDoubleArray> cellVectors1;
+    cellVectors1->SetName("cellVectors1");
+    cellVectors1->SetNumberOfComponents(3);
+    for (vtkIdType i = 0; i < usg->GetNumberOfCells(); ++i)
+    {
+        cellVectors0->InsertNextTuple3(static_cast<double>(i), 0., 0.);
+        cellVectors1->InsertNextTuple3(0., static_cast<double>(i), 0.);
+    }
+    usg->GetCellData()->AddArray(cellVectors0);
+    usg->GetCellData()->AddArray(cellVectors1);
+
+    //-------------------------------------------------------------------
+
+
+
+
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(usg);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(1, 0, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->SetSize(800, 600);
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST304
 
 #ifdef TEST401
 
