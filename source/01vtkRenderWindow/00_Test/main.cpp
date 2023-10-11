@@ -239,6 +239,8 @@ void Param2(vtkSmartPointer<Test> t)
     std::cout << "vtkSmartPointer<Test>\t\tref count\t" << t->GetReferenceCount() << '\n';
 }
 
+// vkObjectBase 有一个成员变量 std::atomic<int32_t> ReferenceCount;
+
 // vtkNew           就好像是 std::unique_ptr
 // vtkSmartPointer  就好像是 std::shared_ptr
 // vtkNew 可以隐式转换为 vtkSmartPointer 

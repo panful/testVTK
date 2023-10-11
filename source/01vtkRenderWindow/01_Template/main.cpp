@@ -169,4 +169,4 @@ int main(int, char*[])
     return 0;
 }
 
-#endif // TEST1
+#endif // TEST3

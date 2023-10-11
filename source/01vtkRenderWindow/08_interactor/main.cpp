@@ -2,9 +2,10 @@
  * 1. vtkInteractorEventRecorder 记录交互事件 播放交互事件
  * 2. vtkInteractorStyleJoystickCamera 长按左键一直旋转、右键一直缩放、中键一直平移，定时器的使用
  * 3. 当鼠标处于 vtkOrientationMarkerWidget 内部时，开启定时器旋转
+ * 4. 读取事件记录文件并播放事件
  */
 
-#define TEST1
+#define TEST4
 
 #ifdef TEST1
 
@@ -50,7 +51,7 @@ int main(int, char*[])
     recorder->SetFileName("record.log"); // 写入或读取文件名
     recorder->On();
 
-#if (0)
+#if (1)
     recorder->Record(); // 开始记录
 #else
     recorder->ReadFromInputStringOff();
@@ -385,3 +386,132 @@ int main(int, char*[])
 }
 
 #endif // TEST3
+
+#ifdef TEST4
+
+#include <vtkActor.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorEventRecorder.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+#include <fstream>
+#include <sstream>
+#include <thread>
+
+// 源码可以查看
+// vtkInteractorEventRecorder.cxx [158] void vtkInteractorEventRecorder::Play()
+
+namespace {
+
+enum ModifierKey
+{
+    ShiftKey   = 1,
+    ControlKey = 2,
+    AltKey     = 4
+};
+
+class Style : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static Style* New();
+    vtkTypeMacro(Style, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnLeftButtonDown() override
+    {
+        std::cout << "start play wheel event\n";
+
+        if (this->Interactor)
+        {
+            char event[256] = {}, keySym[256] = {};
+            int pos[2], ctrlKey, shiftKey, altKey, keyCode, repeatCount;
+
+            std::string line;
+            std::ifstream ifs("../resources/record.log");
+            while (std::getline(ifs, line))
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                std::istringstream iss(line);
+
+                iss.imbue(std::locale::classic());
+
+                iss.width(256);
+                iss >> event;
+
+                unsigned long ievent = vtkCommand::GetEventIdFromString(event);
+                if (ievent != vtkCommand::NoEvent)
+                {
+                    iss >> pos[0];
+                    iss >> pos[1];
+
+                    // version >= 1.1
+                    int m;
+                    iss >> m;
+                    shiftKey = (m & ModifierKey::ShiftKey) ? 1 : 0;
+                    ctrlKey  = (m & ModifierKey::ControlKey) ? 1 : 0;
+                    altKey   = (m & ModifierKey::AltKey) ? 1 : 0;
+
+                    iss >> keyCode;
+                    iss >> repeatCount;
+                    iss >> keySym;
+
+                    this->Interactor->SetEventPosition(pos);
+                    this->Interactor->SetControlKey(ctrlKey);
+                    this->Interactor->SetShiftKey(shiftKey);
+                    this->Interactor->SetAltKey(altKey);
+                    this->Interactor->SetKeyCode(static_cast<char>(keyCode));
+                    this->Interactor->SetRepeatCount(repeatCount);
+                    this->Interactor->SetKeySym(keySym);
+
+                    this->Interactor->InvokeEvent(ievent, nullptr);
+                }
+
+                assert(iss.good() || iss.eof());
+            }
+        }
+
+        Superclass::OnLeftButtonDown();
+    }
+};
+
+vtkStandardNewMacro(Style);
+} // namespace
+
+int main(int, char*[])
+{
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<Style> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST4
