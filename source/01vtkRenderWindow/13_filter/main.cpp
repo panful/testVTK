@@ -14,6 +14,8 @@
  * 301. vtkAppendPolyData 合并多个 vtkPolyData
  * 302. 合并带有Scalars、Vectors的vtkPolyData
  * 303. 使用不同方式设置Scalars数据时，合并后的polyData没有Scalars数据
+ * 304. vtkMergeFilter
+ * 305. vtkAppendFilter
  *
  * 401. vtkCellDataToPointData 单元数据转顶点数据
  * 402. vtkPointDataToCellData 顶点数据转单元数据
@@ -23,14 +25,20 @@
  * 502. vtkClipPolyData 一般用于裁剪输入平面的一侧，保留另一侧
  * 503. vtkExtractCells 提取指定单元，类似设置间隔
  * 504. vtkSelectPolyData 选择多边形网格的一部分，生成选择标量
+ * 505. vtkExtractUnstructuredGrid
  *
  * 601. vtkDataSetSurfaceFilter 将 vtkUnstructuredGrid 转换为 vtkPolyData，还可以将体网格转换为表面数据，从而简化模型
  * 602. vtkGeometryFilter 从数据集中提取边界，可以将任何数据转换为多边形数据，类似vtkDataSetSurfaceFilter
  * 603. vtkDataSetToDataObjectFilter 将数据集(vtkDataSet)转换为数据对象(vtkDataObject)
  * 604. vtkDataObjectToDataSetFilter 将数据对象(vtkDataObject)转换为数据集(vtkDataSet) vtkFieldDataToAttributeDataFilter
+ * 605. 序列化反序列化vtk数据
+ * 
+ * 701.vtkLODProp3D 对于绘制大型网格可以提高渲染效率
+ * 702.decimation多边形削减、网格简化 vtkDecimate vtkDecimatePro vtkQuadricClustering vtkQuardricDecimation
+ * 703.平滑过滤器 vtkWindowedSincPolyDataFilter vtkSmoothPolyDataFilter
  */
 
-#define TEST604
+#define TEST605
 
 #ifdef TEST001
 
@@ -2508,3 +2516,254 @@ int main()
 }
 
 #endif // TEST604
+
+#ifdef TEST605
+
+// This example shows how to manually create a structured grid.
+// The basic idea is to instantiate vtkStructuredGrid, set its dimensions,
+// and then assign points defining the grid coordinate. The number of
+// points must equal the number of points implicit in the dimensions
+// (i.e., dimX*dimY*dimZ). Also, data attributes (either point or cell)
+// can be added to the dataset.
+//
+// https://vtk.org/doc/nightly/html/classvtkDataWriter.html
+
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkDoubleArray.h>
+#include <vtkHedgeHog.h>
+#include <vtkMath.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkStructuredGrid.h>
+
+#include <vtkStructuredGridWriter.h>
+#include <vtkDataSetWriter.h>
+#include <vtkWriter.h>
+#include <vtkStructuredGridReader.h>
+#include <vtkStructuredGridGeometryFilter.h>
+
+#include <vtkDataSetMapper.h>
+
+#include <fstream>
+
+int main(int, char* [])
+{
+    double x[3], v[3], rMin = 0.5, rMax = 1.0, deltaRad, deltaZ;
+    double radius, theta;
+    static int dims[3] = { 13, 11, 11 };
+
+    // Create the structured grid.
+    vtkNew<vtkStructuredGrid> sgrid;
+    sgrid->SetDimensions(dims);
+
+    // We also create the points and vectors. The points
+    // form a hemi-cylinder of data.
+    vtkNew<vtkDoubleArray> vectors;
+    vectors->SetNumberOfComponents(3);
+    vectors->SetNumberOfTuples(dims[0] * dims[1] * dims[2]);
+    vtkNew<vtkPoints> points;
+    points->Allocate(dims[0] * dims[1] * dims[2]);
+
+    deltaZ = 2.0 / (dims[2] - 1);
+    deltaRad = (rMax - rMin) / (dims[1] - 1);
+    v[2] = 0.0;
+    for (auto k = 0; k < dims[2]; k++)
+    {
+        x[2] = -1.0 + k * deltaZ;
+        auto kOffset = k * dims[0] * dims[1];
+        for (auto j = 0; j < dims[1]; j++)
+        {
+            radius = rMin + j * deltaRad;
+            auto jOffset = j * dims[0];
+            for (auto i = 0; i < dims[0]; i++)
+            {
+                theta = i * vtkMath::RadiansFromDegrees(15.0);
+                x[0] = radius * cos(theta);
+                x[1] = radius * sin(theta);
+                v[0] = -x[1];
+                v[1] = x[0];
+                auto offset = i + jOffset + kOffset;
+                points->InsertPoint(offset, x);
+                vectors->InsertTuple(offset, v);
+            }
+        }
+    }
+    sgrid->SetPoints(points);
+    sgrid->GetPointData()->SetVectors(vectors);
+
+    //---------------写文件-----------------
+    vtkNew< vtkStructuredGridWriter> writer;
+    writer->SetFileTypeToASCII();
+    writer->SetFileName("writerStructuredGrid.txt");
+    writer->SetInputData(sgrid);
+    writer->Write();
+
+    // 写文件的具体代码：
+    // vtkStructuredGridWriter.cxx -> line:30
+    // void vtkStructuredGridWriter::WriteData();
+
+    vtkNew<vtkDataSetWriter> writer2;
+    writer2->SetFileName("writerDataSet.txt");
+    writer2->SetFileTypeToASCII();
+    writer2->SetInputData(vtkDataSet::SafeDownCast(sgrid));
+    writer2->Write();
+    //--------------------------------
+
+    //----------------读文件----------------
+    vtkNew<vtkStructuredGridReader> reader;
+    reader->SetFileName("writerStructuredGrid.txt");
+    reader->Update();
+
+    vtkNew<vtkStructuredGridGeometryFilter> geometryFilter;
+    geometryFilter->SetInputConnection(reader->GetOutputPort());
+    geometryFilter->Update();
+    //--------------------------------
+
+    // Mapper
+    // 读上来的DataSet转为PolyData拓扑结构有些问题
+    vtkNew<vtkPolyDataMapper> mapperPolyData;
+    //mapperPolyData->SetInputConnection(geometryFilter->GetOutputPort());
+    mapperPolyData->SetInputData(geometryFilter->GetOutput());
+
+    vtkNew<vtkDataSetMapper> mapperDataSet;
+    mapperDataSet->SetInputData(sgrid);
+    //mapperDataSet->SetInputData(reader->GetOutput());
+
+    // Actor
+    vtkNew<vtkActor> sgridActor;
+    //sgridActor->SetMapper(mapperDataSet);
+    sgridActor->SetMapper(mapperPolyData);
+
+    sgridActor->GetProperty()->SetColor(0, 1, 0);
+
+
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetWindowName("SGrid");
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    renderer->AddActor(sgridActor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->ResetCamera();
+    renWin->SetSize(640, 480);
+
+    // interact with data
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+
+#endif // TEST605
+
+#ifdef TEST701
+
+#include <vtkCallbackCommand.h>
+#include <vtkLODProp3D.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+
+namespace {
+void RefreshCallback(vtkObject* vtkNotUsed(caller), long unsigned int vtkNotUsed(eventId), void* clientData, void* vtkNotUsed(callData));
+}
+
+int main(int, char*[])
+{
+    vtkNew<vtkNamedColors> colors;
+
+    // High res sphere
+    vtkNew<vtkPolyDataMapper> highResMapper;
+    vtkNew<vtkProperty> propertyHighRes;
+    {
+        vtkNew<vtkSphereSource> highResSphereSource;
+        highResSphereSource->SetThetaResolution(100);
+        highResSphereSource->SetPhiResolution(100);
+        highResSphereSource->Update();
+
+        highResMapper->SetInputConnection(highResSphereSource->GetOutputPort());
+
+        propertyHighRes->SetDiffuseColor(0, 1, 0);
+        propertyHighRes->SetInterpolationToFlat();
+    }
+
+    // Low res sphere
+    vtkNew<vtkPolyDataMapper> lowResMapper;
+    vtkNew<vtkProperty> propertyLowRes;
+    {
+        vtkNew<vtkSphereSource> lowResSphereSource;
+        lowResSphereSource->SetThetaResolution(10);
+        lowResSphereSource->SetPhiResolution(10);
+        lowResSphereSource->Update();
+
+        lowResMapper->SetInputConnection(lowResSphereSource->GetOutputPort());
+
+        propertyLowRes->SetDiffuseColor(1, 0, 0);
+        propertyLowRes->SetInterpolationToFlat();
+    }
+
+    vtkNew<vtkLODProp3D> prop;
+    auto id1 = prop->AddLOD(lowResMapper, propertyLowRes, 0.0);
+    auto id2 = prop->AddLOD(highResMapper, propertyHighRes, 0.0);
+
+    std::cout << "There are " << prop->GetNumberOfLODs() << " LODs. "
+              << "ID1: " << id1 << "\tID2: " << id2 << '\n';
+
+    // A renderer and render window
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetWindowName("LODProp3D");
+
+    // prop->SetAllocatedRenderTime(1e-6,renderer);
+    prop->SetAllocatedRenderTime(1e-12, renderer);
+
+    // An interactor
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    // Add the actors to the scene
+    renderer->AddActor(prop);
+    renderer->SetBackground(colors->GetColor3d("SlateGray").GetData());
+
+    vtkNew<vtkCallbackCommand> refreshCallback;
+    refreshCallback->SetCallback(RefreshCallback);
+    refreshCallback->SetClientData(prop);
+
+    renderWindow->AddObserver(vtkCommand::ModifiedEvent, refreshCallback);
+
+    renderWindow->Render();
+
+    // Begin mouse interaction
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+namespace {
+void RefreshCallback(vtkObject* vtkNotUsed(caller), long unsigned int vtkNotUsed(eventId), void* clientData, void* vtkNotUsed(callData))
+{
+    auto lodProp = static_cast<vtkLODProp3D*>(clientData);
+    std::cout << "Last rendered LOD ID: " << lodProp->GetLastRenderedLODID() << std::endl;
+}
+} // namespace
+
+#endif // TEST701

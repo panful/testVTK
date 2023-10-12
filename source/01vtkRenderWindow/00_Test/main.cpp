@@ -4,9 +4,10 @@
  * 2. vtk智能指针的使用
  * 3. vtkNew 和 vtkSmartPointer 函数参数为智能指针
  * 4. AddObserver 使用lambda表达式和继承自vtkCommand
+ * 5. vtk的观察者模式 AddObserver
  */
 
-#define TEST3
+#define TEST5
 
 #ifdef TEST1
 
@@ -243,7 +244,7 @@ void Param2(vtkSmartPointer<Test> t)
 
 // vtkNew           就好像是 std::unique_ptr
 // vtkSmartPointer  就好像是 std::shared_ptr
-// vtkNew 可以隐式转换为 vtkSmartPointer 
+// vtkNew 可以隐式转换为 vtkSmartPointer
 // vtkNew 更轻量
 
 int main(int, char*[])
@@ -357,3 +358,63 @@ int main(int, char*[])
 }
 
 #endif // TEST4
+
+#ifdef TEST5
+
+#include <iostream>
+#include <map>
+
+enum class Event
+{
+    Event_0,
+    Event_1,
+    Event_2,
+};
+
+class Command
+{
+public:
+    void Execute(void* data)
+    {
+        std::cout << "Execute: " << *reinterpret_cast<int*>(data) << '\n';
+    }
+};
+
+class Object
+{
+public:
+    void AddObserve(Event e, Command* cmd)
+    {
+        m_observes.try_emplace(e, cmd);
+    }
+
+    void Update()
+    {
+        std::cout << "Invoke Event 0\n";
+        InvokeEvent(Event::Event_0);
+        std::cout << "Invoke Event 1\n";
+        InvokeEvent(Event::Event_1);
+        std::cout << "Invoke Event 2\n";
+        InvokeEvent(Event::Event_2);
+    }
+
+private:
+    void InvokeEvent(Event e)
+    {
+        m_observes[e]->Execute(&e);
+    }
+
+private:
+    std::map<Event, Command*> m_observes;
+};
+
+int main()
+{
+    Object obj;
+    obj.AddObserve(Event::Event_0, new Command());
+    obj.AddObserve(Event::Event_1, new Command());
+    obj.AddObserve(Event::Event_2, new Command());
+
+    obj.Update();
+}
+#endif // TEST5

@@ -22,17 +22,19 @@
  *
  * 600 OpenFOAM 文件读取
  * 601 vtkStreamTracer 流线图 展示流体流动的轨迹和流动方向
- * 602 流线、流管、流面
+ * 602 流线、流管vtkTubeFilter、流面vtkRuledSurfaceFilter
  * 603 流线生成需要的数据
+ * 604 vtkHyperStreamline
  *
- * 700 vtkContourFilter 等值线
+ * 700 vtkContourFilter 等值线 
  * 701 vtkContourFilter 等值面 vtkSampleFunction使用采样函数提取等值面
  * 702 vtkFlyingEdges3D 从体素数据提取等值面(isosurfaces)
  * 703 vtkContourTriangulator 将等值线包裹的区域转换为三角形网格
  * 704 vtkBandedPolyDataContourFilter 生成带状轮廓，将顶点的数据(Scalars)处于某一指定范围的区域生成多个单元（多边形带）
+ * 705 vtkContourGrid 用于非机构化网格生成等值线/等值面
  */
 
-#define TEST700
+#define TEST705
 
 #ifdef TEST100
 
@@ -3548,3 +3550,14 @@ int main(int, char*[])
 }
 
 #endif // TEST704
+
+#ifdef TEST705
+
+#include <vtkContourGrid.h>
+#include <vtkUnstructuredGrid.h>
+
+int main()
+{
+    vtkNew<vtkContourGrid> contour;
+}
+#endif // TEST705
