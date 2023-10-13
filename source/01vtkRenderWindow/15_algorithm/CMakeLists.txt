@@ -15,6 +15,7 @@ find_package(VTK
         ParallelMPI
         FiltersSources      # vtkCubeSource
         FiltersExtraction   # vtkExtractCells
+        ImagingHybrid       # vtkSurfaceReconstructionFilter
     QUIET
 )
 

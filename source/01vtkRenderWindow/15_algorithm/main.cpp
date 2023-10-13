@@ -10,9 +10,12 @@
  * 401. 多边形每条边的外法向量
  * 402. vtkPolyDataNormals 生成多边形的法线
  *
+ * 501. vtkDelaunay2D 三角剖分 TEST502 表面重建 https://zhuanlan.zhihu.com/p/459884570
+ * 502. 表面重建 vtkSurfaceReconstructionFilter TEST501 三角剖分
+ * 503. vtkGaussianSplatter 高斯抛雪球
  */
 
-#define TEST402
+#define TEST502
 
 #ifdef TEST101
 
@@ -695,3 +698,305 @@ int main()
 }
 
 #endif // TEST402
+
+#ifdef TEST501
+
+#include <vtkActor.h>
+#include <vtkCellArray.h>
+#include <vtkDelaunay2D.h>
+#include <vtkFloatArray.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+namespace {
+// clang-format off
+std::vector<float> vertices{
+    0., 0.,     0., 1.,     0., 2.,     0.,3.,
+    1., 3.,     1., 2.,     1., 1.,     1.,0.,
+    2., 0.,     2., 1.,     2., 2.,     2.,3.,
+    3., 3.,     3., 2.,     3., 1.,     3.,0.,
+};
+
+std::vector<float> fields{
+    4.0f, 4.0f, 4.0f, 4.0f,
+    4.0f, 1.0f, 1.0f, 4.0f,
+    4.0f, 1.0f, 1.0f, 4.0f,
+    4.0f, 4.0f, 4.0f, 4.0f,
+};
+
+// clang-format on
+
+/// @brief 生成一个只有顶点和顶点上的Scalar的数据
+/// @return
+vtkSmartPointer<vtkPolyData> GenPolyData()
+{
+    vtkNew<vtkPolyData> polyData;
+    vtkNew<vtkPoints> points;
+
+    for (size_t i = 0; i < vertices.size(); i += 2)
+    {
+        points->InsertNextPoint(vertices[i], vertices[i + 1], 0.0);
+    }
+    polyData->SetPoints(points);
+
+    vtkNew<vtkFloatArray> scalars;
+    for (size_t i = 0; i < 16; ++i)
+    {
+        scalars->InsertNextValue(fields[i]);
+    }
+
+    polyData->GetPointData()->SetScalars(scalars);
+
+    return polyData;
+}
+} // namespace
+
+int main(int, char*[])
+{
+    auto inPolyData = GenPolyData();
+
+    vtkNew<vtkLookupTable> surfaceLUT;
+    surfaceLUT->SetRange(inPolyData->GetPointData()->GetScalars()->GetRange());
+    surfaceLUT->Build();
+
+    // Triangulate the grid points
+    vtkNew<vtkDelaunay2D> delaunay;
+    delaunay->SetInputData(inPolyData);
+    delaunay->Update();
+
+    auto inNumberOfPoints = inPolyData->GetNumberOfPoints();
+    auto inNumberOfCells  = inPolyData->GetNumberOfCells();
+
+    auto outPolyData       = delaunay->GetOutput();
+    auto outNumberOfPoints = outPolyData->GetNumberOfPoints();
+    auto outNumberOfCells  = outPolyData->GetNumberOfCells();
+
+    std::cout << "in\tpoints: " << inNumberOfPoints << "\tcells: " << inNumberOfCells << std::endl;
+    std::cout << "out\tpoints: " << outNumberOfPoints << "\tcells: " << outNumberOfCells << std::endl;
+
+    vtkNew<vtkPolyDataMapper> meshMapper;
+    meshMapper->InterpolateScalarsBeforeMappingOn();
+    meshMapper->UseLookupTableScalarRangeOn();
+    meshMapper->ScalarVisibilityOn();
+    meshMapper->SetInputData(delaunay->GetOutput());
+    meshMapper->SetLookupTable(surfaceLUT);
+
+    vtkNew<vtkActor> meshActor;
+    meshActor->SetMapper(meshMapper);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(meshActor);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST501
+
+#ifdef TEST502
+
+#include <vtkActor.h>
+#include <vtkContourFilter.h>
+#include <vtkFloatArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkPolyDataReader.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSurfaceReconstructionFilter.h>
+
+namespace {
+// clang-format off
+std::vector<float> vertices { 
+    0., 0., 0., 1., 0., 2., 0., 3.,
+    1., 3., 1., 2., 1., 1., 1., 0.,
+    2., 0., 2., 1., 2., 2., 2., 3.,
+    3., 3., 3., 2., 3., 1., 3., 0. 
+};
+
+std::vector<int> indices {
+    // 四条外部线
+    0,  1,  1,  2,  2,  3,
+   12, 13, 13, 14, 14, 15,
+    0,  7,  7,  8,  8, 15,
+    3,  4,  4, 11, 11, 12,
+
+    // 内部线
+    1, 6, 6,  9,  9, 14,
+    2, 5, 5, 10, 10, 13,
+    4, 5, 5,  6,  6,  7,
+    8, 9, 9, 10, 10, 11,
+};
+
+std::vector<int> indicesPoly {
+    0, 1,  6,  7, 1,  2,  5,  6,  2,  3,  4,  5,
+    4, 5, 10, 11, 5,  6,  9, 10,  6,  7,  8,  9,
+    8, 9, 14, 15, 9, 10, 13, 14, 10, 11, 12, 13,
+};
+
+std::vector<float> fields {
+    1.0f,    1.0f,    1.0f,    1.0f,
+    2.0f,    2.0f,    2.0f,    2.0f,
+    3.0f,    3.0f,    3.0f,    3.0f,
+    4.0f,    4.0f,    4.0f,    4.0f,
+};
+
+// clang-format on
+
+enum class PolyType
+{
+    Vert,
+    Line,
+    Poly
+};
+
+vtkSmartPointer<vtkPolyData> GenPolyData(PolyType type)
+{
+    vtkNew<vtkPolyData> polyData;
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> cellsVert;
+    vtkNew<vtkCellArray> cellsLine;
+    vtkNew<vtkCellArray> cellsPoly;
+
+    for (size_t i = 0; i < vertices.size(); i += 2)
+    {
+        points->InsertNextPoint(vertices[i], vertices[i + 1], 0.0);
+    }
+    for (size_t i = 0; i < vertices.size() / 2; i++)
+    {
+        auto id = static_cast<vtkIdType>(i);
+        cellsVert->InsertNextCell(1, &id);
+    }
+    for (size_t i = 0; i < indices.size(); i += 2)
+    {
+        cellsLine->InsertNextCell({ indices[i], indices[i + 1] });
+    }
+    for (size_t i = 0; i < indicesPoly.size(); i += 4)
+    {
+        cellsPoly->InsertNextCell({ indicesPoly[i], indicesPoly[i + 1], indicesPoly[i + 2], indicesPoly[i + 3] });
+    }
+
+    polyData->SetPoints(points);
+    switch (type)
+    {
+    case PolyType::Vert:
+        polyData->SetVerts(cellsVert);
+        break;
+    case PolyType::Line:
+        polyData->SetLines(cellsLine);
+        break;
+    case PolyType::Poly:
+        polyData->SetPolys(cellsPoly);
+        break;
+    default:
+        break;
+    }
+
+    vtkNew<vtkFloatArray> scalars;
+    for (size_t i = 0; i < 16; ++i)
+    {
+        scalars->InsertNextValue(fields[i]);
+    }
+
+    polyData->GetPointData()->SetScalars(scalars);
+
+    return polyData;
+}
+} // namespace
+
+/**
+ * 三角剖分技术也可以实现网格的曲面重建
+ *
+ * 使用VTKsurfaceReconstructionFilter时，主要涉及两个参数，分别使用函数SetNeighborhoodSize（）和SetSampleSpacing（）进行设置。
+ * SetNeighborhoodSize：
+ *     设置邻域点的个数；而这些邻域点则用来估计每个点的局部切平面。
+ *     邻域点的个数默认为20，能够处理大多数重建问题。个数设置越多，计算消耗时间越长。当点云分布严重不均匀情况下，可以考虑增加该值。
+ * SetSampleSpacing：
+ *     用于设置划分网格的网格间距，间距与小，网格月密集，一般采用默认值0.05.
+ */
+
+int main()
+{
+    auto polyData = GenPolyData(PolyType::Vert);
+
+    vtkNew<vtkPolyData> points;
+    points->SetPoints(polyData->GetPoints()); // 获得网格模型中的几何数据：点集
+
+    vtkNew<vtkSurfaceReconstructionFilter> surf;
+    surf->SetInputData(points);
+    surf->SetNeighborhoodSize(20);
+    surf->SetSampleSpacing(0.005);
+    surf->Update();
+
+    vtkNew<vtkContourFilter> contour;
+    contour->SetInputConnection(surf->GetOutputPort());
+    contour->SetValue(0, 0.0);
+    contour->Update();
+
+    vtkNew<vtkPolyDataMapper> pointMapper;
+    pointMapper->SetInputData(polyData);
+    pointMapper->ScalarVisibilityOff();
+
+    vtkNew<vtkActor> pointActor;
+    pointActor->SetMapper(pointMapper);
+    pointActor->GetProperty()->SetColor(1, 0, 0);
+    pointActor->GetProperty()->SetPointSize(4);
+
+    vtkNew<vtkPolyDataMapper> contourMapper;
+    contourMapper->SetInputData(contour->GetOutput());
+    vtkNew<vtkActor> contourActor;
+    contourActor->SetMapper(contourMapper);
+
+    double pointView[4]   = { 0, 0, 0.5, 1 };
+    double contourView[4] = { 0.5, 0, 1, 1 };
+
+    vtkNew<vtkRenderer> pointRender;
+    pointRender->AddActor(pointActor);
+    pointRender->SetViewport(pointView);
+    pointRender->SetBackground(1, 1, 1);
+    pointRender->ResetCamera();
+
+    vtkNew<vtkRenderer> contourRender;
+    contourRender->AddActor(contourActor);
+    contourRender->SetViewport(contourView);
+    contourRender->SetBackground(0, 1, 0);
+    contourRender->ResetCamera();
+
+    vtkNew<vtkRenderWindow> rw;
+    rw->AddRenderer(pointRender);
+    rw->AddRenderer(contourRender);
+    rw->SetSize(800, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> rwi;
+    rwi->SetRenderWindow(rw);
+    rwi->SetInteractorStyle(style);
+
+    rw->Render();
+    rwi->Start();
+
+    return 0;
+}
+
+#endif // TEST502
