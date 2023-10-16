@@ -6,14 +6,14 @@
 
 int main(int argc, char** argv)
 {
-  // needed to ensure appropriate OpenGL context is created for VTK rendering.
-  QSurfaceFormat::setDefaultFormat(QVTKRenderWidget::defaultFormat());
+    // needed to ensure appropriate OpenGL context is created for VTK rendering.
+    QSurfaceFormat::setDefaultFormat(QVTKRenderWidget::defaultFormat());
 
-  // QT Stuff
-  QApplication app(argc, argv);
+    // QT Stuff
+    QApplication app(argc, argv);
 
-  QtVTKRenderWindows myQtVTKRenderWindows;
-  myQtVTKRenderWindows.show();
+    QtVTKRenderWindows myQtVTKRenderWindows;
+    myQtVTKRenderWindows.show();
 
-  return app.exec();
+    return app.exec();
 }

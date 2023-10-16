@@ -1,90 +1,61 @@
-cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
-
-if(POLICY CMP0020)
-  cmake_policy(SET CMP0020 NEW)
-  cmake_policy(SET CMP0071 NEW)
-endif()
 
 set(target_name "02_09_EventQtSlotConnect")
 
-find_package(VTK COMPONENTS 
-  CommonColor
-  CommonCore
-  FiltersSources
-  GUISupportQt
-  InteractionStyle
-  RenderingContextOpenGL2
-  RenderingCore
-  RenderingFreeType
-  RenderingGL2PSOpenGL2
-  RenderingOpenGL2
-  GUISupportQt
-  RenderingQt
+set(CMAKE_AUTOMOC ON)  # Meta-Object Compiler
+set(CMAKE_AUTORCC OFF) # Resource Compiler
+set(CMAKE_AUTOUIC ON) # User Interface Compiler
+
+find_package(Qt6 COMPONENTS Widgets)
+
+find_package(VTK
+    COMPONENTS
+      CommonColor
+      CommonCore
+      FiltersSources
+      GUISupportQt
+      InteractionStyle
+      RenderingContextOpenGL2
+      RenderingCore
+      RenderingFreeType
+      RenderingGL2PSOpenGL2
+      RenderingOpenGL2
+      GUISupportQt
+      RenderingQt
+    QUIET
 )
 
-if(NOT VTK_FOUND)
-  message(FATAL_ERROR "EventQtSlotConnect: Unable to find the VTK build folder.")
+if (NOT VTK_FOUND)
+  message(FATAL_ERROR "------------------ VTK not found ------------------")
 endif()
 
-if(NOT(TARGET VTK::GUISupportQt))
-  message(FATAL_ERROR "EventQtSlotConnect: VTK not built with Qt support.")
-endif()
+add_executable(${target_name} "main.cpp" "EventQtSlotConnect.h" "EventQtSlotConnect.cpp" "EventQtSlotConnect.ui")
+target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES} Qt6::Widgets)
 
-if(NOT DEFINED VTK_QT_VERSION)
-  set(VTK_QT_VERSION 5)
-endif()
-
-set(qt_components Core Gui Widgets)
-if(${VTK_QT_VERSION} VERSION_GREATER_EQUAL 6)
-  list(APPEND qt_components OpenGLWidgets)
-endif()
-list(SORT qt_components)
-# We have ui files, so this will also bring in the macro:
-#   qt5_wrap_ui or qt_wrap_ui from Widgets.
-find_package(Qt${VTK_QT_VERSION} QUIET
-  REQUIRED COMPONENTS ${qt_components}
-)
-
-foreach(_qt_comp IN LISTS qt_components)
-  list(APPEND qt_modules "Qt${VTK_QT_VERSION}::${_qt_comp}")
-endforeach()
-
-message (STATUS "VTK_VERSION: ${VTK_VERSION}, Qt Version: ${Qt${VTK_QT_VERSION}Widgets_VERSION}")
-
-# Instruct CMake to run moc and uic automatically when needed.
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
-
-include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-
-file(GLOB UI_FILES *.ui)
-file(GLOB QT_WRAP *.h)
-file(GLOB CXX_FILES *.cpp)
-
-# For VTK versions greater than or equal to 8.90.0:
-#  CMAKE_AUTOUIC is ON so we handle uic automatically for Qt targets.
-#  CMAKE_AUTOMOC is ON so we handle moc automatically for Qt targets.
-
-# Prevent a "command line is too long" failure in Windows.
-set(CMAKE_NINJA_FORCE_RESPONSE_FILE "ON" CACHE BOOL "Force Ninja to use response files.")
-
-# CMAKE_AUTOMOC in ON so the MOC headers will be automatically wrapped.
-add_executable(${target_name} MACOSX_BUNDLE
-  ${CXX_FILES} ${UISrcs} ${QT_WRAP}
-)
-
-if (Qt${VTK_QT_VERSION}Widgets_VERSION VERSION_LESS "5.11.0")
-  qt5_use_modules(${target_name} ${qt_components})
-else()
-  target_link_libraries(${target_name} ${qt_modules})
-endif()
-target_link_libraries(${target_name} ${VTK_LIBRARIES})
-
-# vtk_module_autoinit is needed
+# 初始化vtk模块
 vtk_module_autoinit(
-  TARGETS ${target_name}
-  MODULES ${VTK_LIBRARIES}
+    TARGETS ${target_name}
+    MODULES ${VTK_LIBRARIES}
 )
 
+# 安装EXE文件
+install(TARGETS ${target_name}
+        RUNTIME DESTINATION ./
+)
 
-install(TARGETS ${target_name} RUNTIME DESTINATION ./)
+# 调用函数获取依赖的DLL文件
+set(ARG _FULL_NAME_ _NAME_ ${VTK_LIBRARIES})
+include(${PROJECT_SOURCE_DIR}/cmake/FindVTKDependencies.cmake)
+GetDependencies(ARGS ${ARG})
+
+# 拷贝DLL文件
+foreach(_full_name _name IN ZIP_LISTS _FULL_NAME_ _NAME_)
+    # 拷贝DLL到安装目录
+    install(FILES ${_full_name} DESTINATION .)
+    
+    # 拷贝DLL到生成目录
+    add_custom_command(TARGET ${target_name}
+    PRE_BUILD
+        COMMAND ${CMAKE_COMMAND} -E
+        copy_if_different ${_full_name} $<TARGET_FILE_DIR:${target_name}>/${_name}
+    )
+endforeach()

@@ -1,129 +1,56 @@
-cmake_minimum_required(VERSION 3.8)
-
 set(target_name "02_03_MultiWindow")
 
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC OFF)
-set(CMAKE_AUTOUIC OFF)
+set(CMAKE_AUTOMOC ON)  # Meta-Object Compiler
+set(CMAKE_AUTORCC OFF) # Resource Compiler
+set(CMAKE_AUTOUIC OFF) # User Interface Compiler
 
-find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
+find_package(Qt6 COMPONENTS Widgets)
 
-find_package(VTK 
+find_package(VTK
     COMPONENTS
-        CommonColor
         CommonCore
         FiltersSources
         InteractionStyle
-        InteractionWidgets
-        RenderingContextOpenGL2
         RenderingCore
-        RenderingFreeType
-        RenderingGL2PSOpenGL2
         RenderingOpenGL2
+        loguru
+        ParallelMPI
         GUISupportQt
-        RenderingQt
-    REQUIRED
+    QUIET
 )
 
-add_executable(${target_name} "main.cpp" "window.h" )
+if (NOT VTK_FOUND)
+  message(FATAL_ERROR "------------------ VTK not found ------------------")
+endif()
 
-target_include_directories(${target_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+add_executable(${target_name} "main.cpp" "window.h")
+target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES} Qt6::Widgets)
 
-target_link_libraries(${target_name} PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets)
-target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES} )
-
+# 初始化vtk模块
 vtk_module_autoinit(
     TARGETS ${target_name}
     MODULES ${VTK_LIBRARIES}
 )
 
-# exe
+# 安装EXE文件
 install(TARGETS ${target_name}
         RUNTIME DESTINATION ./
 )
 
-# 安装本项目依赖的vtk_dll
-function(vtk_module_glob_dependencies)
-    cmake_parse_arguments(PARSE_ARGV 0 _glob_dependencies
-        ""
-        "OUTPUT"
-        "MODULES"
-    )
+# 调用函数获取依赖的DLL文件
+set(ARG _FULL_NAME_ _NAME_ ${VTK_LIBRARIES})
+include(${PROJECT_SOURCE_DIR}/cmake/FindVTKDependencies.cmake)
+GetDependencies(ARGS ${ARG})
 
-    if(_glob_dependencies_UNRECOGNIZED_ARGUMENTS)
-        message(FATAL_ERROR
-            "==============="
-            "${_glob_dependencies_UNRECOGNIZED_ARGUMENTS}"
-        )
-    endif()
-
-    if(NOT _glob_dependencies_OUTPUT)
-        message(FATAL_ERROR
-            "===========OUPUT"
-        )
-    endif()
-
-    if(NOT _glob_dependencies_MODULES)
-        message(FATAL_ERROR
-            "===========MODULES"
-        )
-    endif()
-
-    set(_glob_dependencies_module_stack ${_glob_dependencies_MODULES})
-    set(_glob_dependencies_seen)
+# 拷贝DLL文件
+foreach(_full_name _name IN ZIP_LISTS _FULL_NAME_ _NAME_)
+    # 拷贝DLL到安装目录
+    install(FILES ${_full_name} DESTINATION .)
     
-    while(_glob_dependencies_module_stack)
-        list(GET _glob_dependencies_module_stack 0 _glob_dependencies_current_module)
-        list(REMOVE_AT _glob_dependencies_module_stack 0)
-
-        if(NOT TARGET "${_glob_dependencies_current_module}")
-            continue()
-        endif()
-
-        if(_glob_dependencies_current_module IN_LIST _glob_dependencies_seen)
-            continue()
-        endif()
-
-        list(APPEND _glob_dependencies_seen "${_glob_dependencies_current_module}")
-
-        get_target_property(_glob_dependencies_public_dependencies "${_glob_dependencies_current_module}" "INTERFACE_vtk_module_depends")
-        get_target_property(_glob_dependencies_private_dependencies "${_glob_dependencies_current_module}" "INTERFACE_vtk_module_private_depends")
-        get_target_property(_glob_dependencies_optional_dependencies "${_glob_dependencies_current_module}" "INTERFACE_vtk_module_optional_depends")
-
-        list(INSERT _glob_dependencies_module_stack 0 "${_glob_dependencies_public_dependencies}" "${_glob_dependencies_private_dependencies}")
-
-        foreach(__optional_dependecy IN LISTS _glob_dependencies_optional_dependencies)
-            if(TARGET "${__optional_dependency}")
-                list(INSERT _glob_dependencies_module_stack 0 "${__optional_dependency}")
-            endif()
-        endforeach()
-
-    endwhile()
-
-    list(REMOVE_DUPLICATES _glob_dependencies_seen)
-    set(${_glob_dependencies_OUTPUT} ${_glob_dependencies_seen} PARENT_SCOPE)
-endfunction()
-
-vtk_module_glob_dependencies(
-    OUTPUT IMPORTED_VTK_MODULES
-    MODULES ${VTK_LIBRARIES}
-)
-
-list(REMOVE_DUPLICATES IMPORTED_VTK_MODULES)
-set(INSTALL_VTK_MODULES)
-
-foreach(_imported_vtk_target IN LISTS IMPORTED_VTK_MODULES)
-    get_target_property(_imported_vtk_target_type "${_imported_vtk_target}" "TYPE")
-
-    if(NOT ${_imported_vtk_target_type} STREQUAL "INTERFACE_LIBRARY")
-        list(APPEND _temp_imported_vtk_modules "$<TARGET_FILE_NAME:${_imported_vtk_target}>")
-        list(APPEND INSTALL_VTK_MODULES "$<TARGET_FILE:${_imported_vtk_target}>")
-    endif()
-endforeach()
-
-set(IMPORTED_VTK_MODULES ${_temp_imported_vtk_modules})
-unset(_temp_imported_vtk_modules)
-
-foreach(_vtk_module_file IN LISTS INSTALL_VTK_MODULES)
-    install(FILES ${_vtk_module_file} DESTINATION .)
+    # 拷贝DLL到生成目录
+    add_custom_command(TARGET ${target_name}
+    PRE_BUILD
+        COMMAND ${CMAKE_COMMAND} -E
+        copy_if_different ${_full_name} $<TARGET_FILE_DIR:${target_name}>/${_name}
+    )
 endforeach()

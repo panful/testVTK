@@ -4,7 +4,7 @@
 * 3.图片满屏显示，适配窗口
 * 4.部分图元大小不变，位置变化，即类似广告牌，只响应旋转平移，不响应缩放
 * 5.照相机矩阵变换，相机旋转，actor不旋转
-* 6.前后平面裁剪，如果摄像机处于图元内部，设置裁剪平面图元仍会被裁剪
+* 6.前后平面裁剪，如果摄像机处于图元内部，设置裁剪平面图元仍会被裁剪，以鼠标所在点缩放
 * 7.相机变换原理
 * 8.Actor变换（旋转，缩放，平移）相机的模型变换矩阵
 * 9.相机旋转Actor也跟着旋转，即Actor的某一部分始终朝向观察者
@@ -21,7 +21,7 @@
 // https://blog.csdn.net/liushao1031177/article/details/116903698
 // https://www.cnblogs.com/ybqjymy/p/13925462.html
 
-#define TEST15
+#define TEST6
 
 #ifdef TEST1
 
@@ -1153,28 +1153,24 @@ protected:
     {
         this->FindPokedRenderer(this->Interactor->GetEventPosition()[0], this->Interactor->GetEventPosition()[1]);
 
-        if (this->CurrentRenderer == nullptr)
+        if (this->CurrentRenderer)
         {
-            return;
+            auto mousePos = vtkVector2d(this->Interactor->GetEventPosition()[0], this->Interactor->GetEventPosition()[1]);
+            ZoomByFocalPoint(mousePos, true);
+            //this->Interactor->Render();
         }
-
-        auto mousePos = vtkVector2d(this->Interactor->GetEventPosition()[0], this->Interactor->GetEventPosition()[1]);
-        ZoomByFocalPoint(mousePos, true);
-        this->Interactor->Render();
     }
 
     void OnMouseWheelBackward() override
     {
         this->FindPokedRenderer(this->Interactor->GetEventPosition()[0], this->Interactor->GetEventPosition()[1]);
 
-        if (this->CurrentRenderer == nullptr)
+        if (this->CurrentRenderer)
         {
-            return;
+            auto mousePos = vtkVector2d(this->Interactor->GetEventPosition()[0], this->Interactor->GetEventPosition()[1]);
+            ZoomByFocalPoint(mousePos, false);
+           // this->Interactor->Render();
         }
-
-        auto mousePos = vtkVector2d(this->Interactor->GetEventPosition()[0], this->Interactor->GetEventPosition()[1]);
-        ZoomByFocalPoint(mousePos, false);
-        this->Interactor->Render();
     }
 
     void OnLeftButtonDown() override

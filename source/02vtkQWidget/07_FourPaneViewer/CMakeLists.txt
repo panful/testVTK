@@ -1,52 +1,57 @@
-cmake_minimum_required(VERSION 3.8...3.12 FATAL_ERROR)
 
 set(target_name "02_07_FourPaneViewer")
 
-find_package(VTK
-  COMPONENTS
-    CommonCore
-    GUISupportQt
-    IOImage
-    ImagingColor
-    ImagingGeneral
-    InteractionImage
-    InteractionStyle
-    InteractionWidgets)
-if (NOT VTK_FOUND)
-  message("Skipping example: ${VTK_NOT_FOUND_MESSAGE}")
-  return ()
-endif ()
+set(CMAKE_AUTOMOC ON)  # Meta-Object Compiler
+set(CMAKE_AUTORCC OFF) # Resource Compiler
+set(CMAKE_AUTOUIC ON) # User Interface Compiler
 
 find_package(Qt6 COMPONENTS Widgets)
-if (NOT TARGET Qt6::Widgets)
-  message("Skipping example: ${Qt5_NOT_FOUND_MESSAGE}")
-  return ()
-endif ()
 
-# Set your files and resources here
-set(Srcs
-  "main.cpp"
-  QtVTKRenderWindows.cxx)
-
-set(Hdrs
-  QtVTKRenderWindows.h)
-
-set(UIs
-  QtVTKRenderWindows.ui)
-
-# Instruct CMake to run moc automatically when needed.
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
-
-# CMAKE_AUTOMOC in ON so the MocHdrs will be automatically wrapped.
-add_executable(${target_name} ${Srcs} ${Hdrs} ${UIs})
-target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES} Qt6::Widgets)
-
-vtk_module_autoinit(
-  TARGETS ${target_name}
-  MODULES ${VTK_LIBRARIES}
+find_package(VTK
+    COMPONENTS
+      CommonCore
+      GUISupportQt
+      IOImage
+      ImagingColor
+      ImagingGeneral
+      InteractionImage
+      InteractionStyle
+      InteractionWidgets
+    QUIET
 )
 
+if (NOT VTK_FOUND)
+  message(FATAL_ERROR "------------------ VTK not found ------------------")
+endif()
+
+add_executable(${target_name} "main.cpp" "QtVTKRenderWindows.h" "QtVTKRenderWindows.cpp" "QtVTKRenderWindows.ui")
+target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES} Qt6::Widgets)
+
+# 初始化vtk模块
+vtk_module_autoinit(
+    TARGETS ${target_name}
+    MODULES ${VTK_LIBRARIES}
+)
+
+# 安装EXE文件
 install(TARGETS ${target_name}
         RUNTIME DESTINATION ./
 )
+
+# 调用函数获取依赖的DLL文件
+set(ARG _FULL_NAME_ _NAME_ ${VTK_LIBRARIES})
+include(${PROJECT_SOURCE_DIR}/cmake/FindVTKDependencies.cmake)
+GetDependencies(ARGS ${ARG})
+
+# 拷贝DLL文件
+foreach(_full_name _name IN ZIP_LISTS _FULL_NAME_ _NAME_)
+    # 拷贝DLL到安装目录
+    install(FILES ${_full_name} DESTINATION .)
+    
+    # 拷贝DLL到生成目录
+    add_custom_command(TARGET ${target_name}
+    PRE_BUILD
+        COMMAND ${CMAKE_COMMAND} -E
+        copy_if_different ${_full_name} $<TARGET_FILE_DIR:${target_name}>/${_name}
+    )
+endforeach()

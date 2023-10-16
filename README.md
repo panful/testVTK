@@ -85,12 +85,17 @@ vtk函数测试
 ## (02)vtkQWidget
 使用QWidget渲染
 ### 01_Template
-使用QVTKRenderWidget+vtkGenericOpenGLRenderWindow的最简单模板
+使用`QVTKRenderWidget + vtkGenericOpenGLRenderWindow`的最简单模板
 ### 02_Undo
-鼠标事件回退（撤销）前进
+在栈中保存vtkCamera，鼠标事件回退（撤销）前进
 ### 03_MultiWindow
-多窗口显示
+多窗口显示 QDockWidget
 ### 04_ShareCamera
+同一个窗口，不同的vtkRender(viewport)共享同一个相机
+### 07_医学四视图
+QVTKRenderWidget
+### 09_EventQtSlotConnect
+使用`vtkEventQtSlotConnect`将`vtkRenderWindowInteractor`和`vtkCommand`回调函数绑定
 ## (03)vtkQQuick
 使用QQuick渲染
 ## (04)vtkRealTimeCloudRender

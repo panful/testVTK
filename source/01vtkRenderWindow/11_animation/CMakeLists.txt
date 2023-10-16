@@ -21,14 +21,8 @@ if (NOT VTK_FOUND)
   message(FATAL_ERROR "------------------ VTK not found ------------------")
 endif()
 
-find_package(Qt6 COMPONENTS Core Widgets QUIET)
-
-if(NOT Qt6_FOUND)
-    message(FATAL_ERROR "------------------ Qt6 not found ------------------")
-endif()
-
 add_executable(${target_name} "main.cpp")
-target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES} Qt6::Core Qt6::Widgets)
+target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES})
 
 # 初始化vtk模块
 vtk_module_autoinit(
