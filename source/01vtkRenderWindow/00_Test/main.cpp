@@ -5,9 +5,12 @@
  * 3. vtkNew 和 vtkSmartPointer 函数参数为智能指针
  * 4. AddObserver 使用lambda表达式和继承自vtkCommand
  * 5. vtk的观察者模式 AddObserver
+ * 6. vtkTimeStamp
+ *
+ * vtkSmartPointer vtkObject vtkCommand vtkTimeStamp vtkDataArray vtkDataObject vtkAlgorithm
  */
 
-#define TEST5
+#define TEST6
 
 #ifdef TEST1
 
@@ -418,3 +421,31 @@ int main()
     obj.Update();
 }
 #endif // TEST5
+
+#ifdef TEST6
+
+#include <vtkCubeSource.h>
+
+// void vtkObject::Modified() 调用修改时间
+// vtkObject的成员变量 vtkTimeStamp MTime; 用来跟踪修改时间
+
+int main(int, char*[])
+{
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+    std::cout << source->GetMTime() << std::endl;
+    std::cout << source->GetMTime() << std::endl;
+    source->SetXLength(2.0);
+    std::cout << source->GetMTime() << std::endl;
+    std::cout << source->GetMTime() << std::endl;
+    source->Update();
+    std::cout << source->GetMTime() << std::endl;
+    std::cout << source->GetMTime() << std::endl;
+    source->Update();
+    std::cout << source->GetMTime() << std::endl;
+    std::cout << source->GetMTime() << std::endl;
+    
+    return 0;
+}
+
+#endif // TEST6
