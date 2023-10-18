@@ -1,34 +1,43 @@
 #pragma once
 
+#include "controller.h"
 #include "vtkViewer.h"
 #include <QBoxLayout>
+#include <QDebug>
 #include <QPushButton>
 #include <QWidget>
+#include <random>
 
 class Window
 {
 public:
-    Window(QWidget* w) : m_base(w)
+    Window(QWidget* w) : m_parentWindow(w), m_controller(new Controller())
     {
     }
 
-    virtual QWidget* GetWidget() const
+    virtual IViewer* GetIViewer() const
     {
-        return m_base;
+        return m_controller;
     }
+
+    QWidget* GetParentWidget() const
+    {
+        return m_parentWindow;
+    }
+
+protected:
+    Controller* m_controller { nullptr };
 
 private:
-    QWidget* m_base { nullptr };
+    QWidget* m_parentWindow { nullptr };
 };
 
 class Decorator : public Window
 {
 public:
-    Decorator(Window* w) : Window(w->GetWidget()), m_window(w)
+    Decorator(Window* w) : Window(w->GetParentWidget()), m_window(w)
     {
     }
-
-    QWidget* GetWidget() const override = 0;
 
 protected:
     Window* m_window { nullptr };
@@ -41,29 +50,28 @@ public:
     {
         auto btnLayout = new QHBoxLayout();
         {
-            auto btn1 = new QPushButton("TEST1");
-            auto btn2 = new QPushButton("TEST2");
-            auto btn3 = new QPushButton("TEST3");
+            auto btn_fitView    = new QPushButton("FitView");
+            auto btn_background = new QPushButton("SetBackground");
 
-            btnLayout->addWidget(btn1);
-            btnLayout->addWidget(btn2);
-            btnLayout->addWidget(btn3);
+            btnLayout->addWidget(btn_fitView);
+            btnLayout->addWidget(btn_background);
+
+            QObject::connect(btn_fitView, &QPushButton::clicked, [this]() { m_controller->FitView(); });
+            QObject::connect(btn_background, &QPushButton::clicked,
+                [this]()
+                {
+                    static std::default_random_engine engine;
+                    std::uniform_real_distribution<float> dist(0.f, 1.f);
+                    float color[3] { dist(engine), dist(engine), dist(engine) };
+                    m_controller->SetBackground(color);
+                });
         }
 
         auto mainLayout = new QVBoxLayout();
-        m_present       = new WindowVTK();
 
         mainLayout->addLayout(btnLayout);
-        mainLayout->addWidget(m_present);
+        mainLayout->addWidget(m_controller->GetWidget());
 
-        m_window->GetWidget()->setLayout(mainLayout);
+        m_window->GetParentWidget()->setLayout(mainLayout);
     }
-
-    QWidget* GetWidget() const
-    {
-        return m_present;
-    }
-
-private:
-    QWidget* m_present { nullptr };
 };

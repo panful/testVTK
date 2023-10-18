@@ -23,7 +23,22 @@ if (NOT VTK_FOUND)
   message(FATAL_ERROR "------------------ VTK not found ------------------")
 endif()
 
-add_executable(${target_name} "main.cpp" "iviewer.h" "vtkViewer.h" "widget.h" "mainWindow.h" "scene.h" "filter.h")
+set(SRC 
+    actor.h
+    controller.h
+    infilter.h
+    iviewer.h
+    main.cpp
+    mainWindow.h
+    rinterface.h
+    scene.h
+    vtkViewer.h
+    widget.h
+    wmanager.h
+    outfilter.h
+)
+
+add_executable(${target_name} ${SRC})
 target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES} Qt6::Widgets)
 
 # 初始化vtk模块

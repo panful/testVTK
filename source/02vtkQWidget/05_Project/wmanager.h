@@ -15,13 +15,9 @@ public:
         m_windows[0] = windowUi;
     }
 
-    IViewer* GetWindow(uint32_t id) const
+    IViewer* GetActiveViewer() const
     {
-        if (m_windows.count(id))
-        {
-            return dynamic_cast<IViewer*>(m_windows.at(id)->GetWidget());
-        }
-        return nullptr;
+        return dynamic_cast<IViewer*>(m_windows.at(0)->GetIViewer());
     }
 
 private:
