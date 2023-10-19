@@ -1,8 +1,9 @@
 #pragma once
 
 #include "iviewer.h"
+#include "log.h"
 #include "scene.h"
-#include <QDebug>
+
 #include <QVTKRenderWidget.h>
 #include <vtkGenericOpenGLRenderWindow.h>
 #include <vtkRenderer.h>
@@ -21,34 +22,31 @@ public:
 
     void SetBackground(float* color)
     {
-        qDebug() << "VTKViewer::SetBackground";
+        LogDebug("");
         m_renderer->SetBackground(color[0], color[1], color[2]);
-        Update();
     }
 
     void FitView() const
     {
-        qDebug() << "VTKViewer::FitView";
+        LogDebug("");
         m_renderer->ResetCamera();
-        Update();
     }
 
     void AddActor(vtkProp* prop) const
     {
-        qDebug() << "VTKViewer::AddActor";
+        LogDebug("");
         m_renderer->AddActor(prop);
-        Update();
     }
 
     void RemoveActor(vtkProp* prop) const
     {
-        qDebug() << "VTKViewer::RemoveActor";
+        LogDebug("");
         m_renderer->RemoveActor(prop);
-        Update();
     }
 
-    void Update() const
+    void Render() const
     {
+        LogDebug("");
         this->renderWindow()->Render();
     }
 

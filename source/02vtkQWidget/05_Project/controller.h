@@ -10,7 +10,7 @@ public:
     Controller()
     {
         m_viewer = new WindowVTK();
-        m_scene  = new Scene(m_viewer);
+        m_scene  = new Scene();
     }
 
     QWidget* GetWidget() const
@@ -36,7 +36,9 @@ public:
     {
         if (actor)
         {
-            m_scene->AddActor(actor->id, VTKFilter::Convert(actor));
+            auto prop = VTKFilter::Convert(actor);
+            m_scene->AddActor(actor->id, prop);
+            m_viewer->AddActor(prop);
         }
     }
 
@@ -48,6 +50,11 @@ public:
     void SetVisible(uint32_t id, bool v) override
     {
         m_scene->SetVisible(id, v);
+    }
+
+    void Render() override
+    {
+        m_viewer->Render();
     }
 
 private:

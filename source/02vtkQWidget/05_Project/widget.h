@@ -56,7 +56,13 @@ public:
             btnLayout->addWidget(btn_fitView);
             btnLayout->addWidget(btn_background);
 
-            QObject::connect(btn_fitView, &QPushButton::clicked, [this]() { m_controller->FitView(); });
+            QObject::connect(btn_fitView, &QPushButton::clicked,
+                [this]()
+                {
+                    m_controller->FitView();
+                    m_controller->Render();
+                });
+
             QObject::connect(btn_background, &QPushButton::clicked,
                 [this]()
                 {
@@ -64,6 +70,7 @@ public:
                     std::uniform_real_distribution<float> dist(0.f, 1.f);
                     float color[3] { dist(engine), dist(engine), dist(engine) };
                     m_controller->SetBackground(color);
+                    m_controller->Render();
                 });
         }
 

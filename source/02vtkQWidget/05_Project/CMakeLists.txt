@@ -28,6 +28,7 @@ set(SRC
     controller.h
     infilter.h
     iviewer.h
+    log.h
     main.cpp
     mainWindow.h
     rinterface.h

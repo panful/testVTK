@@ -24,6 +24,7 @@ public:
     void SetColor(Entity e, float* color) const
     {
         m_winManager->GetActiveViewer()->SetColor(m_actManager->GetId(e), color);
+        m_winManager->GetActiveViewer()->Render();
     }
 
     template <typename VT, typename IT>
@@ -47,11 +48,13 @@ public:
     void ShowEntity(Entity e) const
     {
         m_winManager->GetActiveViewer()->SetVisible(m_actManager->GetId(e), true);
+        m_winManager->GetActiveViewer()->Render();
     }
 
     void HideEntity(Entity e) const
     {
         m_winManager->GetActiveViewer()->SetVisible(m_actManager->GetId(e), false);
+        m_winManager->GetActiveViewer()->Render();
     }
 
 private:

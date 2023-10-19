@@ -25,36 +25,32 @@ public:
 protected:
     void Notify() const
     {
-        m_observer->Update();
+        m_observer->Render();
     }
 
     WindowVTK* m_observer { nullptr };
 };
 
-class Scene : public Subject
+class Scene 
 {
 public:
-    Scene(WindowVTK* w) : Subject(w)
+    Scene()
     {
     }
 
     void SetColor(uint32_t id, float* color) const
     {
         vtkActor::SafeDownCast(m_actors.at(id))->GetProperty()->SetColor(color[0], color[1], color[2]);
-        Notify();
     }
 
     void SetVisible(uint32_t id, bool v) const
     {
         vtkActor::SafeDownCast(m_actors.at(id))->SetVisibility(v);
-        Notify();
     }
 
     void AddActor(uint32_t id, vtkProp* prop)
     {
         m_actors.try_emplace(id, prop);
-        vtkActor::SafeDownCast(m_actors.at(id))->VisibilityOff();
-        m_observer->AddActor(prop);
     }
 
 private:
