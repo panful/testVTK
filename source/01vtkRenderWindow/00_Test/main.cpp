@@ -4,13 +4,14 @@
  * 2. vtk智能指针的使用
  * 3. vtkNew 和 vtkSmartPointer 函数参数为智能指针
  * 4. AddObserver 使用lambda表达式和继承自vtkCommand
- * 5. vtk的观察者模式 AddObserver
- * 6. vtkTimeStamp
+ * 5. vtk的观察者模式 AddObserver 实现方法
+ * 6. vtkTimeStamp 记录数据修改的时间
+ * 7. New基类，调用子类的函数
  *
  * vtkSmartPointer vtkObject vtkCommand vtkTimeStamp vtkDataArray vtkDataObject vtkAlgorithm
  */
 
-#define TEST6
+#define TEST7
 
 #ifdef TEST1
 
@@ -444,8 +445,96 @@ int main(int, char*[])
     source->Update();
     std::cout << source->GetMTime() << std::endl;
     std::cout << source->GetMTime() << std::endl;
-    
+
     return 0;
 }
 
 #endif // TEST6
+
+#ifdef TEST7
+
+#include <iostream>
+
+#define Log_Func std::cout << __FUNCTION__ << std::endl;
+
+class BaseRenderer
+{
+public:
+    static BaseRenderer* New();
+
+    virtual void Render()
+    {
+        Log_Func;
+    }
+
+    void Test()
+    {
+        Log_Func;
+        this->AddActor();
+    }
+
+private:
+    virtual void AddActor()
+    {
+        Log_Func;
+    }
+};
+
+class OpenGLRenderer : public BaseRenderer
+{
+public:
+    void Render() override
+    {
+        Log_Func;
+    }
+
+    void AddActor() override
+    {
+        Log_Func;
+    }
+};
+
+class VulkanRenderer : public BaseRenderer
+{
+public:
+    void Render() override
+    {
+        Log_Func;
+    }
+
+    void AddActor() override
+    {
+        Log_Func;
+    }
+};
+
+/**
+ * vtkObjectFactory.h 定义了以下的宏
+ * vtkStandardNewMacro
+ * vtkObjectFactoryNewMacro
+ *
+ * 通过 VTK_MODULE_INIT 在 main()之前初始化VTK模块并注册方法，New()基类的时候，返回对应的子类实例
+ * 用户看似New的是一个基类，实际执行过程中执行的是子类的函数
+ */
+
+#define Render_Type_OpenGL
+
+int main()
+{
+    auto p = BaseRenderer::New();
+    p->Render();
+    p->Test();
+
+    return 0;
+}
+
+BaseRenderer* BaseRenderer::New()
+{
+#ifdef Render_Type_OpenGL
+    return new OpenGLRenderer();
+#else
+    return new VulkanRenderer();
+#endif
+}
+
+#endif // TEST7
