@@ -7,11 +7,12 @@
  * 5. vtk的观察者模式 AddObserver 实现方法
  * 6. vtkTimeStamp 记录数据修改的时间
  * 7. New基类，调用子类的函数
+ * 8. class中的成员变量是裸指针，引用计数仍会加1，并不会被析构
  *
  * vtkSmartPointer vtkObject vtkCommand vtkTimeStamp vtkDataArray vtkDataObject vtkAlgorithm
  */
 
-#define TEST7
+#define TEST8
 
 #ifdef TEST1
 
@@ -538,3 +539,111 @@ BaseRenderer* BaseRenderer::New()
 }
 
 #endif // TEST7
+
+#ifdef TEST8
+
+#include <vtkNew.h>
+#include <vtkObjectFactory.h>
+#include <vtkSmartPointer.h>
+
+#include <iostream>
+
+namespace {
+
+class Test : public vtkObject
+{
+public:
+    static Test* New();
+    vtkTypeMacro(Test, vtkObject);
+
+protected:
+    Test()
+    {
+        std::cout << __FUNCTION__ << std::endl;
+    }
+
+    ~Test() override
+    {
+        std::cout << __FUNCTION__ << std::endl;
+    }
+};
+
+vtkStandardNewMacro(Test);
+
+class Test2 : public vtkObject
+{
+public:
+    static Test2* New();
+    vtkTypeMacro(Test2, vtkObject);
+
+    void SetTest(Test* t)
+    {
+        // 详见 vtkSetGet.h => vtkSetObjectBodyMacro
+        if (m_test != t)
+        {
+            auto tmp = m_test;
+            m_test   = t;
+            if (m_test)
+            {
+                // 将当前设置的成员变量引用计数加一
+                m_test->Register(this);
+            }
+            if (tmp)
+            {
+                // 将原来的成员变量引用计数减一
+                tmp->UnRegister(this);
+            }
+            this->Modified();
+        }
+    }
+
+    Test* GetTest() const noexcept
+    {
+        return m_test;
+    }
+
+protected:
+    Test2()
+    {
+        std::cout << __FUNCTION__ << std::endl;
+    }
+
+    ~Test2() override
+    {
+        std::cout << __FUNCTION__ << std::endl;
+        if (m_test)
+        {
+            m_test->UnRegister(this);
+            m_test = nullptr;
+        }
+    }
+
+private:
+    Test* m_test { nullptr };
+};
+
+vtkStandardNewMacro(Test2);
+} // namespace
+
+void Func(Test2* test2)
+{
+    // 正常情况下，如果t离开了作用域（Func()函数执行完毕）t就会被析构
+    // 但是既想让t不析构，又想让Test2中保存的Test类型成员变量是裸指针
+    // 可以在SetTest()函数中调用t的Register函数，让引用计数加1
+    // Test2析构的时候需要调用UnRegister函数，将引用计数减1
+    vtkSmartPointer<Test> t = vtkSmartPointer<Test>::New();
+    std::cout << t << '\t' << t->GetReferenceCount() << '\n';
+    test2->SetTest(t);
+    std::cout << t << '\t' << t->GetReferenceCount() << '\n';
+}
+
+int main()
+{
+    {
+        vtkSmartPointer<Test2> test2 = vtkSmartPointer<Test2>::New();
+        Func(test2);
+        std::cout << test2->GetTest() << '\t' << test2->GetTest()->GetReferenceCount() << '\n';
+    }
+}
+
+#endif // TESt8
