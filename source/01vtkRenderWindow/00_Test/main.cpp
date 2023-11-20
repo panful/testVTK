@@ -12,7 +12,7 @@
  * vtkSmartPointer vtkObject vtkCommand vtkTimeStamp vtkDataArray vtkDataObject vtkAlgorithm
  */
 
-#define TEST8
+#define TEST2
 
 #ifdef TEST1
 
@@ -98,6 +98,7 @@ int main(int, char*[])
 
 #ifdef TEST2
 
+#include <vector>
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
 #include <vtkSmartPointer.h>
@@ -138,6 +139,12 @@ Test* Create()
 vtkSmartPointer<Test> Create2()
 {
     auto t = vtkSmartPointer<Test>::New();
+    return t;
+}
+
+Test* Create3()
+{
+    vtkNew<Test> t;
     return t;
 }
 
@@ -194,6 +201,17 @@ int main(int, char*[])
     {
         // 不能正确释放
         vtkSmartPointer<Test> t = Test::New();
+    }
+
+    std::cout << "-------------------------\n";
+
+    {
+        std::cout << "+++\n";
+        auto t = Create3();
+        std::cout << "+++\n";
+        // std::vector<vtkSmartPointer<Test>> ts;
+        // ts.emplace_back(t); // 崩溃，Create3返回的裸指针已经被析构了
+        std::cout << "+++\n";
     }
 
     return 0;
