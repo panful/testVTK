@@ -10,10 +10,11 @@
  * 301 vtkGlyph2D 官方示例 vtkGlyph2D继承自vtkGlyph3D
  * 302 vtkGlyph3D 常用函数，设置标签的大小、方向、颜色
  * 303 vtkGlyph3DMapper vtkGlyph3D 在GPU上计算的版本
- *
+ * 304
+ * 305
  * 306 矢量图标签大小范围设置，避免标签图形过大或过小
  * 307 动态开启关闭矢量图颜色映射
- * 308 官方例子，球面法向量 矢量图
+ * 308
  * 309 线框网格矢量图箭头方向，箭头起始段末端翻转，闭合多边形的内法线、外法线
  *
  * 500 粒子追踪（迹线）
@@ -26,15 +27,16 @@
  * 603 流线生成需要的数据
  * 604 vtkHyperStreamline
  *
- * 700 vtkContourFilter 等值线 
+ * 700 vtkContourFilter 等值线
  * 701 vtkContourFilter 等值面 vtkSampleFunction使用采样函数提取等值面
  * 702 vtkFlyingEdges3D 从体素数据提取等值面(isosurfaces)
  * 703 vtkContourTriangulator 将等值线包裹的区域转换为三角形网格
  * 704 vtkBandedPolyDataContourFilter 生成带状轮廓，将顶点的数据(Scalars)处于某一指定范围的区域生成多个单元（多边形带）
  * 705 vtkContourGrid 用于非机构化网格生成等值线/等值面
+ * 706 vtkContourFilter 等值线和云图结合
  */
 
-#define TEST705
+#define TEST706
 
 #ifdef TEST100
 
@@ -1689,6 +1691,10 @@ int main(int, char*[])
                 continue;
             }
 
+            // 01_15_401 多边形每条边的外法线
+            // 直线和平面的外法线向量 https://zhuanlan.zhihu.com/p/272517099
+            // 线段右边的法线 Normal_right = (y2-y1, x1-x2);
+            // 线段左边的法线 Normal_left  = (y1-y2, x2-x1);
             centerVectors->InsertNextTuple3(dir, -dir * (lineVector[0] / lineVector[1]), 0.0);
         }
 
@@ -1752,6 +1758,7 @@ int main(int, char*[])
         arrow->SetInvert(true); // 将箭头的起始端和末端翻转
         arrow->Update();
 
+        // 绕Z轴旋转180度
         vtkNew<vtkTransform> transform;
         transform->RotateZ(180);
         transform->Update();
@@ -3072,7 +3079,7 @@ int main(int, char*[])
     c2p->PassCellDataOff();
     c2p->Update();
 
-    vtkPolyData::SafeDownCast(c2p->GetOutput())->SetPolys(nullptr);
+    // vtkPolyData::SafeDownCast(c2p->GetOutput())->SetPolys(nullptr);
     c2p->GetOutput()->Print(std::cout);
 
     vtkNew<vtkLookupTable> hueLut;
@@ -3088,7 +3095,7 @@ int main(int, char*[])
     filter->Update();
 
     auto out = filter->GetOutput();
-    //out->Print(std::cout);
+    // out->Print(std::cout);
 
     //---------------------------------------------------------
     vtkNew<vtkPolyDataMapper> mapper;
@@ -3561,3 +3568,125 @@ int main()
     vtkNew<vtkContourGrid> contour;
 }
 #endif // TEST705
+
+#ifdef TEST706
+
+#include <vtkActor.h>
+#include <vtkCellData.h>
+#include <vtkCellDataToPointData.h>
+#include <vtkContourFilter.h>
+#include <vtkDataSetMapper.h>
+#include <vtkDoubleArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkScalarBarActor.h>
+#include <vtkSmartPointer.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkPoints> points;
+    for (size_t i = 0; i < 10; i++)
+    {
+        points->InsertNextPoint(static_cast<double>(i) + 0., 0., 0.);
+        points->InsertNextPoint(static_cast<double>(i) + 1., 1., 0.);
+        points->InsertNextPoint(static_cast<double>(i) + 0., 2., 0.);
+        points->InsertNextPoint(static_cast<double>(i) + 1., 3., 0.);
+    }
+
+    vtkNew<vtkCellArray> cells;
+    for (vtkIdType i = 0; i < 33; i += 4)
+    {
+        cells->InsertNextCell({ i + 0, i + 1, i + 5, i + 4 });
+        cells->InsertNextCell({ i + 1, i + 2, i + 6, i + 5 });
+        cells->InsertNextCell({ i + 2, i + 3, i + 7, i + 6 });
+    }
+
+    vtkNew<vtkDoubleArray> scalars;
+    for (vtkIdType i = 0; i < 10; ++i)
+    {
+        scalars->InsertNextValue(static_cast<double>(i));
+        scalars->InsertNextValue(static_cast<double>(i));
+        scalars->InsertNextValue(static_cast<double>(i));
+        scalars->InsertNextValue(static_cast<double>(i));
+    }
+
+    double range[2] {};
+    scalars->GetRange(range);
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+    polyData->GetPointData()->SetScalars(scalars);
+
+    vtkNew<vtkLookupTable> hueLut;
+    hueLut->SetNumberOfColors(20);
+    hueLut->SetNumberOfTableValues(20);
+    hueLut->SetHueRange(0.0, 0.67);
+    hueLut->Build();
+
+    // 输入数据必须是格点，即顶点上有Scalars/Vectors数据
+    vtkNew<vtkContourFilter> filter;
+    filter->SetInputData(polyData);
+    filter->GenerateValues(21, range);
+    filter->Update();
+
+    //---------------------------------------------------------
+    vtkNew<vtkDataSetMapper> mapper_line;
+    mapper_line->SetInputData(filter->GetOutput());
+    mapper_line->ScalarVisibilityOff();
+    // mapper_line->SetLookupTable(hueLut);
+    // mapper_line->InterpolateScalarsBeforeMappingOn();
+    // mapper_line->SetScalarRange(range);
+    mapper_line->SetRelativeCoincidentTopologyLineOffsetParameters(0, -1.e4); // 深度偏移
+
+    vtkNew<vtkActor> actor_line;
+    actor_line->SetMapper(mapper_line);
+    actor_line->GetProperty()->SetColor(0., 0., 0.);
+    actor_line->GetProperty()->SetLineWidth(2.f);
+
+    //---------------------------------------------------------
+    vtkNew<vtkPolyDataMapper> mapper_polydata;
+    mapper_polydata->SetInputData(polyData);
+    mapper_polydata->ScalarVisibilityOn();
+    mapper_polydata->SetLookupTable(hueLut);
+    mapper_polydata->SetScalarRange(range);
+    mapper_polydata->InterpolateScalarsBeforeMappingOff();
+
+    vtkNew<vtkActor> actor_polydata;
+    actor_polydata->SetMapper(mapper_polydata);
+
+    //---------------------------------------------------------
+    vtkNew<vtkScalarBarActor> scalarBar;
+    scalarBar->SetLookupTable(hueLut);
+    scalarBar->SetMaximumNumberOfColors(20);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor_polydata);
+    renderer->AddActor(actor_line);
+    renderer->AddActor2D(scalarBar);
+    renderer->SetBackground(.1, .3, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->SetSize(800, 600);
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST706

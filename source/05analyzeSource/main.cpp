@@ -10,7 +10,7 @@
  * 8. 多个vtkRenderer，多个图层，让后面的vtkRenderer始终在之前的上面
  * 9. vtk自定义的始终在最上层的图元
  * 10.拾取vtkProp vtkPropPicker
- * 11.顺序无关透明
+ * 11.顺序无关透明，深度剥离
  */
 
 #define TEST11
@@ -1027,7 +1027,7 @@ int main(int argc, char* argv[])
 #include <vtkActor.h>
 #include <vtkCamera.h>
 #include <vtkCellArray.h>
-#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
@@ -1036,174 +1036,148 @@ int main(int argc, char* argv[])
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 
-#include <iostream>
+namespace {
+void AddActor(vtkRenderer* renderer)
+{
+    {
+        vtkNew<vtkPoints> points;
+        points->InsertNextPoint(-0.5, 0.5, 0.2);
+        points->InsertNextPoint(-0.5, -0.5, 0.2);
+        points->InsertNextPoint(0.5, -0.5, 0.2);
+        points->InsertNextPoint(0.5, 0.5, 0.2);
+        points->InsertNextPoint(-0.5, 0.5, -0.2);
+        points->InsertNextPoint(-0.5, -0.5, -0.2);
+        points->InsertNextPoint(0.5, -0.5, -0.2);
+        points->InsertNextPoint(0.5, 0.5, -0.2);
 
-/*
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0, 1, 2, 3 });
+        cells->InsertNextCell({ 4, 5, 6, 7 });
+
+        vtkNew<vtkPolyData> polyData;
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(1, 0, 0);
+        actor->GetProperty()->SetOpacity(.5);
+        actor->GetProperty()->LightingOff();
+
+        renderer->AddActor(actor);
+    }
+
+    {
+        vtkNew<vtkPoints> points;
+        points->InsertNextPoint(-0.5, 0.5, 0.0);
+        points->InsertNextPoint(-0.5, -0.5, 0.0);
+        points->InsertNextPoint(0.5, -0.5, 0.0);
+        points->InsertNextPoint(0.5, 0.5, 0.0);
+
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0, 1, 2, 3 });
+
+        vtkNew<vtkPolyData> polyData;
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(0, 1, 0);
+        actor->GetProperty()->SetOpacity(.5);
+        actor->GetProperty()->LightingOff();
+
+        renderer->AddActor(actor);
+    }
+
+    {
+        vtkNew<vtkPoints> points;
+        points->InsertNextPoint(0.0, 0.5, -0.5);
+        points->InsertNextPoint(0.0, -0.5, -0.5);
+        points->InsertNextPoint(0.0, -0.5, 0.5);
+        points->InsertNextPoint(0.0, 0.5, 0.5);
+
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0, 1, 2, 3 });
+
+        vtkNew<vtkPolyData> polyData;
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(0, 0, 1);
+        actor->GetProperty()->SetOpacity(.5);
+        actor->GetProperty()->LightingOff();
+
+        renderer->AddActor(actor);
+    }
+
+    {
+        vtkNew<vtkPoints> points;
+        points->InsertNextPoint(0.2, 0.5, -0.5);
+        points->InsertNextPoint(0.2, -0.5, -0.5);
+        points->InsertNextPoint(0.2, -0.5, 0.5);
+        points->InsertNextPoint(0.2, 0.5, 0.5);
+
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0, 1, 2, 3 });
+
+        vtkNew<vtkPolyData> polyData;
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(0, 0, 1);
+        actor->GetProperty()->LightingOff();
+
+        renderer->AddActor(actor);
+    }
+}
+} // namespace
+
+/**
+ * 默认使用的是alpha blending(alpha 混合)
  * 调用glDepthMask(GL_TRUE)先渲染不透明的vtkActor，再使用顺序无关透明渲染透明的vtkActor
  * uniform opacityUniform
  * gl_FragDepth
+ * 
+ * 使用深度剥离 https://vtk.org/Wiki/VTK/Depth_Peeling
  */
 
 int main()
 {
     vtkNew<vtkRenderer> renderer;
+    renderer->UseDepthPeelingOn();
+    renderer->SetMaximumNumberOfPeels(100);
+    renderer->SetOcclusionRatio(0.1);
+    AddActor(renderer);
 
-    // 红色
-    {
-        vtkNew<vtkPolyData> polyData;
-        vtkNew<vtkPoints> points;
-        vtkNew<vtkCellArray> cells;
-
-        points->InsertNextPoint(.9f, .6f, -.5f);
-        points->InsertNextPoint(.9f, .5f, -.5f);
-        points->InsertNextPoint(-.9f, .6f, .5f);
-        points->InsertNextPoint(-.9f, .5f, .5f);
-        cells->InsertNextCell({ 0, 1, 3, 2 });
-
-        polyData->SetPoints(points);
-        polyData->SetPolys(cells);
-
-        // mapper
-        vtkNew<vtkPolyDataMapper> mapper;
-        mapper->SetInputData(polyData);
-
-        // actor
-        vtkNew<vtkActor> actor;
-        actor->SetMapper(mapper);
-        actor->GetProperty()->SetColor(1, 0, 0);
-        actor->GetProperty()->SetOpacity(.5);
-
-        renderer->AddActor(actor);
-    }
-    // 绿色
-    {
-        vtkNew<vtkPolyData> polyData;
-        vtkNew<vtkPoints> points;
-        vtkNew<vtkCellArray> cells;
-
-        points->InsertNextPoint(-.9f, .9f, -.5f);
-        points->InsertNextPoint(-.9f, .7f, -.5f);
-        points->InsertNextPoint(.5f, -.7f, .5f);
-        points->InsertNextPoint(.5f, -.9f, .5f);
-        cells->InsertNextCell({ 0, 1, 3, 2 });
-
-        polyData->SetPoints(points);
-        polyData->SetPolys(cells);
-
-        // mapper
-        vtkNew<vtkPolyDataMapper> mapper;
-        mapper->SetInputData(polyData);
-
-        // actor
-        vtkNew<vtkActor> actor;
-        actor->SetMapper(mapper);
-        actor->GetProperty()->SetColor(0, 1, 0);
-        actor->GetProperty()->SetOpacity(.5);
-
-        renderer->AddActor(actor);
-    }
-    // 蓝色
-    {
-        vtkNew<vtkPolyData> polyData;
-        vtkNew<vtkPoints> points;
-        vtkNew<vtkCellArray> cells;
-
-        points->InsertNextPoint(-.5f, -.7f, -.5f);
-        points->InsertNextPoint(-.5f, -.9f, -.5f);
-        points->InsertNextPoint(.9f, .9f, .5f);
-        points->InsertNextPoint(.9f, .7f, .5f);
-        cells->InsertNextCell({ 0, 1, 3, 2 });
-
-        polyData->SetPoints(points);
-        polyData->SetPolys(cells);
-
-        // mapper
-        vtkNew<vtkPolyDataMapper> mapper;
-        mapper->SetInputData(polyData);
-
-        // actor
-        vtkNew<vtkActor> actor;
-        actor->SetMapper(mapper);
-        actor->GetProperty()->SetColor(0, 0, 1);
-        actor->GetProperty()->SetOpacity(.5);
-
-        renderer->AddActor(actor);
-    }
-    // 上面的不透明红色
-    {
-        vtkNew<vtkPolyData> polyData;
-        vtkNew<vtkPoints> points;
-        vtkNew<vtkCellArray> cells;
-
-        points->InsertNextPoint(.9f, .2f, .5f);
-        points->InsertNextPoint(.9f, .1f, .5f);
-        points->InsertNextPoint(-.9f, .2f, .5f);
-        points->InsertNextPoint(-.9f, .1f, .5f);
-        cells->InsertNextCell({ 0, 1, 3, 2 });
-
-        polyData->SetPoints(points);
-        polyData->SetPolys(cells);
-
-        // mapper
-        vtkNew<vtkPolyDataMapper> mapper;
-        mapper->SetInputData(polyData);
-
-        // actor
-        vtkNew<vtkActor> actor;
-        actor->SetMapper(mapper);
-        actor->GetProperty()->SetColor(1, 0, 0);
-        // actor->GetProperty()->SetOpacity(1.);
-
-        renderer->AddActor(actor);
-    }
-    // 下面的不透明红色
-    {
-        vtkNew<vtkPolyData> polyData;
-        vtkNew<vtkPoints> points;
-        vtkNew<vtkCellArray> cells;
-
-        points->InsertNextPoint(.9f, -.5f, -.5f);
-        points->InsertNextPoint(.9f, -.6f, -.5f);
-        points->InsertNextPoint(-.9f, -.5f, -.5f);
-        points->InsertNextPoint(-.9f, -.6f, -.5f);
-        cells->InsertNextCell({ 0, 1, 3, 2 });
-
-        polyData->SetPoints(points);
-        polyData->SetPolys(cells);
-
-        // mapper
-        vtkNew<vtkPolyDataMapper> mapper;
-        mapper->SetInputData(polyData);
-
-        // actor
-        vtkNew<vtkActor> actor;
-        actor->SetMapper(mapper);
-        actor->GetProperty()->SetColor(1, 0, 0);
-        // actor->GetProperty()->SetOpacity(1.0);
-
-        renderer->AddActor(actor);
-    }
-
-    renderer->SetBackground(1, 1, 1);
-    renderer->GetActiveCamera()->SetPosition(0, 0, 5);
-    renderer->GetActiveCamera()->SetViewUp(0, 1, 0);
-    renderer->GetActiveCamera()->SetFocalPoint(0, 0, 0);
-    renderer->GetActiveCamera()->ParallelProjectionOn();
-
-    // RenderWindow
     vtkNew<vtkRenderWindow> renWin;
+    renWin->AlphaBitPlanesOn();
+    renWin->SetMultiSamples(0);
     renWin->AddRenderer(renderer);
     renWin->SetSize(800, 600);
 
-    // RenderWindowInteractor
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
 
-    // interactor syle
-    vtkNew<vtkInteractorStyleRubberBand3D> style;
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
     iren->SetInteractorStyle(style);
 
-    // 数据交互
     renWin->Render();
     iren->Start();
 
