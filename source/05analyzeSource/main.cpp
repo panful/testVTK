@@ -15,7 +15,7 @@
  * 13.同一个面的正面和背面设置不同的属性
  */
 
-#define TEST13
+#define TEST11
 
 #ifdef TEST1
 
@@ -1030,6 +1030,7 @@ int main(int argc, char* argv[])
 #include <vtkCamera.h>
 #include <vtkCellArray.h>
 #include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkOpenGLPolyDataMapper.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
@@ -1037,41 +1038,61 @@ int main(int argc, char* argv[])
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
+#include <vtkShaderProgram.h>
 
 namespace {
-void AddActor(vtkRenderer* renderer)
+
+class MyMapper : public vtkOpenGLPolyDataMapper
 {
+public:
+    static MyMapper* New();
+    vtkTypeMacro(MyMapper, vtkOpenGLPolyDataMapper);
+
+    void PrintShaderSource()
     {
-        vtkNew<vtkPoints> points;
-        points->InsertNextPoint(-0.5, 0.5, 0.2);
-        points->InsertNextPoint(-0.5, -0.5, 0.2);
-        points->InsertNextPoint(0.5, -0.5, 0.2);
-        points->InsertNextPoint(0.5, 0.5, 0.2);
-        points->InsertNextPoint(-0.5, 0.5, -0.2);
-        points->InsertNextPoint(-0.5, -0.5, -0.2);
-        points->InsertNextPoint(0.5, -0.5, -0.2);
-        points->InsertNextPoint(0.5, 0.5, -0.2);
+        for (size_t i = 0; i < PrimitiveEnd; ++i)
+        {
+            if (auto program = this->Primitives[i].Program)
+            {
+                auto vs = program->GetVertexShader()->GetSource();
+                std::cout << vs << std::endl;
+                auto fs = program->GetFragmentShader()->GetSource();
+                std::cout << fs << std::endl;
+            }
+        }
+    }
+};
 
-        vtkNew<vtkCellArray> cells;
-        cells->InsertNextCell({ 0, 1, 2, 3 });
-        cells->InsertNextCell({ 4, 5, 6, 7 });
+vtkStandardNewMacro(MyMapper);
 
-        vtkNew<vtkPolyData> polyData;
-        polyData->SetPoints(points);
-        polyData->SetPolys(cells);
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
 
-        vtkNew<vtkPolyDataMapper> mapper;
-        mapper->SetInputData(polyData);
-
-        vtkNew<vtkActor> actor;
-        actor->SetMapper(mapper);
-        actor->GetProperty()->SetColor(1, 0, 0);
-        actor->GetProperty()->SetOpacity(.5);
-        actor->GetProperty()->LightingOff();
-
-        renderer->AddActor(actor);
+    void SetActor(vtkActor* a)
+    {
+        m_actor = a;
     }
 
+protected:
+    void OnLeftButtonUp() override
+    {
+        MyMapper::SafeDownCast(m_actor->GetMapper())->PrintShaderSource();
+        Superclass::OnLeftButtonUp();
+    }
+
+private:
+    vtkActor* m_actor { nullptr };
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+namespace {
+vtkActor* AddActor(vtkRenderer* renderer)
+{
     {
         vtkNew<vtkPoints> points;
         points->InsertNextPoint(-0.5, 0.5, 0.0);
@@ -1086,12 +1107,12 @@ void AddActor(vtkRenderer* renderer)
         polyData->SetPoints(points);
         polyData->SetPolys(cells);
 
-        vtkNew<vtkPolyDataMapper> mapper;
+        vtkNew<MyMapper> mapper;
         mapper->SetInputData(polyData);
 
         vtkNew<vtkActor> actor;
         actor->SetMapper(mapper);
-        actor->GetProperty()->SetColor(0, 1, 0);
+        actor->GetProperty()->SetColor(1., 0., 0.);
         actor->GetProperty()->SetOpacity(.5);
         actor->GetProperty()->LightingOff();
 
@@ -1112,41 +1133,18 @@ void AddActor(vtkRenderer* renderer)
         polyData->SetPoints(points);
         polyData->SetPolys(cells);
 
-        vtkNew<vtkPolyDataMapper> mapper;
+        vtkNew<MyMapper> mapper;
         mapper->SetInputData(polyData);
 
         vtkNew<vtkActor> actor;
         actor->SetMapper(mapper);
-        actor->GetProperty()->SetColor(0, 0, 1);
+        actor->GetProperty()->SetColor(0., 1., 0.);
         actor->GetProperty()->SetOpacity(.5);
         actor->GetProperty()->LightingOff();
 
         renderer->AddActor(actor);
-    }
 
-    {
-        vtkNew<vtkPoints> points;
-        points->InsertNextPoint(0.2, 0.5, -0.5);
-        points->InsertNextPoint(0.2, -0.5, -0.5);
-        points->InsertNextPoint(0.2, -0.5, 0.5);
-        points->InsertNextPoint(0.2, 0.5, 0.5);
-
-        vtkNew<vtkCellArray> cells;
-        cells->InsertNextCell({ 0, 1, 2, 3 });
-
-        vtkNew<vtkPolyData> polyData;
-        polyData->SetPoints(points);
-        polyData->SetPolys(cells);
-
-        vtkNew<vtkPolyDataMapper> mapper;
-        mapper->SetInputData(polyData);
-
-        vtkNew<vtkActor> actor;
-        actor->SetMapper(mapper);
-        actor->GetProperty()->SetColor(0, 0, 1);
-        actor->GetProperty()->LightingOff();
-
-        renderer->AddActor(actor);
+        return actor;
     }
 }
 } // namespace
@@ -1158,6 +1156,7 @@ void AddActor(vtkRenderer* renderer)
  * gl_FragDepth
  *
  * 使用深度剥离 https://vtk.org/Wiki/VTK/Depth_Peeling
+ * CPU深度排序 vtkDepthSortPolyData https://examples.vtk.org/site/Cxx/Visualization/CorrectlyRenderTranslucentGeometry/
  */
 
 int main()
@@ -1166,7 +1165,7 @@ int main()
     renderer->UseDepthPeelingOn();
     renderer->SetMaximumNumberOfPeels(100);
     renderer->SetOcclusionRatio(0.1);
-    AddActor(renderer);
+    auto actor = AddActor(renderer);
 
     vtkNew<vtkRenderWindow> renWin;
     renWin->AlphaBitPlanesOn();
@@ -1177,7 +1176,8 @@ int main()
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
 
-    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<MyStyle> style;
+    style->SetActor(actor);
     iren->SetInteractorStyle(style);
 
     renWin->Render();
