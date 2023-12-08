@@ -21,7 +21,7 @@
 // https://blog.csdn.net/liushao1031177/article/details/116903698
 // https://www.cnblogs.com/ybqjymy/p/13925462.html
 
-#define TEST6
+#define TEST88
 
 #ifdef TEST1
 
@@ -85,8 +85,8 @@ int main(int, char* [])
     actor->SetMapper(mapper);
 
     vtkNew<vtkLegendScaleActor> scale;
-    scale->BottomAxisVisibilityOff();//下面的比例尺不显示
-    scale->LeftAxisVisibilityOff();  //左边比例尺不显示
+    scale->BottomAxisVisibilityOff();
+    scale->LeftAxisVisibilityOff();
     scale->RightAxisVisibilityOff();
     scale->TopAxisVisibilityOff();
 
@@ -221,18 +221,11 @@ int main(int, char* [])
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
 
-    // 比例尺
     vtkNew<vtkLegendScaleActor> scaleActor;
-    scaleActor->BottomAxisVisibilityOff();//下面的比例尺不显示
-    scaleActor->LeftAxisVisibilityOff();  //左边比例尺不显示
+    scaleActor->BottomAxisVisibilityOff();
+    scaleActor->LeftAxisVisibilityOff();
     scaleActor->RightAxisVisibilityOff();
     scaleActor->TopAxisVisibilityOff();
-    //scaleActor->GetBounds();
-    //scaleActor->GetCornerOffsetFactorMaxValue();
-    //scaleActor->GetCornerOffsetFactorMinValue();
-    //scaleActor->GetCornerOffsetFactor();
-    //scaleActor->GetLabelModeMaxValue();
-    //scaleActor->GetLabelModeMinValue();
     scaleActor->GetLegendLabelProperty();
     scaleActor->GetLegendTitleProperty()->SetColor(1, 0, 0);
     scaleActor->SetLegendVisibility(true);
@@ -1270,8 +1263,8 @@ vtkStandardNewMacro(CustomStyle);
 int main(int, char* [])
 {
     vtkNew<vtkLegendScaleActor> scale;
-    scale->BottomAxisVisibilityOff();//下面的比例尺不显示
-    scale->LeftAxisVisibilityOff();  //左边比例尺不显示
+    scale->BottomAxisVisibilityOff();
+    scale->LeftAxisVisibilityOff();
     scale->RightAxisVisibilityOff();
     scale->TopAxisVisibilityOff();
 
@@ -3567,10 +3560,9 @@ vtkSmartPointer<vtkActor> GenActorPoint(double x, double y, double z)
 
 int main(int, char* [])
 {
-    // 比例尺
     vtkNew<vtkLegendScaleActor> scaleActor;
-    scaleActor->BottomAxisVisibilityOff();//下面的比例尺不显示
-    scaleActor->LeftAxisVisibilityOff();  //左边比例尺不显示
+    scaleActor->BottomAxisVisibilityOff();
+    scaleActor->LeftAxisVisibilityOff();
     scaleActor->RightAxisVisibilityOff();
     scaleActor->TopAxisVisibilityOff();
 
@@ -3846,8 +3838,8 @@ int main(int, char* [])
     auto bounds4_2 = actor2->GetBounds();
 
     vtkNew<vtkLegendScaleActor> scale;
-    scale->BottomAxisVisibilityOff();//下面的比例尺不显示
-    scale->LeftAxisVisibilityOff();  //左边比例尺不显示
+    scale->BottomAxisVisibilityOff();
+    scale->LeftAxisVisibilityOff();
     scale->RightAxisVisibilityOff();
     scale->TopAxisVisibilityOff();
 

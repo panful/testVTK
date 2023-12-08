@@ -38,7 +38,6 @@
 25.多边形三角化，减少三角形的数量，图像和原来保持不变
 26.纹理，光照
 
-31.比例尺(vtkLegendScaleActor)
 32.
 33.vtkMaskPoints 对输入的数据进行挑拣筛选
 
@@ -1117,8 +1116,6 @@ int main(int, char*[])
 }
 
 #endif // TEST11
-
-
 
 #ifdef TEST13
 
@@ -2220,98 +2217,7 @@ int main()
 
 #endif // TEST26
 
-#ifdef TEST31
 
-#include <vtkActor.h>
-#include <vtkLegendScaleActor.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkParametricEnneper.h>
-#include <vtkParametricFunctionSource.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkShaderProperty.h>
-#include <vtkTextProperty.h>
-
-int main(int, char*[])
-{
-    vtkNew<vtkNamedColors> colors;
-
-    // The next source will be a parametric function
-    vtkNew<vtkParametricEnneper> src;
-    vtkNew<vtkParametricFunctionSource> fnSrc;
-    fnSrc->SetParametricFunction(src);
-
-    // Create a mapper and actor
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputConnection(fnSrc->GetOutputPort());
-    vtkNew<vtkActor> actor;
-    actor->SetMapper(mapper);
-    actor->GetProperty()->SetColor(colors->GetColor3d("MistyRose").GetData());
-
-    // Create a renderer, render window, and interactor
-    vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("LegendScaleActor");
-
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-
-    vtkNew<vtkLegendScaleActor> legendScaleActor;
-    // 位置可以通过继承vtkLegendScaleActor并重新实现BuildRepresentation方法并修改LabelActors的坐标来修改
-    // legendScaleActor->LegendVisibilityOff();  //主比例尺不显示
-    // legendScaleActor->VisibilityOff();        // 所有都不显示
-    // legendScaleActor->BottomAxisVisibilityOff();//下面的比例尺不显示
-    // legendScaleActor->LeftAxisVisibilityOff();  //左边比例尺不显示
-    // legendScaleActor->RightAxisVisibilityOff();
-    // legendScaleActor->TopAxisVisibilityOff();
-
-    // legendScaleActor->SetLabelMode(); //设置比例尺标签模式
-    // legendScaleActor->SetLabelModeToXYCoordinates();
-    // legendScaleActor->SetLabelModeToDistance();
-
-    // legendScaleActor->UseBoundsOff();
-    // legendScaleActor->SetAllocatedRenderTime();
-    // legendScaleActor->SetCornerOffsetFactor(0);//设置四个次比例尺相交距离
-    // legendScaleActor->SetTopBorderOffset(0); //设置上比例尺到窗口边缘的距离
-    // legendScaleActor->SetDragable(false);  //和拖动有关，默认为true
-    // legendScaleActor->SetEstimatedRenderTime();
-    // legendScaleActor->SetMemkindDirectory("sss");
-    // vtkNew<vtkShaderProperty> shaderProperty;
-    // legendScaleActor->SetShaderProperty(shaderProperty); //设置着色器属性
-    // legendScaleActor->SetRenderTimeMultiplier();
-    // legendScaleActor->SetPropertyKeys();
-
-    // legendScaleActor->GetLegendLabelProperty()->SetColor(1, 0, 0); //标签文本属性
-    // legendScaleActor->GetLegendTitleProperty()->SetColor(0, 1, 0); //标题文本属性
-    // legendScaleActor->GetLegendTitleProperty()->SetFontSize(legendScaleActor->GetLegendLabelProperty()->GetFontSize() * 10);
-    // legendScaleActor->GetLegendLabelProperty()->SetFontSize(legendScaleActor->GetLegendLabelProperty()->GetFontSize() * 2);
-    // legendScaleActor->GetLegendTitleProperty()->SetLineOffset(100);
-    // legendScaleActor->GetLegendLabelProperty()->SetLineOffset(-250);
-
-    // vtkNew<vtkPropCollection> propCollection;
-    // legendScaleActor->GetActors(propCollection);
-    // auto bound = legendScaleActor->GetBounds();
-
-    // Add the actor to the scene
-    renderer->AddActor(actor);
-    renderer->AddActor(legendScaleActor);
-
-    renderer->SetBackground(colors->GetColor3d("RoyalBlue").GetData());
-
-    // Render and interact
-    renderWindow->Render();
-    renderWindowInteractor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST31
 
 #ifdef TEST33
 
@@ -2932,7 +2838,6 @@ int main(int, char*[])
 }
 
 #endif // TEST45
-
 
 #ifdef TEST51
 
