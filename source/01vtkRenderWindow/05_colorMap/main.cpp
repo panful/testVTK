@@ -35,9 +35,10 @@
  * 705 vtkContourGrid 用于非机构化网格生成等值线/等值面
  * 706 对四边形构成的网格求等值线，绘制四边形网格云图，等值线和实际的云图颜色对应不上
  * 707 vtkBandedPolyDataContourFilter 等值区域、等值线、网格边框
+ * 708 云图动画，通过动态修改Scalar改变云图的颜色映射
  */
 
-#define TEST707
+#define TEST708
 
 #ifdef TEST100
 
@@ -3649,12 +3650,7 @@ int main(int, char*[])
 #include <random>
 #include <vtkActor.h>
 #include <vtkBandedPolyDataContourFilter.h>
-#include <vtkCellData.h>
-#include <vtkCellDataToPointData.h>
-#include <vtkContourFilter.h>
-#include <vtkContourTriangulator.h>
 #include <vtkDataSetMapper.h>
-#include <vtkDelaunay2D.h>
 #include <vtkDoubleArray.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkLookupTable.h>
@@ -3666,7 +3662,6 @@ int main(int, char*[])
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 #include <vtkScalarBarActor.h>
-#include <vtkSmartPointer.h>
 
 int main(int, char*[])
 {
@@ -3784,3 +3779,180 @@ int main(int, char*[])
 }
 
 #endif // TEST707
+
+#ifdef TEST708
+
+#include <bitset>
+#include <random>
+#include <thread>
+#include <vtkActor.h>
+#include <vtkBandedPolyDataContourFilter.h>
+#include <vtkDataSetMapper.h>
+#include <vtkDoubleArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLookupTable.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkScalarBarActor.h>
+
+namespace {
+class Style : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static Style* New();
+    vtkTypeMacro(Style, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnMiddleButtonDown() override
+    {
+        Superclass::OnMiddleButtonDown();
+
+        if (this->Interactor)
+        {
+            // 原来Scalars的每个值都加一，总共循环100次
+            std::bitset<100> opera;
+            for (size_t i = 0; i < 100; ++i)
+            {
+                vtkNew<vtkDoubleArray> new_scalars;
+                vtkDoubleArray* scalars = vtkDoubleArray::SafeDownCast(m_polyData->GetPointData()->GetScalars());
+                new_scalars->SetNumberOfValues(scalars->GetNumberOfValues());
+                for (vtkIdType j = 0; j < scalars->GetNumberOfValues(); ++j)
+                {
+                    auto value = scalars->GetValue(j);
+                    if (value + 1. > 100.)
+                    {
+                        opera.set(j, true);
+                    }
+
+                    if (!opera.test(j))
+                    {
+                        value += 1.;
+                    }
+                    else
+                    {
+                        value -= 1.;
+                    }
+
+                    new_scalars->SetValue(j, value);
+                }
+
+                m_polyData->GetPointData()->SetScalars(new_scalars);
+
+                vtkNew<vtkBandedPolyDataContourFilter> filter;
+                filter->SetInputData(m_polyData);
+                filter->GenerateValues(21, 0., 100.);
+                filter->Update();
+
+                m_mapper->SetInputData(filter->GetOutput());
+
+                this->Interactor->Render();
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
+        }
+    }
+
+    void SetPolyData(vtkPolyData* poly)
+    {
+        m_polyData = poly;
+    }
+
+    void SetMapper(vtkDataSetMapper* mapper)
+    {
+        m_mapper = mapper;
+    }
+
+private:
+    vtkSmartPointer<vtkPolyData> m_polyData { nullptr };
+    vtkSmartPointer<vtkDataSetMapper> m_mapper { nullptr };
+};
+
+vtkStandardNewMacro(Style);
+} // namespace
+
+int main(int, char*[])
+{
+    std::default_random_engine generator;
+    std::uniform_real_distribution<double> distribution(0., 100.);
+
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkDoubleArray> scalars;
+    for (size_t i = 0; i < 10; ++i)
+    {
+        for (size_t j = 0; j < 10; ++j)
+        {
+            points->InsertNextPoint(static_cast<double>(i), static_cast<double>(j), 0.);
+            scalars->InsertNextValue(distribution(generator));
+        }
+    }
+
+    vtkNew<vtkCellArray> cells;
+    for (vtkIdType i = 0; i < 9; ++i)
+    {
+        for (vtkIdType j = 0; j < 9; ++j)
+        {
+            cells->InsertNextCell({ i * 10 + j, i * 10 + j + 10, i * 10 + 11 + j, i * 10 + 1 + j });
+        }
+    }
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+    polyData->GetPointData()->SetScalars(scalars);
+
+    vtkNew<vtkLookupTable> hueLut;
+    hueLut->SetNumberOfColors(20);
+    hueLut->SetNumberOfTableValues(20);
+    hueLut->SetHueRange(0.0, 0.67);
+    hueLut->Build();
+
+    vtkNew<vtkBandedPolyDataContourFilter> filter;
+    filter->SetInputData(polyData);
+    filter->GenerateValues(21, 0., 100.);
+    filter->Update();
+
+    //---------------------------------------------------------
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(filter->GetOutput());
+    mapper->ScalarVisibilityOn();
+    mapper->SetLookupTable(hueLut);
+    mapper->SetScalarRange(0., 100.);
+    mapper->InterpolateScalarsBeforeMappingOn();
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    //---------------------------------------------------------
+    vtkNew<vtkScalarBarActor> scalarBar;
+    scalarBar->SetLookupTable(hueLut);
+    scalarBar->SetMaximumNumberOfColors(20);
+
+    //---------------------------------------------------------
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->AddActor2D(scalarBar);
+    renderer->SetBackground(.1, .3, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<Style> style;
+    style->SetPolyData(polyData);
+    style->SetMapper(mapper);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST708
