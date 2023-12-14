@@ -6,13 +6,14 @@
  * 4. AddObserver 使用lambda表达式和继承自vtkCommand
  * 5. vtk的观察者模式 AddObserver 实现方法
  * 6. vtkTimeStamp 记录数据修改的时间
- * 7. New基类，调用子类的函数
+ * 7. vtkNew基类，调用子类的函数
  * 8. class中的成员变量是裸指针，引用计数仍会加1，并不会被析构
+ * 9. 从 vtkActor vtkPolyDataMapper... 继承
  *
  * vtkSmartPointer vtkObject vtkCommand vtkTimeStamp vtkDataArray vtkDataObject vtkAlgorithm
  */
 
-#define TEST2
+#define TEST9
 
 #ifdef TEST1
 
@@ -665,3 +666,65 @@ int main()
 }
 
 #endif // TESt8
+
+#ifdef TEST9
+
+#include <vtkActor.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkOpenGLActor.h>
+
+namespace {
+class MyActor : public vtkOpenGLActor
+{
+public:
+    static MyActor* New();
+};
+
+vtkStandardNewMacro(MyActor);
+} // namespace
+
+// 如果MyActor直接从vtkActor继承，则不能正常绘制
+// 因为vtkNew<vtkActor>实际上new的是一个vtkOpenGLActor，详见TEST7的说明
+// vtkOpenGLActor重写了Render()函数，继承vtkActor时Render()函数不能正常调用
+// 类似的还有vtkPolyDataMapper vtkCamera等等，和OpenGL有关的都要注意继承的父类
+
+int main(int, char*[])
+{
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<MyActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST9
