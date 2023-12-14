@@ -4,11 +4,13 @@
  * 102. vtkDiskSource 圆盘
  * 103. vtkRegularPolygonSource 圆
  * 104. vtkArrowSource 箭头
+ * 105. vtkPointSource 生成一堆顶点
+ *
  * 201. vtkParametricSuperEllipsoid 超椭球体
  *
  */
 
-#define TEST104
+#define TEST105
 
 #ifdef TEST101
 
@@ -207,6 +209,62 @@ int main(int, char*[])
 }
 
 #endif // TEST103
+
+#ifdef TEST105
+
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPointSource.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+int main(int, char*[])
+{
+    // 在一个指定的球内部（或者外壳）上随机生成指定个数的顶点
+    vtkNew<vtkPointSource> source;
+    source->SetCenter(0.0, 0.0, 0.0);
+    source->SetNumberOfPoints(1000);    // 点的个数
+    source->SetDistributionToUniform(); // 球的内部均匀分布
+    source->SetDistributionToShell();   // 只有球的外壳上分布，内部没有
+    source->SetRadius(10.);             // 点云所在球的半径（不是点的半径，点就是一个点，没有半径）
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+    actor->GetProperty()->SetPointSize(5.f);
+
+    auto bounds = actor->GetBounds();
+    std::cout << bounds[0] << '\t' << bounds[1] << '\n' << bounds[2] << '\t' << bounds[3] << '\n' << bounds[4] << '\t' << bounds[5] << '\n';
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST105
 
 #ifdef TEST201
 
