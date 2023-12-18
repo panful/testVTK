@@ -2,6 +2,7 @@ set(target_name "01_09_image")
 
 find_package(VTK
     COMPONENTS
+        CommonColor
         CommonCore
         FiltersSources
         InteractionStyle
@@ -12,6 +13,11 @@ find_package(VTK
         IOImage         # vtkPostScriptWriter
         IOExport        # vtkExporter
         ImagingColor    # vtkImageLuminance
+        ImagingSources  # vtkImageCanvasSource2D
+        InteractionImage    # vtkImageViewer2
+        InteractionWidgets  # vtkWidgetRepresentation
+        RenderingImage      # vtkImageResliceMapper
+        ImagingMath         # vtkImageMagnitude
     QUIET
 )
 

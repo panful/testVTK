@@ -20,6 +20,7 @@ find_package(VTK
         FiltersExtraction               # vtkExtractPolyDataGeometry
         CommonComputationalGeometry     # vtkParametricSuperEllipsoid
         IOLegacy                        # vtkDataObjectWriter
+        IOImage                         # vtkJPEGWriter
     QUIET
 )
 

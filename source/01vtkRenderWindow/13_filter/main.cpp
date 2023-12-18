@@ -3,7 +3,7 @@
  * 002. 从经过 Filter 变换后的数据获取原始数据
  *
  * 101. vtkProbeFilter 探针的基础使用，探针某些时候插值的结果并不准确
- * 102. vtkGlyph3D vtkProbeFilter vtkSampleFunction vtkThreshold
+ * 102. vtkGlyph3D vtkProbeFilter vtkSampleFunction vtkThreshold 使用隐函数随机采样
  * 103. vtkPointInterpolator 插值，类似探针，比探针结果更准确
  *
  * 201. vtkWarpScalar vtkWarpVector 根据标量或向量值在指定方向对顶点进行偏移
@@ -32,13 +32,17 @@
  * 603. vtkDataSetToDataObjectFilter 将数据集(vtkDataSet)转换为数据对象(vtkDataObject)
  * 604. vtkDataObjectToDataSetFilter 将数据对象(vtkDataObject)转换为数据集(vtkDataSet) vtkFieldDataToAttributeDataFilter
  * 605. 序列化反序列化vtk数据
- * 
+ *
  * 701.vtkLODProp3D 对于绘制大型网格可以提高渲染效率
  * 702.decimation多边形削减、网格简化 vtkDecimate vtkDecimatePro vtkQuadricClustering vtkQuardricDecimation
  * 703.平滑过滤器 vtkWindowedSincPolyDataFilter vtkSmoothPolyDataFilter
+ *
+ * 801. vtkSampleFunction生成 vtkImageData 求等值面（几何数据）
+ * 802. vtkSampleFunction生成 vtkImageData 转几何数据
+ * 803. PerlinNoise 使用 vtkSampleFunction 生成噪声图片
  */
 
-#define TEST605
+#define TEST803
 
 #ifdef TEST001
 
@@ -400,9 +404,6 @@ int main(int, char*[])
 #include <vtkCone.h>
 #include <vtkDataSetMapper.h>
 #include <vtkGlyph3D.h>
-
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
 #include <vtkPointData.h>
 #include <vtkPointSource.h>
 #include <vtkProbeFilter.h>
@@ -420,7 +421,6 @@ int main(int, char*[])
 /*
  * https://kitware.github.io/vtk-examples/site/Cxx/Visualization/RandomProbe/
  *
- * vtkSampleFunction 用于将函数或隐式函数转换为VTK渲染或分析的数据结构
  * vtkThreshold 用于对数据集进行阈值处理，检测数据集的某个特定区域
  */
 
@@ -428,15 +428,15 @@ int main(int argc, char* argv[])
 {
     int resolution = 50;
 
-    // Create a sampled cone
+    // 用来采样的圆锥体，注意不是被采样的几何体
     vtkNew<vtkCone> implicitCone;
     implicitCone->SetAngle(30.0);
 
     double radius = 1.;
+    double xMin   = -radius * 2.0;
+    double xMax   = radius * 2.0;
     vtkNew<vtkSampleFunction> sampledCone;
     sampledCone->SetSampleDimensions(resolution, resolution, resolution);
-    double xMin = -radius * 2.0;
-    double xMax = radius * 2.0;
     sampledCone->SetModelBounds(xMin, xMax, xMin, xMax, xMin, xMax);
     sampledCone->SetImplicitFunction(implicitCone);
 
@@ -444,14 +444,17 @@ int main(int argc, char* argv[])
     thresholdCone->SetInputConnection(sampledCone->GetOutputPort());
     thresholdCone->SetLowerThreshold(0);
     thresholdCone->SetThresholdFunction(vtkThreshold::THRESHOLD_LOWER);
+    thresholdCone->Update();
 
+    // 被采样的几何体
     vtkNew<vtkPointSource> randomPoints;
     randomPoints->SetCenter(0.0, 0.0, 0.0);
     randomPoints->SetNumberOfPoints(10000);
     randomPoints->SetDistributionToUniform();
     randomPoints->SetRadius(xMax);
+    randomPoints->Update();
 
-    // Probe the cone dataset with random points
+    // 用随机点（圆锥体）探测圆锥体数据集（一大堆顶点）
     vtkNew<vtkProbeFilter> randomProbe;
     randomProbe->SetInputConnection(0, randomPoints->GetOutputPort());
     randomProbe->SetInputConnection(1, thresholdCone->GetOutputPort());
@@ -462,6 +465,8 @@ int main(int argc, char* argv[])
     selectPoints->SetInputConnection(randomProbe->GetOutputPort());
     selectPoints->ThresholdByUpper(1.0);
 
+    //------------------------------------------------------
+    // 将采样得到的点可视化
     vtkNew<vtkSphereSource> sphere;
     sphere->SetRadius(0.025);
 
@@ -469,7 +474,6 @@ int main(int argc, char* argv[])
     glyph->SetSourceConnection(sphere->GetOutputPort());
     glyph->SetInputConnection(selectPoints->GetOutputPort());
 
-    // Create a mapper and actor
     vtkNew<vtkDataSetMapper> mapper;
     mapper->SetInputConnection(glyph->GetOutputPort());
     mapper->ScalarVisibilityOff();
@@ -478,7 +482,6 @@ int main(int argc, char* argv[])
     actor->SetMapper(mapper);
     actor->GetProperty()->SetColor(1, 0, 0);
 
-    // Visualize
     vtkNew<vtkRenderer> renderer;
     renderer->AddActor(actor);
     renderer->SetBackground(.1, .2, .3);
@@ -2544,17 +2547,17 @@ int main()
 #include <vtkRenderer.h>
 #include <vtkStructuredGrid.h>
 
-#include <vtkStructuredGridWriter.h>
 #include <vtkDataSetWriter.h>
-#include <vtkWriter.h>
-#include <vtkStructuredGridReader.h>
 #include <vtkStructuredGridGeometryFilter.h>
+#include <vtkStructuredGridReader.h>
+#include <vtkStructuredGridWriter.h>
+#include <vtkWriter.h>
 
 #include <vtkDataSetMapper.h>
 
 #include <fstream>
 
-int main(int, char* [])
+int main(int, char*[])
 {
     double x[3], v[3], rMin = 0.5, rMax = 1.0, deltaRad, deltaZ;
     double radius, theta;
@@ -2572,24 +2575,24 @@ int main(int, char* [])
     vtkNew<vtkPoints> points;
     points->Allocate(dims[0] * dims[1] * dims[2]);
 
-    deltaZ = 2.0 / (dims[2] - 1);
+    deltaZ   = 2.0 / (dims[2] - 1);
     deltaRad = (rMax - rMin) / (dims[1] - 1);
-    v[2] = 0.0;
+    v[2]     = 0.0;
     for (auto k = 0; k < dims[2]; k++)
     {
-        x[2] = -1.0 + k * deltaZ;
+        x[2]         = -1.0 + k * deltaZ;
         auto kOffset = k * dims[0] * dims[1];
         for (auto j = 0; j < dims[1]; j++)
         {
-            radius = rMin + j * deltaRad;
+            radius       = rMin + j * deltaRad;
             auto jOffset = j * dims[0];
             for (auto i = 0; i < dims[0]; i++)
             {
-                theta = i * vtkMath::RadiansFromDegrees(15.0);
-                x[0] = radius * cos(theta);
-                x[1] = radius * sin(theta);
-                v[0] = -x[1];
-                v[1] = x[0];
+                theta       = i * vtkMath::RadiansFromDegrees(15.0);
+                x[0]        = radius * cos(theta);
+                x[1]        = radius * sin(theta);
+                v[0]        = -x[1];
+                v[1]        = x[0];
                 auto offset = i + jOffset + kOffset;
                 points->InsertPoint(offset, x);
                 vectors->InsertTuple(offset, v);
@@ -2600,7 +2603,7 @@ int main(int, char* [])
     sgrid->GetPointData()->SetVectors(vectors);
 
     //---------------写文件-----------------
-    vtkNew< vtkStructuredGridWriter> writer;
+    vtkNew<vtkStructuredGridWriter> writer;
     writer->SetFileTypeToASCII();
     writer->SetFileName("writerStructuredGrid.txt");
     writer->SetInputData(sgrid);
@@ -2630,20 +2633,19 @@ int main(int, char* [])
     // Mapper
     // 读上来的DataSet转为PolyData拓扑结构有些问题
     vtkNew<vtkPolyDataMapper> mapperPolyData;
-    //mapperPolyData->SetInputConnection(geometryFilter->GetOutputPort());
+    // mapperPolyData->SetInputConnection(geometryFilter->GetOutputPort());
     mapperPolyData->SetInputData(geometryFilter->GetOutput());
 
     vtkNew<vtkDataSetMapper> mapperDataSet;
     mapperDataSet->SetInputData(sgrid);
-    //mapperDataSet->SetInputData(reader->GetOutput());
+    // mapperDataSet->SetInputData(reader->GetOutput());
 
     // Actor
     vtkNew<vtkActor> sgridActor;
-    //sgridActor->SetMapper(mapperDataSet);
+    // sgridActor->SetMapper(mapperDataSet);
     sgridActor->SetMapper(mapperPolyData);
 
     sgridActor->GetProperty()->SetColor(0, 1, 0);
-
 
     vtkNew<vtkRenderer> renderer;
     vtkNew<vtkRenderWindow> renWin;
@@ -2664,7 +2666,6 @@ int main(int, char* [])
 
     return EXIT_SUCCESS;
 }
-
 
 #endif // TEST605
 
@@ -2767,3 +2768,238 @@ void RefreshCallback(vtkObject* vtkNotUsed(caller), long unsigned int vtkNotUsed
 } // namespace
 
 #endif // TEST701
+
+#ifdef TEST801
+
+#include <vtkActor.h>
+#include <vtkCone.h>
+#include <vtkContourFilter.h>
+#include <vtkCylinder.h>
+#include <vtkImageData.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkOutlineFilter.h>
+#include <vtkPlane.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSampleFunction.h>
+#include <vtkSphere.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkPlane> function1;
+
+    vtkNew<vtkCone> function2;
+    function2->SetAngle(30.);
+
+    vtkNew<vtkCylinder> function3;
+    function3->SetRadius(5.);
+
+    vtkNew<vtkSphere> function4;
+    function4->SetRadius(5.);
+
+    vtkNew<vtkSampleFunction> sample;
+    sample->SetImplicitFunction(function3);
+    sample->SetSampleDimensions(3, 3, 3);        // 指定要采样的数据的维度，数字越大采样的点越多
+    sample->SetModelBounds(-2, 2, -2, 2, -2, 2); // 指定采样的区域，坐标范围
+    sample->ComputeNormalsOff();
+    sample->CappingOff();
+    sample->Update();
+
+    double range[2] {};
+    sample->GetOutput()->GetScalarRange(range);
+    std::cout << "Range:\n" << range[0] << '\t' << range[1] << '\n';
+
+    //---------------------------------------------------------
+    // 等值线，每一个等值线就是一个对应的隐式函数
+    // 例如隐式函数是vtkSphere，那么等值线（面）就是一个球面
+    vtkNew<vtkContourFilter> contours;
+    contours->SetInputConnection(sample->GetOutputPort());
+    contours->GenerateValues(6, range);
+
+    vtkNew<vtkPolyDataMapper> contourMapper;
+    contourMapper->SetInputConnection(contours->GetOutputPort());
+    contourMapper->SetScalarRange(range);
+
+    vtkNew<vtkActor> contourActor;
+    contourActor->GetProperty()->LightingOff();
+    contourActor->SetMapper(contourMapper);
+
+    double bounds[6] {};
+    contourActor->GetBounds(bounds);
+    std::cout << "Bounds:\n"
+              << bounds[0] << '\t' << bounds[1] << '\n'
+              << bounds[2] << '\t' << bounds[3] << '\n'
+              << bounds[4] << '\t' << bounds[5] << '\n';
+
+    //---------------------------------------------------------
+    // 边框
+    vtkNew<vtkOutlineFilter> outline;
+    outline->SetInputConnection(sample->GetOutputPort());
+
+    vtkNew<vtkPolyDataMapper> outlineMapper;
+    outlineMapper->SetInputConnection(outline->GetOutputPort());
+
+    vtkNew<vtkActor> outlineActor;
+    outlineActor->SetMapper(outlineMapper);
+    outlineActor->GetProperty()->SetColor(0., 0., 0.);
+
+    //---------------------------------------------------------
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(contourActor);
+    renderer->AddActor(outlineActor);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+    renderWindow->SetWindowName("Samplefunction");
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> interactor;
+    interactor->SetRenderWindow(renderWindow);
+    interactor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    interactor->Start();
+
+    return EXIT_SUCCESS;
+}
+#endif // TEST801
+
+#ifdef TEST802
+
+#include <vtkActor.h>
+#include <vtkCone.h>
+#include <vtkContourFilter.h>
+#include <vtkCylinder.h>
+#include <vtkDataSetMapper.h>
+#include <vtkImageData.h>
+#include <vtkImageDataToPointSet.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkOutlineFilter.h>
+#include <vtkPlane.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSampleFunction.h>
+#include <vtkSphere.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkPlane> function1;
+
+    vtkNew<vtkCone> function2;
+    function2->SetAngle(30.);
+
+    vtkNew<vtkCylinder> function3;
+    function3->SetRadius(5.);
+
+    vtkNew<vtkSphere> function4;
+    function4->SetRadius(5.);
+
+    vtkNew<vtkSampleFunction> sample;
+    sample->SetImplicitFunction(function3);
+    sample->SetSampleDimensions(3, 3, 3);        // 指定要采样的数据的维度，数字越大采样的点越多
+    sample->SetModelBounds(-2, 2, -2, 2, -2, 2); // 指定采样的区域，坐标范围
+    sample->ComputeNormalsOff();
+    sample->CappingOff();
+    sample->Update();
+
+    double range[2] {};
+    sample->GetOutput()->GetScalarRange(range);
+    std::cout << "Range:\n" << range[0] << '\t' << range[1] << '\n';
+
+    //---------------------------------------------------------
+    // 将 vtkImageData转换为几何数据并渲染
+    // 采样的维度决定了几何数据顶点的个数，采样的区域决定了几何数据的范围
+    vtkNew<vtkImageDataToPointSet> imageDataToPointSet;
+    imageDataToPointSet->SetInputData(sample->GetOutput());
+    imageDataToPointSet->Update();
+
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(imageDataToPointSet->GetOutput());
+    mapper->SetScalarRange(range);
+
+    vtkNew<vtkActor> actor;
+    actor->GetProperty()->LightingOff();
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->SetMapper(mapper);
+
+    std::cout << "Number of Points:\n"
+              << imageDataToPointSet->GetOutput()->GetNumberOfPoints() << "\nNumber of Cells:\n"
+              << imageDataToPointSet->GetOutput()->GetNumberOfCells() << '\n';
+
+    double bounds[6] {};
+    actor->GetBounds(bounds);
+    std::cout << "Bounds:\n"
+              << bounds[0] << '\t' << bounds[1] << '\n'
+              << bounds[2] << '\t' << bounds[3] << '\n'
+              << bounds[4] << '\t' << bounds[5] << '\n';
+
+    //---------------------------------------------------------
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+    renderWindow->SetWindowName("Samplefunction");
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> interactor;
+    interactor->SetRenderWindow(renderWindow);
+    interactor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    interactor->Start();
+
+    return EXIT_SUCCESS;
+}
+#endif // TEST802
+
+#ifdef TEST803
+
+#include <vtkImageData.h>
+#include <vtkJPEGWriter.h>
+#include <vtkNew.h>
+#include <vtkPerlinNoise.h>
+#include <vtkSampleFunction.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkPerlinNoise> perlinNoise;
+    perlinNoise->SetAmplitude(255.); // 设置振幅，默认为1，越大生成的图片颜色值越多。比如振幅为1，颜色值可能只有1和255
+    perlinNoise->SetFrequency(1024., 1024., 1024.); // 设置频率
+    perlinNoise->SetPhase(0., 0., 0.);              // 设置相位，可以移动噪声函数
+
+    vtkNew<vtkSampleFunction> sample;
+    sample->SetImplicitFunction(perlinNoise);
+    sample->SetSampleDimensions(512, 512, 1);
+    sample->ComputeNormalsOff();
+    sample->SetOutputScalarTypeToUnsignedChar();
+    sample->Update();
+
+    std::cout << "Image is " << sample->GetOutput()->GetDataDimension() << "D\n";
+    std::cout << "number of pixels: " << sample->GetOutput()->GetNumberOfPoints() << '\n';
+
+    int dimensions[3] {};
+    sample->GetOutput()->GetDimensions(dimensions);
+    std::cout << "Dimensions: " << dimensions[0] << ' ' << dimensions[1] << ' ' << dimensions[2] << '\n';
+
+    vtkNew<vtkJPEGWriter> writer;
+    writer->SetInputData(sample->GetOutput());
+    writer->SetFileName("perlinNosize.jpg");
+    writer->Write();
+
+    std::cout << "save image success\n";
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST803
