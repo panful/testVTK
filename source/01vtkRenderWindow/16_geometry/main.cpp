@@ -1,16 +1,17 @@
 
 /**
- * 101. vtkCubeSource 立方体
- * 102. vtkDiskSource 圆盘
+ * 101. vtkCubeSource           立方体
+ * 102. vtkDiskSource           圆盘
  * 103. vtkRegularPolygonSource 圆
- * 104. vtkArrowSource 箭头
- * 105. vtkPointSource 生成一堆顶点
+ * 104. vtkArrowSource          箭头
+ * 105. vtkPointSource          生成一堆顶点
+ * 106. vtkPlaneSource          生成一个平面（矩形、四边形、菱形）
  *
  * 201. vtkParametricSuperEllipsoid 超椭球体
  *
  */
 
-#define TEST105
+#define TEST106
 
 #ifdef TEST101
 
@@ -265,6 +266,74 @@ int main(int, char*[])
 }
 
 #endif // TEST105
+
+#ifdef TEST106
+
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPlaneSource.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+int main(int, char*[])
+{
+
+    vtkNew<vtkPlaneSource> source;
+    source->SetOutputPointsPrecision(vtkAlgorithm::SINGLE_PRECISION); // 设置输出点的精度（单精度、双精度）
+    source->SetResolution(10, 10);     // 由多少个格子组成，注意是格子不是线的个数，格子比线的个数少1（X和Y方向）
+    source->SetNormal(0., 0., 1.);     // 设置法线，默认是(0,0,1)
+    source->SetPoint1(5., -10., 0.);   // 右下角的顶点
+    source->SetPoint2(-5., 10., 0.);   // 左上角的顶点
+    source->SetOrigin(-10., -10., 0.); // 左下角的起始顶点（其他的顶点以这个顶点为标志，通过偏移得到）
+    source->SetCenter(0., 0., 0.);     // 平面的中心，Origin Center Point1 Point2会互相影响
+    source->Update();
+
+    // 四个顶点的顺序依次是（Resolution为1时的四个顶点）：左下 右下 左上 右上
+    for (vtkIdType i = 0; i < source->GetOutput()->GetNumberOfPoints(); ++i)
+    {
+        double pt[3] {};
+        source->GetOutput()->GetPoint(i, pt);
+        std::cout << "point " << i << " : " << pt[0] << ' ' << pt[1] << ' ' << pt[2] << '\n';
+    }
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+    actor->GetProperty()->SetPointSize(5.f);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(1, 0, 0);
+
+    auto bounds = actor->GetBounds();
+    std::cout << bounds[0] << '\t' << bounds[1] << '\n' << bounds[2] << '\t' << bounds[3] << '\n' << bounds[4] << '\t' << bounds[5] << '\n';
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST106
 
 #ifdef TEST201
 
