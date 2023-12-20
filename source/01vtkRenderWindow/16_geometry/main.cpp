@@ -1,17 +1,23 @@
 
 /**
  * 101. vtkCubeSource           立方体
- * 102. vtkDiskSource           圆盘
- * 103. vtkRegularPolygonSource 圆
- * 104. vtkArrowSource          箭头
- * 105. vtkPointSource          生成一堆顶点
- * 106. vtkPlaneSource          生成一个平面（矩形、四边形、菱形）
  *
- * 201. vtkParametricSuperEllipsoid 超椭球体
+ * 201. vtkDiskSource           圆盘
+ *
+ * 301. vtkRegularPolygonSource 圆
+ *
+ * 401. vtkArrowSource          箭头
+ *
+ * 501. vtkPointSource          在一个球体内生成一堆点精灵
+ * 502. vtkBoundedPointSource   在一个立方体包围盒内生成一堆顶点
+ *
+ * 601. vtkPlaneSource          生成一个平面（矩形、四边形、菱形）
+ *
+ * 901. vtkParametricSuperEllipsoid vtkParametricFunctionSource 超椭球体
  *
  */
 
-#define TEST106
+#define TEST502
 
 #ifdef TEST101
 
@@ -59,7 +65,7 @@ int main(int, char*[])
 
 #endif // TEST101
 
-#ifdef TEST102
+#ifdef TEST201
 
 #include <vtkActor.h>
 #include <vtkDiskSource.h>
@@ -107,9 +113,9 @@ int main(int, char*[])
     return 0;
 }
 
-#endif // TEST102
+#endif // TEST201
 
-#ifdef TEST103
+#ifdef TEST301
 
 #include <vtkActor.h>
 #include <vtkInteractorStyleTrackballCamera.h>
@@ -157,9 +163,9 @@ int main(int, char*[])
     return 0;
 }
 
-#endif // TEST103
+#endif // TEST301
 
-#ifdef TEST104
+#ifdef TEST401
 
 #include <vtkActor.h>
 #include <vtkArrowSource.h>
@@ -209,9 +215,9 @@ int main(int, char*[])
     return 0;
 }
 
-#endif // TEST103
+#endif // TEST401
 
-#ifdef TEST105
+#ifdef TEST501
 
 #include <vtkActor.h>
 #include <vtkInteractorStyleTrackballCamera.h>
@@ -225,7 +231,7 @@ int main(int, char*[])
 
 int main(int, char*[])
 {
-    // 在一个指定的球内部（或者外壳）上随机生成指定个数的顶点
+    // 在一个指定的球内部（或者外壳）上随机生成指定个数的点精灵
     vtkNew<vtkPointSource> source;
     source->SetCenter(0.0, 0.0, 0.0);
     source->SetNumberOfPoints(1000);    // 点的个数
@@ -233,6 +239,8 @@ int main(int, char*[])
     source->SetDistributionToShell();   // 只有球的外壳上分布，内部没有
     source->SetRadius(10.);             // 点云所在球的半径（不是点的半径，点就是一个点，没有半径）
     source->Update();
+
+    source->GetOutput()->Print(std::cout);
 
     vtkNew<vtkPolyDataMapper> mapper;
     mapper->SetInputData(source->GetOutput());
@@ -265,9 +273,78 @@ int main(int, char*[])
     return 0;
 }
 
-#endif // TEST105
+#endif // TEST501
 
-#ifdef TEST106
+#ifdef TEST502
+
+#include <numeric>
+#include <vector>
+#include <vtkActor.h>
+#include <vtkBoundedPointSource.h>
+#include <vtkCellArray.h>
+#include <vtkIdTypeArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPointSource.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+int main(int, char*[])
+{
+    // 生成的只有顶点数据，没有单元数据
+    vtkNew<vtkBoundedPointSource> source;
+    source->SetNumberOfPoints(10000);                 // 点的个数
+    source->SetBounds(-10., 10., -10., 10., -2., 2.); // 包围盒范围
+    source->Update();
+
+    // 将每一个顶点设置为一个单元（点精灵）
+    vtkNew<vtkCellArray> cells;
+    for (vtkIdType i = 0; i < 10000; ++i)
+    {
+        vtkIdType pts = i;
+        cells->InsertNextCell(1, &pts);
+    }
+
+    source->GetOutput()->SetVerts(cells);
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+    actor->GetProperty()->SetPointSize(5.f);
+
+    auto bounds = actor->GetBounds();
+    std::cout << bounds[0] << '\t' << bounds[1] << '\n' << bounds[2] << '\t' << bounds[3] << '\n' << bounds[4] << '\t' << bounds[5] << '\n';
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST502
+
+#ifdef TEST601
 
 #include <vtkActor.h>
 #include <vtkInteractorStyleTrackballCamera.h>
@@ -333,9 +410,9 @@ int main(int, char*[])
     return 0;
 }
 
-#endif // TEST106
+#endif // TEST601
 
-#ifdef TEST201
+#ifdef TEST901
 
 #include <vtkActor.h>
 #include <vtkElevationFilter.h>
@@ -387,4 +464,4 @@ int main(int, char*[])
     return EXIT_SUCCESS;
 }
 
-#endif // TEST201
+#endif // TEST901

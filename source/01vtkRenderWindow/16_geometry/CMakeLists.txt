@@ -9,7 +9,8 @@ find_package(VTK
         RenderingOpenGL2
         loguru
         ParallelMPI
-        CommonComputationalGeometry   # vtkParametricSuperEllipsoid
+        CommonComputationalGeometry     # vtkParametricSuperEllipsoid
+        FiltersPoints                   # vtkBoundedPointSource
     QUIET
 )
 
