@@ -121,20 +121,20 @@ int main()
 #include <vtkSmartPointer.h>
 
 namespace {
-class Style : public vtkInteractorStyleTrackballCamera
+class MyStyle : public vtkInteractorStyleTrackballCamera
 {
 public:
-    static Style* New();
-    vtkTypeMacro(Style, vtkInteractorStyleTrackballCamera);
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
 
-    virtual void OnLeftButtonDown() override
+    void OnLeftButtonDown() override
     {
         std::cout << "left button down\n";
         Superclass::OnLeftButtonDown();
     }
 };
 
-vtkStandardNewMacro(Style);
+vtkStandardNewMacro(MyStyle);
 } // namespace
 
 int main(int, char*[])
@@ -160,7 +160,7 @@ int main(int, char*[])
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
 
-    vtkNew<Style> style;
+    vtkNew<MyStyle> style;
     iren->SetInteractorStyle(style);
 
     renWin->Render();

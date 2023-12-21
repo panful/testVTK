@@ -8,7 +8,9 @@
  * 6 并行处理数据 vtk自带Example Examples/ParallelProcessing/Generic/Cxx/ParallelIso.cxx"  vtkMPIController
  */
 
-#define TEST1
+// \Examples\Infovis\Cxx\ParallelBFS.cxx
+
+#define TEST7
 
 #ifdef TEST1
 

@@ -3,8 +3,10 @@
  * 101. vtkCubeSource           立方体
  *
  * 201. vtkDiskSource           圆盘
+ * 202. vtkRegularPolygonSource 圆
  *
- * 301. vtkRegularPolygonSource 圆
+ * 301. vtkLineSource           线段
+ * 302. vtkLineSource           虚线
  *
  * 401. vtkArrowSource          箭头
  *
@@ -17,7 +19,7 @@
  *
  */
 
-#define TEST502
+#define TEST302
 
 #ifdef TEST101
 
@@ -115,7 +117,7 @@ int main(int, char*[])
 
 #endif // TEST201
 
-#ifdef TEST301
+#ifdef TEST202
 
 #include <vtkActor.h>
 #include <vtkInteractorStyleTrackballCamera.h>
@@ -163,7 +165,189 @@ int main(int, char*[])
     return 0;
 }
 
+#endif // TEST202
+
+#ifdef TEST301
+
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLineSource.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRegularPolygonSource.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkLineSource> source;
+    source->SetPoint1(1.0, 0.0, 0.0); // 起点
+    source->SetPoint2(0.0, 1.0, 0.0); // 终点
+    source->SetResolution(10);        // 线段的个数
+    source->Update();
+
+    std::cout << "number of points: " << source->GetOutput()->GetNumberOfPoints() << '\n';
+    std::cout << "number of cells: " << source->GetOutput()->GetNumberOfCells() << '\n';
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
 #endif // TEST301
+
+#ifdef TEST302
+
+#include <vtkActor.h>
+#include <vtkDoubleArray.h>
+#include <vtkImageData.h>
+#include <vtkLineSource.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPointData.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkTexture.h>
+
+#include <iostream>
+#include <string>
+
+namespace {
+void StippledLine(vtkActor* actor, int lineStipplePattern, int lineStippleRepeat)
+{
+    vtkNew<vtkDoubleArray> tcoords;
+    vtkNew<vtkImageData> image;
+    vtkNew<vtkTexture> texture;
+
+    // Create texture.
+    int dimension = 16 * lineStippleRepeat;
+
+    image->SetDimensions(dimension, 1, 1);
+    image->AllocateScalars(VTK_UNSIGNED_CHAR, 4);
+    image->SetExtent(0, dimension - 1, 0, 0, 0, 0);
+    unsigned char* pixel;
+    pixel             = static_cast<unsigned char*>(image->GetScalarPointer());
+    unsigned char on  = 255;
+    unsigned char off = 0;
+    for (int i = 0; i < 16; ++i)
+    {
+        unsigned int mask   = (1 << i);
+        unsigned int bit    = (lineStipplePattern & mask) >> i;
+        unsigned char value = static_cast<unsigned char>(bit);
+        if (value == 0)
+        {
+            for (int j = 0; j < lineStippleRepeat; ++j)
+            {
+                *pixel       = on;
+                *(pixel + 1) = on;
+                *(pixel + 2) = on;
+                *(pixel + 3) = off;
+                pixel += 4;
+            }
+        }
+        else
+        {
+            for (int j = 0; j < lineStippleRepeat; ++j)
+            {
+                *pixel       = on;
+                *(pixel + 1) = on;
+                *(pixel + 2) = on;
+                *(pixel + 3) = on;
+                pixel += 4;
+            }
+        }
+    }
+    vtkPolyData* polyData = dynamic_cast<vtkPolyData*>(actor->GetMapper()->GetInput());
+
+    // Create texture coordnates.
+    tcoords->SetNumberOfComponents(1);
+    tcoords->SetNumberOfTuples(polyData->GetNumberOfPoints());
+    for (int i = 0; i < polyData->GetNumberOfPoints(); ++i)
+    {
+        double value = static_cast<double>(i) * .5;
+        tcoords->SetTypedTuple(i, &value);
+    }
+
+    polyData->GetPointData()->SetTCoords(tcoords);
+    texture->SetInputData(image);
+    texture->InterpolateOff();
+    texture->RepeatOn();
+
+    actor->SetTexture(texture);
+}
+} // namespace
+
+// OpenGL2不再支持虚线，示例使用纹理贴图实现虚线
+// https://examples.vtk.org/site/Cxx/Rendering/StippledLine/
+
+int main(int, char*[])
+{
+    double p0[3] = { 1.0, 0.0, 0.0 };
+    double p1[3] = { 5.0, 0.0, 0.0 };
+
+    vtkNew<vtkLineSource> lines;
+    lines->SetResolution(11);
+    lines->SetPoint1(p0);
+    lines->SetPoint2(p1);
+    lines->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputConnection(lines->GetOutputPort());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetLineWidth(5);
+    actor->GetProperty()->SetColor(1., 0., 0.);
+
+    StippledLine(actor, 0xA1A1, 2);
+
+    vtkNew<vtkRenderer> ren1;
+    ren1->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->SetSize(640, 480);
+    renWin->SetWindowName("StippledLine");
+
+    renWin->AddRenderer(ren1);
+    vtkSmartPointer<vtkRenderWindowInteractor> iren = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    iren->SetRenderWindow(renWin);
+    ren1->AddActor(actor);
+
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST302
 
 #ifdef TEST401
 
