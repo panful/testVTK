@@ -15,7 +15,8 @@ find_package(VTK
         ParallelMPI
         ViewsCore       # vtkDataRepresentation
         ViewsInfovis    # vtkGraphLayoutView
-        RenderingSceneGraph
+        RenderingSceneGraph 
+        InfovisLayout   # vtkGraphLayout
     QUIET
 )
 
