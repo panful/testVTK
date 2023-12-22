@@ -3,7 +3,8 @@
  * 101. vtkCubeSource           立方体
  *
  * 201. vtkDiskSource           圆盘
- * 202. vtkRegularPolygonSource 圆
+ * 202. vtkRegularPolygonSource 圆 多边形（实心圆、圆圈）
+ * 203. vtkSphereSource         球
  *
  * 301. vtkLineSource           线段
  * 302. vtkLineSource           虚线
@@ -19,7 +20,7 @@
  *
  */
 
-#define TEST302
+#define TEST203
 
 #ifdef TEST101
 
@@ -166,6 +167,58 @@ int main(int, char*[])
 }
 
 #endif // TEST202
+
+#ifdef TEST203
+
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+
+int main(int, char*[])
+{
+    // 两个Resolution最小值为3，如果实参小于3则强制设置为3
+    vtkNew<vtkSphereSource> source;
+    source->SetRadius(5.0);         // 设置半径
+    source->SetPhiResolution(30);   // 纬度方向，从北极到南极点的个数（不是绕纬线一圈）
+    source->SetThetaResolution(30); // 经度方向，绕经线一圈顶点的个数，
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+    actor->GetProperty()->LightingOff();
+    actor->GetProperty()->EdgeVisibilityOn();
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST203
 
 #ifdef TEST301
 
