@@ -22,6 +22,8 @@ find_package(VTK
         FiltersGeometry     # vtkStructuredGridGeometryFilter
         IOParallel          # vtkMultiBlockPLOT3DReader
         ImagingHybrid       # vtkSampleFunction
+        ImagingSources      # vtkImageGridSource
+        IOPLY               # vtkPLYReader
     QUIET
 )
 

@@ -36,9 +36,12 @@
  * 706 对四边形构成的网格求等值线，绘制四边形网格云图，等值线和实际的云图颜色对应不上
  * 707 vtkBandedPolyDataContourFilter 等值区域、等值线、网格边框
  * 708 云图动画，通过动态修改Scalar改变云图的颜色映射
+ *
+ * 801 vtkOpenGLFluidMapper 基于屏幕空间的流体技术
+ * 802 带交互的流体模拟
  */
 
-#define TEST708
+#define TEST802
 
 #ifdef TEST100
 
@@ -3955,3 +3958,772 @@ int main(int, char*[])
 }
 
 #endif // TEST708
+
+#ifdef TEST801
+
+#include "vtkActor.h"
+#include "vtkCallbackCommand.h"
+#include "vtkCamera.h"
+#include "vtkCullerCollection.h"
+#include "vtkFloatArray.h"
+#include "vtkImageData.h"
+#include "vtkImageFlip.h"
+#include "vtkImageGridSource.h"
+#include "vtkInteractorStyleSwitch.h"
+#include "vtkJPEGReader.h"
+#include "vtkLight.h"
+#include "vtkLookupTable.h"
+#include "vtkNew.h"
+#include "vtkOpenGLFluidMapper.h"
+#include "vtkOpenGLRenderer.h"
+#include "vtkPBRIrradianceTexture.h"
+#include "vtkPBRLUTTexture.h"
+#include "vtkPBRPrefilterTexture.h"
+#include "vtkPLYReader.h"
+#include "vtkPlaneSource.h"
+#include "vtkPointData.h"
+#include "vtkPolyDataMapper.h"
+#include "vtkProperty.h"
+#include "vtkRegressionTestImage.h"
+#include "vtkRenderWindow.h"
+#include "vtkRenderWindowInteractor.h"
+#include "vtkSkybox.h"
+#include "vtkTexture.h"
+#include "vtkVolume.h"
+
+// 蓝色水还是红色血液
+#define BLUE_WATER
+
+constexpr static double g_DragonPos[3] { 2, -0.5, 3 };
+constexpr static float g_ParticleRadius { 0.03f };
+
+// https://gitlab.kitware.com/vtk/vtk/-/blob/v9.3.0/Rendering/OpenGL2/Testing/Cxx/TestFluidMapper.cxx
+// https://gitlab.kitware.com/vtk/vtk/-/blob/v9.3.0/Rendering/OpenGL2/Testing/Cxx/TestFluidDemo.cxx
+
+int main(int argc, char* argv[])
+{
+    vtkNew<vtkOpenGLRenderer> renderer;
+    renderer->SetBackground(0.0, 0.0, 0.0);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->UseSRGBColorSpaceOn();
+    renderWindow->SetMultiSamples(0);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renderWindow);
+    renderer->RemoveCuller(renderer->GetCullers()->GetLastItem());
+
+    //------------------------------------------------------------
+    vtkNew<vtkPLYReader> reader;
+    reader->SetFileName("../resources/dragon.ply");
+    reader->Update();
+
+    vtkNew<vtkPolyDataMapper> dragonMapper;
+    dragonMapper->SetInputConnection(reader->GetOutputPort());
+
+    vtkNew<vtkActor> dragon;
+    dragon->SetMapper(dragonMapper);
+    dragon->SetScale(20, 20, 20);
+    dragon->SetPosition(g_DragonPos[0], g_DragonPos[1], g_DragonPos[2]);
+    dragon->GetProperty()->SetDiffuseColor(0.780392, 0.568627, 0.113725);
+    dragon->GetProperty()->SetSpecular(1.0);
+    dragon->GetProperty()->SetSpecularPower(80.0);
+    dragon->GetProperty()->SetDiffuse(0.7);
+
+    renderer->AddActor(dragon);
+
+    //------------------------------------------------------------
+    vtkSmartPointer<vtkPBRIrradianceTexture> irradiance = renderer->GetEnvMapIrradiance();
+    irradiance->SetIrradianceStep(0.3);
+
+    vtkNew<vtkOpenGLTexture> textureCubemap;
+    textureCubemap->CubeMapOn();
+    textureCubemap->UseSRGBColorSpaceOn();
+
+    std::string pathSkybox[6] = { "../resources/skybox/posx.jpg", "../resources/skybox/negx.jpg", "../resources/skybox/posy.jpg",
+        "../resources/skybox/negy.jpg", "../resources/skybox/posz.jpg", "../resources/skybox/negz.jpg" };
+
+    for (int i = 0; i < 6; i++)
+    {
+        vtkNew<vtkJPEGReader> jpg;
+        jpg->SetFileName(pathSkybox[i].c_str());
+
+        vtkNew<vtkImageFlip> flip;
+        flip->SetInputConnection(jpg->GetOutputPort());
+        flip->SetFilteredAxis(1); // flip y axis
+        textureCubemap->SetInputConnection(i, flip->GetOutputPort());
+    }
+
+    renderer->SetEnvironmentTexture(textureCubemap);
+    renderer->UseImageBasedLightingOn();
+
+    vtkNew<vtkSkybox> skybox;
+    skybox->SetTexture(textureCubemap);
+    renderer->AddActor(skybox);
+
+    //------------------------------------------------------------
+    vtkNew<vtkImageGridSource> grid;
+    grid->SetGridSpacing(32, 32, 0);
+    grid->SetLineValue(0.2);
+    grid->SetFillValue(1.0);
+
+    vtkNew<vtkLookupTable> lut;
+    lut->SetSaturationRange(0.0, 0.0);
+    lut->SetValueRange(0.0, 1.0);
+    lut->SetTableRange(0.0, 1.0);
+    lut->Build();
+
+    vtkNew<vtkTexture> texture;
+    texture->SetColorModeToMapScalars();
+    texture->InterpolateOn();
+    texture->RepeatOn();
+    texture->MipmapOn();
+    texture->SetInputConnection(grid->GetOutputPort(0));
+    texture->UseSRGBColorSpaceOn();
+    texture->SetLookupTable(lut);
+
+    vtkNew<vtkPlaneSource> plane;
+    plane->SetNormal(0.0, -1.0, 0.0);
+    plane->SetOrigin(-15.0, 0.0, -15.0);
+    plane->SetPoint1(15, 0, -15);
+    plane->SetPoint2(-15, 0, 15);
+    plane->Update();
+
+    vtkNew<vtkPolyDataMapper> planeMapper;
+    planeMapper->SetInputConnection(plane->GetOutputPort());
+
+    vtkNew<vtkActor> texturedPlane;
+    texturedPlane->SetMapper(planeMapper);
+    texturedPlane->GetProperty()->SetBaseColorTexture(texture);
+    texturedPlane->GetProperty()->SetInterpolationToPBR();
+    texturedPlane->GetProperty()->SetMetallic(0.2);
+    texturedPlane->GetProperty()->SetRoughness(0.1);
+    renderer->AddActor(texturedPlane);
+
+    //------------------------------------------------------------
+    vtkNew<vtkPoints> points;
+    const float spacing = 0.1f;
+    for (int z = 0; z < 50; ++z)
+    {
+        for (int y = 0; y < 15; ++y)
+        {
+            for (int x = 0; x < 50; ++x)
+            {
+                points->InsertNextPoint(static_cast<double>(x * spacing), static_cast<double>(y * spacing), static_cast<double>(z * spacing));
+            }
+        }
+    }
+
+    vtkNew<vtkPolyData> pointData;
+    pointData->SetPoints(points);
+
+    vtkNew<vtkOpenGLFluidMapper> fluidMapper;
+    fluidMapper->SetInputData(pointData);
+
+    renderWindow->SetSize(400, 400);
+
+    // Begin parameters turning for fluid mapper ==========>
+    // For new dataset, we may need to do multiple times turning parameters until
+    // we get a nice result Must set parameter is particle radius,
+
+    // MUST SET PARAMETER ==========================
+    // Set the radius of the rendered spheres to be 2 times larger than the actual
+    // sphere radius This is necessary to fuse the gaps between particles and
+    // obtain a smooth surface
+    fluidMapper->SetParticleRadius(g_ParticleRadius * 3.0f);
+
+    // Set the number of iterations to filter the depth surface
+    // This is an optional parameter, default value is 3
+    // Usually set this to around 3-5
+    // Too many filter iterations will over-smooth the surface
+    fluidMapper->SetSurfaceFilterIterations(3);
+
+    // Set the filter radius for smoothing the depth surface
+    // This is an optional parameter, default value is 5
+    fluidMapper->SetSurfaceFilterRadius(5);
+
+    // Set the filtering method, it's up to personal choice
+    // This is an optional parameter, default value is NarrowRange, other value is
+    // BilateralGaussian
+    fluidMapper->SetSurfaceFilterMethod(vtkOpenGLFluidMapper::FluidSurfaceFilterMethod::NarrowRange);
+
+    // Set the display method, from transparent volume to opaque surface etc
+    // Default value is TransparentFluidVolume
+    fluidMapper->SetDisplayMode(vtkOpenGLFluidMapper::FluidDisplayMode::TransparentFluidVolume);
+
+#ifdef BLUE_WATER
+    // Set the volume attenuation color (color that will be absorbed
+    // exponentially through the fluid volume) (below is the attenuation color
+    // that will produce blue volume fluid)
+    fluidMapper->SetAttenuationColor(0.8f, 0.2f, 0.15f);
+
+    // Set the attenuation scale, which will be multiplied with the
+    // attenuation color Default value is 1.0
+    fluidMapper->SetAttenuationScale(1.0f);
+#else // Not BLUE_WATER
+    // This is blood
+    fluidMapper->SetAttenuationColor(0.2f, 0.95f, 0.95f);
+    fluidMapper->SetAttenuationScale(3.0f);
+#endif
+
+    // Set the surface color (applicable only if the display mode is
+    // <Filter/Unfiltered>OpaqueSurface)
+    fluidMapper->SetOpaqueColor(0.0f, 0.0f, 0.9f);
+
+    // Set the particle color power and scale
+    // (applicable only if there is color data for each point)
+    // The particle color is then recomputed as newColor = pow(oldColor, power) *
+    // scale
+    fluidMapper->SetParticleColorPower(0.1f);
+    fluidMapper->SetParticleColorScale(0.57f);
+
+    // Set the additional reflection parameter, to add more light reflecting off
+    // the surface Default value is 0.0
+    fluidMapper->SetAdditionalReflection(0.0f);
+
+    // Set the refractive index (1.33 for water)
+    // Default value is 1.33
+    fluidMapper->SetRefractiveIndex(1.33f);
+
+    // Set the refraction scale, this will explicitly change the amount of
+    // refraction Default value is 1
+    fluidMapper->SetRefractionScale(0.07f);
+
+    // <========== end parameters turning for fluid mapper
+
+    vtkNew<vtkVolume> vol;
+    vol->SetMapper(fluidMapper);
+    renderer->AddVolume(vol);
+
+    //------------------------------------------------------------
+    renderer->GetActiveCamera()->SetPosition(10, 2, 20);
+    renderer->GetActiveCamera()->SetFocalPoint(1, 1, 0);
+    renderer->GetActiveCamera()->SetViewUp(0, 1, 0);
+    renderer->GetActiveCamera()->SetViewAngle(40.0);
+    renderer->GetActiveCamera()->Dolly(1.7);
+    renderer->ResetCameraClippingRange();
+
+    vtkNew<vtkInteractorStyleSwitch> style;
+    style->SetCurrentStyleToTrackballCamera();
+
+    iren->SetInteractorStyle(style);
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST801
+
+#ifdef TEST802
+
+// SPDX-FileCopyrightText: Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+// SPDX-License-Identifier: BSD-3-Clause
+
+#include "vtkActor.h"
+#include "vtkCallbackCommand.h"
+#include "vtkCamera.h"
+#include "vtkCullerCollection.h"
+#include "vtkFloatArray.h"
+#include "vtkImageData.h"
+#include "vtkImageFlip.h"
+#include "vtkImageGridSource.h"
+#include "vtkInteractorStyleSwitch.h"
+#include "vtkJPEGReader.h"
+#include "vtkLight.h"
+#include "vtkLookupTable.h"
+#include "vtkNew.h"
+#include "vtkOpenGLFluidMapper.h"
+#include "vtkOpenGLRenderer.h"
+#include "vtkPBRIrradianceTexture.h"
+#include "vtkPBRLUTTexture.h"
+#include "vtkPBRPrefilterTexture.h"
+#include "vtkPLYReader.h"
+#include "vtkPlaneSource.h"
+#include "vtkPointData.h"
+#include "vtkPolyDataMapper.h"
+#include "vtkProperty.h"
+#include "vtkRegressionTestImage.h"
+#include "vtkRenderWindow.h"
+#include "vtkRenderWindowInteractor.h"
+#include "vtkSkybox.h"
+#include "vtkTexture.h"
+#include "vtkVolume.h"
+
+// 蓝色水 or 红色血液
+#define BLUE_WATER
+
+// Global variables for particle data
+static vtkNew<vtkPoints> g_Points;
+constexpr static double g_DragonPos[3] { 2, -0.5, 3 };
+
+constexpr static float g_ParticleRadius = 0.03f;
+
+//------------------------------------------------------------------------------
+// Enable this for interactive demonstration
+#define INTERACTIVE_DEMO
+
+// Define this to animation the dragon
+#define ANIMATE_DRAGON
+
+// Define this to add particle color to particles
+// #define VERTEX_COLOR
+
+//------------------------------------------------------------------------------
+// Global variables for animation pause/resume
+static bool g_Animation          = true;
+constexpr static float g_Spacing = 2.0f * g_ParticleRadius;
+
+#include <cmath>
+#include <queue>
+
+constexpr float colorRamp[] = { 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.5, 1.0 };
+
+std::array<float, 3> getColorRamp(float x)
+{
+    while (x > 1.0f)
+    {
+        x -= 1.0f;
+    }
+    const float segmentSize = 1.0f / 6.0f;
+    float segment           = floor(x / segmentSize);
+    float t                 = (x - segmentSize * segment) / segmentSize;
+
+    return std::array<float, 3> { (1.0f - t) * colorRamp[int(segment) * 3] + t * colorRamp[int(segment) + 1],
+        (1.0f - t) * colorRamp[int(segment) * 3 + 1] + t * colorRamp[(int(segment) + 1) * 3 + 1],
+        (1.0f - t) * colorRamp[int(segment) * 3 + 2] + t * colorRamp[(int(segment) + 1) * 3 + 2] };
+}
+
+// Random number from [-1, 1]
+float rand11()
+{
+    return 2.0f * (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) - 1.0f;
+}
+
+#ifdef VERTEX_COLOR
+static vtkNew<vtkFloatArray> g_Colors;
+#endif
+
+// Pause/resume animation by pressing spacebar
+// Press 'd' to change display mode
+// Press 'm' to change filter method
+void keypressFunc(vtkObject* caller, unsigned long vtkNotUsed(eventId), void* clientData, void* vtkNotUsed(callData))
+{
+    const auto iren  = static_cast<vtkRenderWindowInteractor*>(caller);
+    auto fluidMapper = static_cast<vtkOpenGLFluidMapper*>(clientData);
+    if (iren->GetKeyCode() == ' ')
+    {
+        g_Animation = !g_Animation;
+    }
+    else if (iren->GetKeyCode() == 'd')
+    {
+        auto mode = static_cast<int>(fluidMapper->GetDisplayMode());
+        mode      = (mode + 1) % vtkOpenGLFluidMapper::NumDisplayModes;
+        fluidMapper->SetDisplayMode(static_cast<vtkOpenGLFluidMapper::FluidDisplayMode>(mode));
+        static_cast<vtkRenderWindowInteractor*>(caller)->Render();
+    }
+    else if (iren->GetKeyCode() == 'm')
+    {
+        auto filter = static_cast<int>(fluidMapper->GetSurfaceFilterMethod());
+        filter      = (filter + 1) % vtkOpenGLFluidMapper::NumFilterMethods;
+        fluidMapper->SetSurfaceFilterMethod(static_cast<vtkOpenGLFluidMapper::FluidSurfaceFilterMethod>(filter));
+        static_cast<vtkRenderWindowInteractor*>(caller)->Render();
+    }
+}
+
+// Update particle animation data
+void updateFunc(vtkObject* caller, unsigned long vtkNotUsed(eventId), void* clientData, void* vtkNotUsed(callData))
+{
+    if (!g_Animation)
+    {
+        return;
+    }
+
+    auto dragon = static_cast<vtkActor*>(clientData);
+
+    // Max number of particle layers in x dimension
+    constexpr static uint32_t maxLayers = static_cast<uint32_t>(17.0f / g_Spacing);
+
+    // Each time step, move particles by (spacing * stepRatio) distance
+    constexpr static float stepRatio = 0.5f;
+
+    // Start position of the particles in the x dimension
+    constexpr static float startX = -10.0f;
+
+    // Min height and height variation of the fluid wave
+    constexpr static int minHeight       = static_cast<uint32_t>(0.8f / g_Spacing);
+    constexpr static int heightVariation = static_cast<uint32_t>(0.65f / g_Spacing);
+    constexpr static int minZ            = -static_cast<int>(1.0f / g_Spacing);
+    constexpr static int maxZ            = static_cast<int>(6.0f / g_Spacing);
+
+    // Speed of the fluid wave
+    constexpr static float waveSpeed = 5.0f;
+
+    // Time step size
+    constexpr static float timeStep = 0.006f;
+
+    constexpr static uint32_t maxHeight = 2 * heightVariation + minHeight;
+    constexpr static uint32_t maxPoints = maxLayers * maxHeight * (maxZ - minZ);
+
+    static std::queue<uint32_t> layerSizeQueue;
+    static uint32_t layers     = 0;
+    static float t             = 0;
+    static float lastX         = startX;
+    static bool allocationDone = false;
+
+    if (!allocationDone)
+    {
+        g_Points->Allocate(maxPoints * 3);
+#ifdef VERTEX_COLOR
+        g_Colors->Allocate(maxPoints * 3);
+#endif
+        allocationDone = true;
+    }
+
+    // Remove the last fluid layer in the x dimension
+    auto oldLayerSize = 0;
+    if (layers > maxLayers)
+    {
+        oldLayerSize = layerSizeQueue.front();
+        layerSizeQueue.pop();
+        --layers;
+    }
+
+    // Shift particles to the right (positive x)
+    auto pointsToMove = g_Points->GetNumberOfPoints() - oldLayerSize;
+    float* pptr       = static_cast<float*>(g_Points->GetVoidPointer(0));
+    auto lpptr        = pptr + pointsToMove * 3;
+    for (auto i = 0; i < pointsToMove; ++i)
+    {
+        pptr[i * 3]     = pptr[(i + oldLayerSize) * 3] + g_Spacing * stepRatio;
+        pptr[i * 3 + 1] = pptr[(i + oldLayerSize) * 3 + 1];
+        pptr[i * 3 + 2] = pptr[(i + oldLayerSize) * 3 + 2];
+    }
+
+#ifdef VERTEX_COLOR
+    float* cptr = static_cast<float*>(g_Colors->GetVoidPointer(0));
+    auto lcptr  = cptr + pointsToMove * 3;
+    if (oldLayerSize)
+    {
+        memmove(cptr, cptr + oldLayerSize * 3, pointsToMove * 3 * sizeof(float));
+    }
+#endif
+    lastX += g_Spacing * stepRatio;
+
+#ifdef ANIMATE_DRAGON
+    dragon->SetPosition(g_DragonPos[0], g_DragonPos[1] + static_cast<double>(std::cos(waveSpeed * t)) * 0.5, g_DragonPos[2]);
+#endif
+
+    // Append one more layer
+    uint32_t newLayerSize = 0;
+    if (lastX >= startX + g_Spacing)
+    {
+        int height = static_cast<int>(heightVariation * std::cos(waveSpeed * t) + heightVariation) + minHeight;
+        for (int y = 0; y < height; ++y)
+        {
+            for (int z = minZ; z < maxZ; ++z)
+            {
+                ++newLayerSize;
+                *(lpptr++) = static_cast<float>(startX + 0.5f * rand11() * g_Spacing);
+                *(lpptr++) = static_cast<float>((y + 0.5f * rand11()) * g_Spacing);
+                *(lpptr++) = static_cast<float>((z + 0.5f * rand11()) * g_Spacing);
+#ifdef VERTEX_COLOR
+                const auto color = getColorRamp(t);
+                *(lcptr++)       = color[0];
+                *(lcptr++)       = color[1];
+                *(lcptr++)       = color[2];
+#endif
+            }
+        }
+        layerSizeQueue.push(newLayerSize);
+        ++layers;
+        lastX = startX;
+    }
+
+    t += timeStep;
+    // points always change their position
+    g_Points->Modified();
+    // the number of points, and colors doesn't always change
+    if (oldLayerSize > 0 || newLayerSize > 0)
+    {
+        g_Points->SetNumberOfPoints(pointsToMove + newLayerSize);
+#ifdef VERTEX_COLOR
+        g_Colors->SetNumberOfTuples(pointsToMove + newLayerSize);
+        g_Colors->Modified();
+#endif
+    }
+
+    static_cast<vtkRenderWindowInteractor*>(caller)->Render();
+    //    std::cout << "Particle: " << g_Points->GetNumberOfPoints() << "\n";
+    //    std::cout << "layers: " << layers << "\n";
+    //    std::cout << "maxlayers: " << maxLayers << "\n";
+}
+
+void setupInteractiveDemo(vtkRenderWindow* renderWindow, vtkRenderer* renderer, vtkRenderWindowInteractor* iren,
+#ifdef VERTEX_COLOR
+    vtkPolyData* pointData,
+#else
+    vtkPolyData* vtkNotUsed(pointData),
+#endif
+    vtkActor* dragon, vtkOpenGLFluidMapper* fluidMapper)
+{
+    //------------------------------------------------------------
+    // Create a light
+    double lightPosition[3]   = { -10, 10, 0 };
+    double lightFocalPoint[3] = { 0, 0, 0 };
+
+    {
+        vtkNew<vtkLight> light;
+        light->SetLightTypeToSceneLight();
+        light->SetPosition(lightPosition[0], lightPosition[1], lightPosition[2]);
+        light->SetPositional(true);
+        light->SetConeAngle(30);
+        light->SetFocalPoint(lightFocalPoint[0], lightFocalPoint[1], lightFocalPoint[2]);
+        light->SetColor(1, 0.5, 0.5);
+        renderer->AddLight(light);
+    }
+
+    {
+        vtkNew<vtkLight> light;
+        light->SetLightTypeToSceneLight();
+        light->SetPosition(0, 10, 10);
+        light->SetPositional(true);
+        light->SetConeAngle(30);
+        light->SetFocalPoint(lightFocalPoint[0], lightFocalPoint[1], lightFocalPoint[2]);
+        light->SetColor(0.5, 1, 0.5);
+        renderer->AddLight(light);
+    }
+
+#ifdef VERTEX_COLOR
+    g_Colors->SetNumberOfComponents(3);
+    pointData->GetPointData()->SetScalars(g_Colors);
+    g_FluidMapper->ScalarVisibilityOn();
+#endif
+
+    renderWindow->SetSize(1920, 1080);
+    vtkNew<vtkCallbackCommand> updateCallback;
+    vtkNew<vtkCallbackCommand> keypressCallback;
+    updateCallback->SetCallback(updateFunc);
+    updateCallback->SetClientData(dragon);
+    keypressCallback->SetCallback(keypressFunc);
+    keypressCallback->SetClientData(fluidMapper);
+
+    iren->AddObserver(vtkCommand::TimerEvent, updateCallback);
+    iren->AddObserver(vtkCommand::KeyPressEvent, keypressCallback);
+    iren->Initialize();
+    iren->CreateRepeatingTimer(0);
+}
+
+int main(int argc, char* argv[])
+{
+    vtkNew<vtkOpenGLRenderer> renderer;
+    renderer->SetBackground(0.0, 0.0, 0.0);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->UseSRGBColorSpaceOn();
+    renderWindow->SetMultiSamples(0);
+    renderWindow->AddRenderer(renderer);
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renderWindow);
+    renderer->RemoveCuller(renderer->GetCullers()->GetLastItem());
+
+    //------------------------------------------------------------
+    vtkNew<vtkPLYReader> reader;
+    reader->SetFileName("../resources/dragon.ply");
+    reader->Update();
+
+    vtkNew<vtkPolyDataMapper> dragonMapper;
+    dragonMapper->SetInputConnection(reader->GetOutputPort());
+
+    vtkNew<vtkActor> dragon;
+    dragon->SetMapper(dragonMapper);
+    dragon->SetScale(20, 20, 20);
+    dragon->SetPosition(g_DragonPos[0], g_DragonPos[1], g_DragonPos[2]);
+    dragon->GetProperty()->SetDiffuseColor(0.780392, 0.568627, 0.113725);
+    dragon->GetProperty()->SetSpecular(1.0);
+    dragon->GetProperty()->SetSpecularPower(80.0);
+    dragon->GetProperty()->SetDiffuse(0.7);
+    renderer->AddActor(dragon);
+
+    //------------------------------------------------------------
+    vtkSmartPointer<vtkPBRIrradianceTexture> irradiance = renderer->GetEnvMapIrradiance();
+    irradiance->SetIrradianceStep(0.3);
+
+    vtkNew<vtkOpenGLTexture> textureCubemap;
+    textureCubemap->CubeMapOn();
+    textureCubemap->UseSRGBColorSpaceOn();
+
+    std::string pathSkybox[6] = { "../resources/skybox/posx.jpg", "../resources/skybox/negx.jpg", "../resources/skybox/posy.jpg",
+        "../resources/skybox/negy.jpg", "../resources/skybox/posz.jpg", "../resources/skybox/negz.jpg" };
+
+    for (int i = 0; i < 6; i++)
+    {
+        vtkNew<vtkJPEGReader> jpg;
+        jpg->SetFileName(pathSkybox[i].c_str());
+        vtkNew<vtkImageFlip> flip;
+        flip->SetInputConnection(jpg->GetOutputPort());
+        flip->SetFilteredAxis(1); // flip y axis
+        textureCubemap->SetInputConnection(i, flip->GetOutputPort());
+    }
+
+    renderer->SetEnvironmentTexture(textureCubemap);
+    renderer->UseImageBasedLightingOn();
+
+    vtkNew<vtkSkybox> skybox;
+    skybox->SetTexture(textureCubemap);
+    renderer->AddActor(skybox);
+
+    //------------------------------------------------------------
+    vtkNew<vtkImageGridSource> grid;
+    grid->SetGridSpacing(32, 32, 0);
+    grid->SetLineValue(0.2);
+    grid->SetFillValue(1.0);
+
+    vtkNew<vtkTexture> texture;
+    texture->SetColorModeToMapScalars();
+    vtkNew<vtkLookupTable> lut;
+    texture->SetLookupTable(lut);
+    lut->SetSaturationRange(0.0, 0.0);
+    lut->SetValueRange(0.0, 1.0);
+    lut->SetTableRange(0.0, 1.0);
+    lut->Build();
+    texture->InterpolateOn();
+    texture->RepeatOn();
+    texture->MipmapOn();
+    texture->SetInputConnection(grid->GetOutputPort(0));
+    texture->UseSRGBColorSpaceOn();
+
+    vtkNew<vtkPlaneSource> plane;
+    plane->SetNormal(0.0, -1.0, 0.0);
+    plane->SetOrigin(-15.0, 0.0, -15.0);
+    plane->SetPoint1(15, 0, -15);
+    plane->SetPoint2(-15, 0, 15);
+    plane->Update();
+
+    vtkNew<vtkPolyDataMapper> planeMapper;
+    planeMapper->SetInputConnection(plane->GetOutputPort());
+    vtkNew<vtkActor> texturedPlane;
+    texturedPlane->SetMapper(planeMapper);
+    texturedPlane->GetProperty()->SetBaseColorTexture(texture);
+    texturedPlane->GetProperty()->SetInterpolationToPBR();
+    texturedPlane->GetProperty()->SetMetallic(0.2);
+    texturedPlane->GetProperty()->SetRoughness(0.1);
+
+    renderer->AddActor(texturedPlane);
+    //------------------------------------------------------------
+
+    vtkNew<vtkPolyData> pointData;
+    pointData->SetPoints(g_Points);
+
+    vtkNew<vtkOpenGLFluidMapper> fluidMapper;
+    fluidMapper->SetInputData(pointData);
+
+#ifdef INTERACTIVE_DEMO
+    setupInteractiveDemo(renderWindow, renderer, iren, pointData, dragon, fluidMapper);
+#else
+    renderWindow->SetSize(400, 400);
+    const float spacing = 0.1f;
+    for (int z = 0; z < 50; ++z)
+    {
+        for (int y = 0; y < 15; ++y)
+        {
+            for (int x = 0; x < 50; ++x)
+            {
+                g_Points->InsertNextPoint(static_cast<double>(x * spacing), static_cast<double>(y * spacing), static_cast<double>(z * spacing));
+            }
+        }
+    }
+#endif
+
+    // Begin parameters turning for fluid mapper ==========>
+    // For new dataset, we may need to do multiple times turning parameters until
+    // we get a nice result Must set parameter is particle radius,
+
+    // MUST SET PARAMETER ==========================
+    // Set the radius of the rendered spheres to be 2 times larger than the actual
+    // sphere radius This is necessary to fuse the gaps between particles and
+    // obtain a smooth surface
+    fluidMapper->SetParticleRadius(g_ParticleRadius * 3.0f);
+
+    // Set the number of iterations to filter the depth surface
+    // This is an optional parameter, default value is 3
+    // Usually set this to around 3-5
+    // Too many filter iterations will over-smooth the surface
+    fluidMapper->SetSurfaceFilterIterations(3);
+
+    // Set the filter radius for smoothing the depth surface
+    // This is an optional parameter, default value is 5
+    fluidMapper->SetSurfaceFilterRadius(5);
+
+    // Set the filtering method, it's up to personal choice
+    // This is an optional parameter, default value is NarrowRange, other value is
+    // BilateralGaussian
+    fluidMapper->SetSurfaceFilterMethod(vtkOpenGLFluidMapper::FluidSurfaceFilterMethod::NarrowRange);
+
+    // Set the display method, from transparent volume to opaque surface etc
+    // Default value is TransparentFluidVolume
+    fluidMapper->SetDisplayMode(vtkOpenGLFluidMapper::FluidDisplayMode::TransparentFluidVolume);
+
+#ifdef BLUE_WATER
+    // Set the volume attenuation color (color that will be absorbed
+    // exponentially through the fluid volume) (below is the attenuation color
+    // that will produce blue volume fluid)
+    fluidMapper->SetAttenuationColor(0.8f, 0.2f, 0.15f);
+
+    // Set the attenuation scale, which will be multiplied with the
+    // attenuation color Default value is 1.0
+    fluidMapper->SetAttenuationScale(1.0f);
+#else // Not BLUE_WATER
+    // This is blood
+    fluidMapper->SetAttenuationColor(0.2f, 0.95f, 0.95f);
+    fluidMapper->SetAttenuationScale(3.0f);
+#endif
+
+    // Set the surface color (applicable only if the display mode is
+    // <Filter/Unfiltered>OpaqueSurface)
+    fluidMapper->SetOpaqueColor(0.0f, 0.0f, 0.9f);
+
+    // Set the particle color power and scale
+    // (applicable only if there is color data for each point)
+    // The particle color is then recomputed as newColor = pow(oldColor, power) *
+    // scale
+    fluidMapper->SetParticleColorPower(0.1f);
+    fluidMapper->SetParticleColorScale(0.57f);
+
+    // Set the additional reflection parameter, to add more light reflecting off
+    // the surface Default value is 0.0
+    fluidMapper->SetAdditionalReflection(0.0f);
+
+    // Set the refractive index (1.33 for water)
+    // Default value is 1.33
+    fluidMapper->SetRefractiveIndex(1.33f);
+
+    // Set the refraction scale, this will explicitly change the amount of
+    // refraction Default value is 1
+    fluidMapper->SetRefractionScale(0.07f);
+
+    // <========== end parameters turning for fluid mapper
+
+    vtkNew<vtkVolume> vol;
+    vol->SetMapper(fluidMapper);
+    renderer->AddVolume(vol);
+    //------------------------------------------------------------
+
+    renderer->GetActiveCamera()->SetPosition(10, 2, 20);
+    renderer->GetActiveCamera()->SetFocalPoint(1, 1, 0);
+    renderer->GetActiveCamera()->SetViewUp(0, 1, 0);
+    renderer->GetActiveCamera()->SetViewAngle(40.0);
+    renderer->GetActiveCamera()->Dolly(1.7);
+    renderer->ResetCameraClippingRange();
+
+    renderWindow->Render();
+
+    vtkNew<vtkInteractorStyleSwitch> style;
+    style->SetCurrentStyleToTrackballCamera();
+    iren->SetInteractorStyle(style);
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST802
