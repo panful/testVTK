@@ -8,6 +8,7 @@
  *
  * 301. vtkLineSource           线段
  * 302. vtkLineSource           虚线
+ * 302. vtkLineSource           折线
  *
  * 401. vtkArrowSource          箭头
  *
@@ -20,7 +21,7 @@
  *
  */
 
-#define TEST203
+#define TEST303
 
 #ifdef TEST101
 
@@ -401,6 +402,73 @@ int main(int, char*[])
 }
 
 #endif // TEST302
+
+#ifdef TEST303
+
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLineSource.h>
+#include <vtkPoints.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRegularPolygonSource.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(2., 1., 0.);
+    points->InsertNextPoint(4., 0., 0.);
+    points->InsertNextPoint(6., 1., 0.);
+    points->InsertNextPoint(8., 0., 0.);
+
+    vtkNew<vtkLineSource> source;
+    source->SetPoint1(0.0, 0.0, 0.0); // 起点，没用
+    source->SetPoint2(9.0, 0.0, 0.0); // 终点，没用
+    source->SetPoints(points);        // 线的顶点由points定义
+    source->Update();
+
+    std::cout << "number of points: " << source->GetOutput()->GetNumberOfPoints() << '\n';
+    std::cout << "number of cells: " << source->GetOutput()->GetNumberOfCells() << '\n';
+
+    for (vtkIdType i = 0; i < source->GetOutput()->GetNumberOfPoints(); ++i)
+    {
+        double pt[3] {};
+        source->GetOutput()->GetPoint(i, pt);
+        std::cout << "Point " << i << " : " << pt[0] << ' ' << pt[1] << ' ' << pt[2] << '\n';
+    }
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST303
 
 #ifdef TEST401
 
