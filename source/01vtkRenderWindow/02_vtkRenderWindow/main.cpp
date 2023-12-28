@@ -30,7 +30,7 @@
 17.
 18.带流场参数的立方体
 19.vtkDistancePolyDataFilter 计算两个vtkPolyData的距离
-20.可以随意拖动的坐标轴
+
 21.
 22.将点（向量）投影到平面
 23.鼠标双击事件 DoubleClick
@@ -1596,134 +1596,7 @@ int main(int, char*[])
 
 #endif // TEST19
 
-#ifdef TEST20
 
-#include <vtkAnnotatedCubeActor.h>
-#include <vtkAxesActor.h>
-#include <vtkBandedPolyDataContourFilter.h>
-#include <vtkCamera.h>
-#include <vtkCaptionActor2D.h>
-#include <vtkCellData.h>
-#include <vtkColorSeries.h>
-#include <vtkConeSource.h>
-#include <vtkCubeSource.h>
-#include <vtkGenericOpenGLRenderWindow.h>
-#include <vtkInteractorStyleRubberBand3D.h>
-#include <vtkLookupTable.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkOrientationMarkerWidget.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSmartPointer.h>
-#include <vtkTextProperty.h>
-#include <vtkTransform.h>
-#include <vtkTransformPolyDataFilter.h>
-
-#include <array>
-
-namespace {
-
-/**
- * Make an axes actor.
- *
- * @param scale: 轴的比例和方向
- * @param xyzLabels: 轴的文字标签
- * @return The axes actor.
- */
-vtkSmartPointer<vtkAxesActor> MakeAxesActor(std::array<double, 3>& scale, std::array<std::string, 3>& xyzLabels);
-
-} // namespace
-
-int main(int, char*[])
-{
-    // Basic stuff setup
-    // Set up the renderer, window, and interactor
-    vtkNew<vtkNamedColors> colors;
-
-    vtkNew<vtkRenderer> ren;
-    vtkNew<vtkRenderWindow> renWin;
-    // vtkNew< vtkGenericOpenGLRenderWindow> renWin;
-
-    renWin->AddRenderer(ren);
-    renWin->SetSize(640, 480);
-    vtkNew<vtkRenderWindowInteractor> iRen;
-    iRen->SetRenderWindow(renWin);
-
-    vtkNew<vtkInteractorStyleRubberBand3D> style;
-    iRen->SetInteractorStyle(style);
-
-    std::array<std::string, 3> xyzLabels { { "X", "Y", "Z" } };
-    std::array<double, 3> scale { { 1.0, 1.0, 1.0 } };
-    auto axes = MakeAxesActor(scale, xyzLabels);
-
-    // 2D的窗口小部件，可以用鼠标拖来拖去，小部件上可以绘制其他图元
-    vtkNew<vtkOrientationMarkerWidget> om2;
-    om2->SetOrientationMarker(axes);
-    // Position lower right in the viewport.
-    om2->SetViewport(0.5, 0, 1.0, 0.5);
-    // om2->SetShouldConstrainSize(true);       // 开启最大最小尺寸限制
-    // om2->SetSizeConstraintDimensionSizes();  // 设置最大和最小尺寸
-
-    om2->SetInteractor(iRen);
-    om2->EnabledOn();
-    om2->InteractiveOn();
-
-    // ren->AddActor(axes);
-
-    // 设置窗口的背景颜色（渐变色）
-    // ren->SetBackground2(colors->GetColor3d("RoyalBlue").GetData());
-    ren->SetBackground(.1, .2, .3);
-    // ren->SetBackground(colors->GetColor3d("MistyRose").GetData());
-    // ren->GradientBackgroundOn();
-
-    // 设置摄像机方向
-    ren->GetActiveCamera()->Azimuth(45);
-    ren->GetActiveCamera()->Pitch(-22.5);
-    ren->ResetCamera();
-
-    renWin->SetSize(600, 1000);
-    renWin->Render();
-    renWin->SetWindowName("ColoredAnnotatedCube");
-    renWin->Render();
-    iRen->Start();
-
-    return EXIT_SUCCESS;
-}
-
-namespace {
-
-vtkSmartPointer<vtkAxesActor> MakeAxesActor(std::array<double, 3>& scale, std::array<std::string, 3>& xyzLabels)
-{
-    vtkNew<vtkAxesActor> axes;
-    // axes->SetScale(scale[0], scale[1], scale[2]);
-    // axes->SetShaftTypeToCylinder();
-    // axes->SetXAxisLabelText(xyzLabels[0].c_str());
-    // axes->SetYAxisLabelText(xyzLabels[1].c_str());
-    // axes->SetZAxisLabelText(xyzLabels[2].c_str());
-
-    // axes->SetCylinderRadius(0.5 * axes->GetCylinderRadius());  //轴的粗细
-    // axes->SetConeRadius(1.025 * axes->GetConeRadius());        //圆锥的大小
-    // axes->SetSphereRadius(0.1 * axes->GetSphereRadius());
-
-    vtkTextProperty* tprop = axes->GetXAxisCaptionActor2D()->GetCaptionTextProperty();
-    tprop->ItalicOn();             // 启用文本斜体
-    tprop->ShadowOn();             // 启用文本阴影
-    tprop->SetFontFamilyToTimes(); // 字体
-    tprop->SetColor(1, 1, 1);      // 标签文字颜色
-
-    // Use the same text properties on the other two axes.
-    axes->GetYAxisCaptionActor2D()->GetCaptionTextProperty()->ShallowCopy(tprop);
-    axes->GetZAxisCaptionActor2D()->GetCaptionTextProperty()->ShallowCopy(tprop);
-    return axes;
-}
-
-} // namespace
-
-#endif // TEST20
 
 #ifdef TEST22
 

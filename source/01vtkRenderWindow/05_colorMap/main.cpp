@@ -1,9 +1,9 @@
 ﻿/*
  * 100 上下左右四视图，格点、格心数据，线框、面显示模式的区别
- * 101 色卡 vtkScalarBarActor 颜色查找表 vtkLookupTable
- * 102 vtkScalarBarWidget 拖动色卡，获取色卡色带部分的具体位置，用来标记某一个颜色条
+ * 101 vtkLookupTable 颜色查找表 
+ * 102 
  * 103 scalars范围超出lookuptable的范围时，超出部分不显示或指定颜色
- * 104 自定义色卡的标签，解决因为double的精度导致标签计算错误
+ * 104 
  * 105 给vtkPolyData添加多个vtkDataArray，指定某个Array映射颜色
  *
  * 300 vtkGlyph3D 官方示例 矢量图(箭头)
@@ -375,21 +375,10 @@ int main(int, char*[])
     mapper->InterpolateScalarsBeforeMappingOn();
 
     //---------------------------------------------------------
+    // 色卡
     vtkNew<vtkScalarBarActor> scalarBar;
     scalarBar->SetLookupTable(mapper->GetLookupTable());
-    // 设置色卡最大颜色分段个数，如果LookupTable大于该数，也只能显示MaximumNumberOfColors个颜色。太小会导致两头的颜色不显示，默认64
     scalarBar->SetMaximumNumberOfColors(numOfColors);
-    // 设置色卡最大占多少像素
-    // scalarBar->SetMaximumWidthInPixels(80);
-    // scalarBar->SetMaximumHeightInPixels(900);
-
-    //
-    // vtkScalarBarActor::ConfigureScalarBar()在该函数中设置色卡的每一个颜色时，
-    // 可能会因为浮点数精度问题导致设置的颜色错误，即两个相邻的颜色值相同
-    // 修改：rgbval = range[0] + (range[1] - range[0]) * (i / static_cast<double>(this->P->NumColors));
-    // rgbval = range[0] + (range[1] - range[0]) * ((i + 0.5) / static_cast<double>(this->P->NumColors));
-    // 继承一个vtkScalarBarActor重写该方法即可
-    //
 
     //---------------------------------------------------------
     vtkNew<vtkActor> actor;
@@ -402,6 +391,7 @@ int main(int, char*[])
 
     vtkNew<vtkRenderWindow> renderWindow;
     renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
 
     vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
     renderWindowInteractor->SetRenderWindow(renderWindow);
@@ -409,7 +399,6 @@ int main(int, char*[])
     vtkNew<vtkInteractorStyleTrackballCamera> style;
     renderWindowInteractor->SetInteractorStyle(style);
 
-    renderWindow->SetSize(800, 600);
     renderWindow->Render();
     renderWindowInteractor->Start();
 
@@ -417,267 +406,6 @@ int main(int, char*[])
 }
 
 #endif // TEST101
-
-#ifdef TEST102
-
-#include <vtkActor.h>
-#include <vtkCellData.h>
-#include <vtkCommand.h>
-#include <vtkFloatArray.h>
-#include <vtkImageMapToColors.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkLookupTable.h>
-#include <vtkPointData.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkScalarBarActor.h>
-#include <vtkScalarBarWidget.h>
-#include <vtkSmartPointer.h>
-#include <vtkTextProperty.h>
-#include <vtkViewport.h>
-
-class Callback : public vtkCommand
-{
-public:
-    static Callback* New()
-    {
-        return new Callback;
-    }
-
-    virtual void Execute(vtkObject* caller, unsigned long x, void* y)
-    {
-        if (auto interactor = vtkRenderWindowInteractor::SafeDownCast(caller))
-        {
-            auto size = interactor->GetRenderWindow()->GetSize();
-            std::cout << "Window size : " << size[0] << ',' << size[1] << '\t';
-
-            std::cout << "Mouse pos : " << interactor->GetEventPosition()[0] << ',' << interactor->GetEventPosition()[1] << '\n';
-        }
-
-        if (m_bar && m_renderer)
-        {
-            std::cout << "----------------------\n";
-
-            // 色卡的色带部分在渲染窗口中的像素位置
-            int rect[4] { 0 };
-            m_bar->GetScalarBarRect(rect, m_renderer);
-            std::cout << "ScalarBarRect : " << rect[0] << '\t' << rect[1] << '\t' << rect[2] << '\t' << rect[3] << '\n';
-
-            auto range = m_bar->GetLookupTable()->GetRange();
-            std::cout << "Range: " << range[0] << '\t' << range[1] << '\n';
-
-            // 获取指定scalar在颜色映射表中的索引
-            if (auto lut = vtkLookupTable::SafeDownCast(m_bar->GetLookupTable()))
-            {
-                double scalar  = 10.0;
-                auto index     = lut->GetIndex(scalar);
-                auto numColors = lut->GetNumberOfColors();
-                auto indexLu   = lut->GetIndexedLookup();
-                std::cout << "indexedLookup: " << indexLu << "\tcolor num: " << numColors << "\tscalar: " << scalar << "\tindex: " << index << '\n';
-            }
-        }
-    }
-
-    void SetScalarBar(vtkSmartPointer<vtkScalarBarActor> bar)
-    {
-        m_bar = bar;
-    }
-
-    void SetRenderer(vtkSmartPointer<vtkRenderer> renderer)
-    {
-        m_renderer = renderer;
-    }
-
-private:
-    vtkSmartPointer<vtkScalarBarActor> m_bar { nullptr };
-    vtkSmartPointer<vtkRenderer> m_renderer { nullptr };
-};
-
-int main(int, char*[])
-{
-    // clang-format off
-    std::vector<float> vertices { 
-        0., 0., 0., 1., 0., 2., 0., 3.,
-        1., 3., 1., 2., 1., 1., 1., 0.,
-        2., 0., 2., 1., 2., 2., 2., 3.,
-        3., 3., 3., 2., 3., 1., 3., 0.,
-    };
-
-    std::vector<int> indicesPoly {
-         0,         1,         6,         7,
-         1,         2,         5,         6,
-         2,         3,         4,         5,
-         4,         5,        10,        11,
-         5,         6,         9,        10,
-         6,         7,         8,         9,
-         8,         9,        14,        15,
-         9,        10,        13,        14,
-        10,        11,        12,        13,
-    };
-
-    std::vector<float> fields {
-        1.0f,        1.0f,        1.0f,        1.0f,
-        2.0f,        2.0f,        2.0f,        2.0f,
-        3.0f,        3.0f,        3.0f,        3.0f,
-        4.0f,        4.0f,        4.0f,        4.0f,
-    };
-    // clang-format on
-
-    auto GenPolyData = [vertices, indicesPoly, fields]()
-    {
-        vtkNew<vtkPolyData> polyData;
-        vtkNew<vtkPoints> points;
-        vtkNew<vtkCellArray> cellsLine;
-        vtkNew<vtkCellArray> cellsPoly;
-
-        for (size_t i = 0; i < vertices.size(); i += 2)
-        {
-            points->InsertNextPoint(vertices[i], vertices[i + 1], 0.0);
-        }
-
-        for (size_t i = 0; i < indicesPoly.size(); i += 4)
-        {
-            cellsPoly->InsertNextCell({ indicesPoly[i], indicesPoly[i + 1], indicesPoly[i + 2], indicesPoly[i + 3] });
-        }
-        polyData->SetPoints(points);
-        polyData->SetPolys(cellsPoly);
-
-        vtkNew<vtkFloatArray> scalars;
-        for (size_t i = 0; i < 16; ++i)
-        {
-            scalars->InsertNextValue(fields[i]);
-        }
-
-        polyData->GetPointData()->SetScalars(scalars);
-
-        return polyData;
-    };
-
-    //-------------------------------------------------------------------
-    // 创建颜色查找表
-    vtkNew<vtkLookupTable> hueLut;
-    hueLut->SetNumberOfColors(10);
-    hueLut->SetHueRange(0.67, 0.0);
-    hueLut->SetRange(GenPolyData()->GetPointData()->GetScalars()->GetRange());
-    hueLut->Build();
-
-    //---------------------------------------------------------
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputData(GenPolyData());
-    mapper->SetScalarRange(mapper->GetInput()->GetPointData()->GetScalars()->GetRange()); // 设置标量值的范围
-    mapper->ScalarVisibilityOn();                                                         // 默认开启标量属性显示
-    mapper->SetLookupTable(hueLut);
-
-    //---------------------------------------------------------
-    vtkNew<vtkActor> actor;
-    actor->SetMapper(mapper);
-
-    //---------------------------------------------------------
-    vtkNew<vtkScalarBarActor> scalarBar;
-    std::cout << "------------------------------------------\n";
-    std::cout << "GetNumberOfLabels \t" << scalarBar->GetNumberOfLabels() << '\n';
-    std::cout << "GetNumberOfConsumers\t" << scalarBar->GetNumberOfConsumers() << '\n';
-    std::cout << "GetNumberOfLabelsMinValue\t" << scalarBar->GetNumberOfLabelsMinValue() << '\n';
-    std::cout << "GetNumberOfLabelsMaxValue\t" << scalarBar->GetNumberOfLabelsMaxValue() << '\n';
-    std::cout << "GetNumberOfPaths\t" << scalarBar->GetNumberOfPaths() << '\n';
-    std::cout << "GetNumberOfColors\t" << vtkLookupTable::SafeDownCast(mapper->GetLookupTable())->GetNumberOfColors() << '\n';
-    std::cout << "GetPostion\t" << scalarBar->GetPosition()[0] << '\t' << scalarBar->GetPosition()[1] << '\n';
-    std::cout << "GetPostion2\t" << scalarBar->GetPosition2()[0] << '\t' << scalarBar->GetPosition2()[1] << '\n';
-
-    scalarBar->SetLookupTable(mapper->GetLookupTable());
-    scalarBar->SetTextPad(5);        // 设置文本框周围的填充量，就是标签文本距离颜色映射表的距离
-    scalarBar->SetPosition(.2, .2);  // 设置位置，左下角
-    scalarBar->SetPosition2(.8, .8); // 右上角，是相对最下角的位置，不是实际位置，还包括Title的大小
-    std::cout << "GetPostion\t" << scalarBar->GetPosition()[0] << '\t' << scalarBar->GetPosition()[1] << '\n';
-    std::cout << "GetPostion2\t" << scalarBar->GetPosition2()[0] << '\t' << scalarBar->GetPosition2()[1] << '\n';
-    std::cout << "GetBarRatio\t" << scalarBar->GetBarRatio() << '\n'; // 获取颜色条相对于小部件框架的厚度。
-
-    std::cout << "GetPositionCoordinate\t" << scalarBar->GetPositionCoordinate()->GetValue()[0] << '\t'
-              << scalarBar->GetPositionCoordinate()->GetValue()[1] << '\n';
-    std::cout << "GetPosition2Coordinate\t" << scalarBar->GetPosition2Coordinate()->GetValue()[0] << '\t'
-              << scalarBar->GetPosition2Coordinate()->GetValue()[1] << '\n';
-
-    std::cout << "GetHeight\t" << scalarBar->GetHeight() << '\n';
-    std::cout << "GetWidth\t" << scalarBar->GetWidth() << '\n';
-
-    // scalarBar->SetUseOpacity(1);          //设置不透明度
-    // scalarBar->UseOpacityOn();
-    // scalarBar->SetLayerNumber(0);
-    // scalarBar->SetTextureGridWidth(10);
-    // scalarBar->SetDrawAnnotations(0);
-
-    // 色卡标题
-    scalarBar->SetTitle("U (m/s)");
-    scalarBar->GetTitleTextProperty()->SetColor(0, 0, 0);
-    scalarBar->GetTitleTextProperty()->SetFontFamilyToArial();
-    scalarBar->GetTitleTextProperty()->SetFontSize(20);
-
-    std::cout << "------------------------------------------\n";
-    std::cout << "GetTitleRatio\t" << scalarBar->GetTitleRatio() << '\n';
-    std::cout << "GetTitleRatioMaxValue\t" << scalarBar->GetTitleRatioMaxValue() << '\n';
-    std::cout << "GetTitleRatioMinValue\t" << scalarBar->GetTitleRatioMinValue() << '\n';
-
-    // 色卡标签
-    scalarBar->UnconstrainedFontSizeOn(); // 设置标题和标签的字体大小是否不受限制。默认设置为禁用。
-    scalarBar->SetNumberOfLabels(5);      // 标签个数，和颜色个数没关系，颜色个数由SetLookupTable的NumberOfColors决定
-    scalarBar->SetLabelFormat("%5.3f");
-    // scalarBar->GetLabelTextProperty()->SetColor(0, 0, 0);
-    // scalarBar->GetLabelTextProperty()->SetFontFamilyToArial();
-    // scalarBar->GetLabelTextProperty()->SetFontFamilyToCourier();
-    // scalarBar->GetLabelTextProperty()->SetFontSize(20);
-    std::cout << "------------------------------------------\n";
-
-    // 设置色卡最大颜色分段个数，如果LookupTable大于该数，也只能显示MaximumNumberOfColors个颜色。太小会导致两头的颜色不显示，默认64
-    scalarBar->SetMaximumNumberOfColors(10);
-
-    scalarBar->SetMaximumWidthInPixels(80);
-    scalarBar->SetMaximumHeightInPixels(900);
-
-    vtkNew<vtkTextProperty> textProperty;
-    textProperty->SetColor(0, 0, 0);
-    textProperty->SetFontFamilyToTimes();
-    scalarBar->SetLabelTextProperty(textProperty);
-
-    //---------------------------------------------------------
-    vtkNew<vtkRenderer> renderer;
-    renderer->SetBackground(.1, .2, .3);
-
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-
-    // 设置回调函数，用来返回色卡的位置
-    auto callback = Callback::New();
-    callback->SetScalarBar(scalarBar);
-    callback->SetRenderer(renderer);
-    renderWindowInteractor->AddObserver(vtkCommand::LeftButtonPressEvent, callback);
-
-    // 添加色卡小部件，可以使用鼠标拖动色卡，缩放色卡
-    vtkNew<vtkScalarBarWidget> scalarBarWidget;
-    scalarBarWidget->SetInteractor(renderWindowInteractor);
-    scalarBarWidget->SetScalarBarActor(scalarBar);
-    scalarBarWidget->On();
-
-    vtkNew<vtkInteractorStyleTrackballCamera> style;
-    renderWindowInteractor->SetInteractorStyle(style);
-
-    renderer->AddActor(actor);
-    // renderer->AddActor2D(scalarBar);
-
-    renderWindow->SetSize(800, 600);
-    renderWindow->Render();
-    renderWindowInteractor->Start();
-
-    return 0;
-}
-
-#endif // TEST102
 
 #ifdef TEST103
 
@@ -761,85 +489,6 @@ int main(int, char*[])
 }
 
 #endif // TEST103
-
-#ifdef TEST104
-
-#include <vtkActor.h>
-#include <vtkCellData.h>
-#include <vtkCommand.h>
-#include <vtkFloatArray.h>
-#include <vtkImageMapToColors.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkLookupTable.h>
-#include <vtkPointData.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkScalarBarActor.h>
-#include <vtkScalarBarWidget.h>
-#include <vtkSmartPointer.h>
-#include <vtkTextProperty.h>
-#include <vtkViewport.h>
-
-#include <numbers>
-
-int main(int, char*[])
-{
-    vtkNew<vtkLookupTable> hueLut;
-    hueLut->SetNumberOfColors(10);
-    hueLut->SetHueRange(0.67, 0.0);
-    hueLut->SetRange(-1.e20, 100.0);
-    hueLut->Build();
-
-    // Double类型变量的精度是保留15-17位小数，因为Double类型的表示方式为1个符号位、11位指数位和52位精度（即尾数）位。
-    // 所以双精度浮点数一共有53个二进制位。其中，最高位是符号位，0表示正数，1表示负数，接着11位是指数位，
-    // 也就是可存储的数据范围，剩余的52位是精度位，也就是小数部分的数据精度。
-
-    vtkNew<vtkScalarBarActor> scalarBar;
-    scalarBar->SetLookupTable(hueLut);
-    scalarBar->SetPosition(.1, .1);  // 设置位置，左下角
-    scalarBar->SetPosition2(.8, .8); // 右上角，是相对最下角的位置，不是实际位置，还包括Title的大小
-    // scalarBar->SetLabelFormat("%.3e");
-    scalarBar->SetLabelFormat("%.3f");
-
-    // 自定义标签
-    // 标签的值需要保证在颜色映射表的Range中，且位置会根据Range自动计算
-    vtkNew<vtkDoubleArray> labels;
-    labels->InsertNextValue(-1.e20);
-    labels->InsertNextValue(-8.e19);
-    labels->InsertNextValue(-6.e19);
-    labels->InsertNextValue(-4.e19);
-    labels->InsertNextValue(-2.e19);
-    labels->InsertNextValue(100.0);
-
-    scalarBar->UseCustomLabelsOn();
-    scalarBar->SetCustomLabels(labels);
-
-    //---------------------------------------------------------
-    vtkNew<vtkRenderer> renderer;
-    renderer->AddActor2D(scalarBar);
-    renderer->SetBackground(.1, .2, .3);
-
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetSize(800, 600);
-
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-
-    vtkNew<vtkInteractorStyleTrackballCamera> style;
-    renderWindowInteractor->SetInteractorStyle(style);
-
-    renderWindow->Render();
-    renderWindowInteractor->Start();
-
-    return 0;
-}
-
-#endif // TEST104
 
 #ifdef TEST105
 

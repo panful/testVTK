@@ -2,6 +2,7 @@ set(target_name "01_17_widgets")
 
 find_package(VTK
     COMPONENTS
+        CommonColor
         CommonCore
         FiltersSources
         InteractionStyle
@@ -10,6 +11,8 @@ find_package(VTK
         loguru
         ParallelMPI
         RenderingAnnotation     # vtkLegendScaleActor
+        IOImage                 # vtkJPEGReader
+        InteractionWidgets      # vtkLogoRepresentation
     QUIET
 )
 

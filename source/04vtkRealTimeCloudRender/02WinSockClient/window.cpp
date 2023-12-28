@@ -106,6 +106,6 @@ void Window::OnBtnTest()
     qDebug() << "test\n";
 
     QPixmap pixmap;
-    pixmap.load("p4.jpg");
+    pixmap.load("../resources/test1.jpg");
     m_label->setPixmap(pixmap);
 }
