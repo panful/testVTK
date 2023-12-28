@@ -8,14 +8,17 @@
  * 6. 多边形的边框
  * 7. 只有一个图层，有多个vtkRenderer
  * 8. 多个vtkRenderer，多个图层，让后面的vtkRenderer始终在之前的上面
- * 9. vtk自定义的始终在最上层的图元
+ * 9. 
  * 10.拾取vtkProp vtkPropPicker
  * 11.顺序无关透明，深度剥离
  * 12.打印shader code
  * 13.同一个面的正面和背面设置不同的属性
+ * 14.
+ * 
+ * 201. vtkAlgorithm vtkExecutive vtkInformation 管道端口的作用
  */
 
-#define TEST11
+#define TEST201
 
 #ifdef TEST1
 
@@ -858,52 +861,6 @@ int main()
 
 #endif // TEST8
 
-#ifdef TEST9
-
-#include <vtkAxesActor.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkOrientationMarkerWidget.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSmartPointer.h>
-
-// 增加一个图层 vtkOrientationMarkerWidget
-// 通过判断光标位置来决定当前光标的显示形状，Widget的边框是否显示等
-
-int main(int, char*[])
-{
-    vtkNew<vtkRenderer> ren;
-    vtkNew<vtkRenderWindow> renWin;
-
-    renWin->AddRenderer(ren);
-    renWin->SetSize(800, 800);
-
-    vtkNew<vtkRenderWindowInteractor> iRen;
-    iRen->SetRenderWindow(renWin);
-
-    vtkNew<vtkInteractorStyleTrackballCamera> style;
-    iRen->SetInteractorStyle(style);
-
-    vtkNew<vtkAxesActor> axes;
-
-    vtkNew<vtkOrientationMarkerWidget> omw;
-    omw->SetOrientationMarker(axes);
-    omw->SetInteractor(iRen);
-    omw->SetViewport(0.5, 0.5, 0.75, 0.75);
-    omw->EnabledOn();
-    omw->InteractiveOn();
-
-    ren->SetBackground(.1, .2, .3);
-    ren->ResetCamera();
-
-    renWin->Render();
-    iRen->Start();
-
-    return 0;
-}
-
-#endif // TEST9
 
 #ifdef TEST10
 
@@ -1421,3 +1378,55 @@ int main()
 }
 
 #endif // TEST13
+
+#ifdef TEST201
+
+#include <vtkActor.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+// vtkAlgorithm 有一个函数 ProcessRequest()，通过它来执行实际的算法
+// 常用的算法都会执行一个函数 RequestData()，在它内部生成实际的数据 
+
+int main(int, char*[])
+{
+    vtkNew<vtkCubeSource> source;
+    source->SetXLength(1.);
+    source->SetYLength(2.);
+    source->SetZLength(3.);
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputConnection(source->GetOutputPort());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST201

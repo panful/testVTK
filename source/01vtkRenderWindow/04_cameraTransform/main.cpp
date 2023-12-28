@@ -27,7 +27,7 @@
 // https://blog.csdn.net/liushao1031177/article/details/116903698
 // https://www.cnblogs.com/ybqjymy/p/13925462.html
 
-#define TEST101
+#define TEST501
 
 #ifdef TEST101
 
@@ -87,7 +87,7 @@ protected:
             double vec3[3] { 0.0 };
             camera->GetEyePosition(vec3);
             camera->GetEyePlaneNormal(vec3);
-            
+
             // std::cout << "Camera Pos:\t\t" << cameraPos[0] << '\t' << cameraPos[1] << '\t' << cameraPos[2] << '\n';
             // std::cout << "Camera Focal Pos:\t" << cameraFocalPos[0] << '\t' << cameraFocalPos[1] << '\t' << cameraFocalPos[2] << '\n';
             // std::cout << "Camera Focal Distance:\t" << cameraFocalDistance << '\n';
@@ -1463,9 +1463,14 @@ int main()
     source->GeneratePolygonOff();
     source->Update();
 
+    std::cout << "Number of points: " << source->GetOutput()->GetNumberOfPoints() << std::endl
+              << "Number of cells: " << source->GetOutput()->GetNumberOfCells() << std::endl;
+
     vtkNew<vtkGlyph3D> glyph;
     glyph->SetInputConnection(disToCamera->GetOutputPort()); // 必须使用管道方式设置Input
     glyph->SetSourceData(source->GetOutput());               // 管道和数据集都可以
+    glyph->ScalingOn();                                      // 开启缩放
+    glyph->SetScaleModeToScaleByScalar();                    // 使用Scalar数据缩放，DistanceToCamera就是Scalar数据
     glyph->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "DistanceToCamera");
     glyph->Update();
 

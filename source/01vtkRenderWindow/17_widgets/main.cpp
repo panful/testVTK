@@ -22,7 +22,7 @@
  *
  */
 
-#define TEST203
+#define TEST403
 
 #ifdef TEST101
 
@@ -1146,6 +1146,11 @@ int main(int, char*[])
 #include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
 
+// 动画效果在下面这个函数中实现
+// void vtkCameraOrientationWidget::EndSelectAction(vtkAbstractWidget* w)
+// 根据动画的帧数，在每帧中更新父vtkRenderer相机的位置并渲染，即可实现动画效果
+// 播放动画时，窗口是不能响应的
+
 int main(int, char*[])
 {
     vtkNew<vtkCubeSource> source;
@@ -1173,6 +1178,7 @@ int main(int, char*[])
 
     vtkNew<vtkCameraOrientationWidget> cow;
     cow->SetParentRenderer(renderer); // 设置操作的渲染器（相机）
+    cow->SetAnimatorTotalFrames(100); // 设置动画的帧数
     cow->AnimateOn();                 // 开启动画
     cow->On();
 
@@ -1197,6 +1203,10 @@ int main(int, char*[])
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
+
+// vtkOrientationMarkerWidget 的构造函数中，创建了一个 vtkRenderer
+// 通过设置 Interactor，并设置 Enabled 为On时，将这个 vtkRenderer 添加到当前窗口中
+// 通过判断光标位置来决定当前光标的显示形状，Widget的边框是否显示等
 
 int main(int, char*[])
 {
@@ -1353,6 +1363,11 @@ int main(int, char*[])
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
+
+// vtkBorderRepresentation 继承自 vtkWidgetRepresentation
+// vtkWidgetRepresentation 继承自 vtkProp
+// vtkBorderWidget 绘制时，实际就是绘制它的成员 vtkBorderRepresentation
+// vtkBorderWidget 不会创建新的 vtkRender 只是将 vtkProp 绘制到 Interactor 的 CurrentRenderer
 
 int main(int argc, char* argv[])
 {
