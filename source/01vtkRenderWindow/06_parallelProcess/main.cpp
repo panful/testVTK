@@ -6,6 +6,7 @@
  * 4 MPI
  * 5 并行渲染     vtk自带Example Rendering/Parallel/Testing/Cxx/PrmMagnify.cxx  vtkParallelRenderManager
  * 6 并行处理数据 vtk自带Example Examples/ParallelProcessing/Generic/Cxx/ParallelIso.cxx"  vtkMPIController
+ * 7 vtkSMPTools
  */
 
 // \Examples\Infovis\Cxx\ParallelBFS.cxx

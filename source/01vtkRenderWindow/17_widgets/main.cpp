@@ -15,14 +15,19 @@
  * 402. vtkAnnotatedCubeActor 立方体坐标轴
  * 403. vtkCameraOrientationWidget 拾取到某一个方向后，以动画方式跳转到该方向
  * 404. vtkOrientationMarkerWidget 用来操作标记的2D小部件，比如将坐标轴放到该部件中，就可以随意移动坐标轴
+ * 405. vtkOrientationMarkerWidget 左键事件屏蔽对父窗口的响应
  *
  * 501. vtkButtonWidget 按钮
  *
  * 601. vtkBorderWidget 边框，vtkLogoWidget vtkTextWidget vtkScalarBarWidget 等继承自 vtkBorderWidget
  *
+ * 701. vtkCaptionWidget 标注某一个点，用一个带线框及箭头的文本信息来标注某一对象，鼠标可拖动标注的点和文本信息
+ * 702. vtkTextWidget 在渲染场景中生成一串标识文本，可以随意调整该文本在渲染场景中的位置，缩放其大小等。
+ * 703. vtkBalloonWidget 当鼠标停留在渲染场景中的某个Actor一段时间后，会弹出提示信息。所提示的信息，除了可以用文本表示，也可以用图像表示
+ *
  */
 
-#define TEST403
+#define TEST701
 
 #ifdef TEST101
 
@@ -1256,6 +1261,233 @@ int main(int, char*[])
 
 #endif // TEST404
 
+#ifdef TEST405
+
+#include <vtkActor.h>
+#include <vtkActor2D.h>
+#include <vtkAxesActor.h>
+#include <vtkCallbackCommand.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleRubberBand3D.h>
+#include <vtkNew.h>
+#include <vtkOrientationMarkerWidget.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+namespace {
+class CustomOrientationMarkerWidget : public vtkOrientationMarkerWidget
+{
+public:
+    static CustomOrientationMarkerWidget* New();
+    vtkTypeMacro(CustomOrientationMarkerWidget, vtkOrientationMarkerWidget);
+
+public:
+    virtual void OnLeftButtonDown() override
+    {
+        // We're only here if we are enabled
+        int X = this->Interactor->GetEventPosition()[0];
+        int Y = this->Interactor->GetEventPosition()[1];
+
+        // are we over the widget?
+        double vp[4];
+        this->Renderer->GetViewport(vp);
+
+        this->Renderer->NormalizedDisplayToDisplay(vp[0], vp[1]);
+        this->Renderer->NormalizedDisplayToDisplay(vp[2], vp[3]);
+
+        int pos1[2] = { static_cast<int>(vp[0]), static_cast<int>(vp[1]) };
+        int pos2[2] = { static_cast<int>(vp[2]), static_cast<int>(vp[3]) };
+
+        this->StartPosition[0] = X;
+        this->StartPosition[1] = Y;
+
+        // flag that we are attempting to adjust or move the outline
+        this->Moving = 1;
+        this->State  = this->ComputeStateBasedOnPosition(X, Y, pos1, pos2);
+        this->SetCursor(this->State);
+
+        if (this->State == vtkOrientationMarkerWidget::Outside)
+        {
+            this->Moving = 0;
+            return;
+        }
+
+        this->EventCallbackCommand->SetAbortFlag(1);
+        this->StartInteraction();
+        this->InvokeEvent(vtkCommand::StartInteractionEvent, nullptr);
+    }
+
+    virtual void OnLeftButtonUp() override
+    {
+        static int index = 0;
+        std::cout << index++ << '\t' << this->State << '\t' << this->Moving << '\n';
+
+        if (this->State == vtkOrientationMarkerWidget::Outside)
+        {
+            return;
+        }
+
+        // finalize any corner adjustments
+        this->SquareRenderer();
+        this->UpdateOutline();
+
+        switch (this->State)
+        {
+        case vtkOrientationMarkerWidget::AdjustingP1:
+        case vtkOrientationMarkerWidget::AdjustingP2:
+        case vtkOrientationMarkerWidget::AdjustingP3:
+        case vtkOrientationMarkerWidget::AdjustingP4:
+        case vtkOrientationMarkerWidget::Translating:
+            this->EventCallbackCommand->SetAbortFlag(1);
+            break;
+        }
+
+        // stop adjusting
+        this->State  = vtkOrientationMarkerWidget::Outside;
+        this->Moving = 0;
+
+        this->RequestCursorShape(VTK_CURSOR_DEFAULT);
+        this->EndInteraction();
+        this->InvokeEvent(vtkCommand::EndInteractionEvent, nullptr);
+        this->Interactor->Render();
+    }
+
+    virtual void OnMouseMove() override
+    {
+        // compute some info we need for all cases
+        int X = this->Interactor->GetEventPosition()[0];
+        int Y = this->Interactor->GetEventPosition()[1];
+
+        double vp[4];
+        this->Renderer->GetViewport(vp);
+
+        // compute display bounds of the widget to see if we are inside or outside
+        this->Renderer->NormalizedDisplayToDisplay(vp[0], vp[1]);
+        this->Renderer->NormalizedDisplayToDisplay(vp[2], vp[3]);
+
+        int pos1[2] = { static_cast<int>(vp[0]), static_cast<int>(vp[1]) };
+        int pos2[2] = { static_cast<int>(vp[2]), static_cast<int>(vp[3]) };
+
+        int state   = this->ComputeStateBasedOnPosition(X, Y, pos1, pos2);
+        this->State = this->Moving ? this->State : state;
+        this->SetCursor(this->State);
+        this->OutlineActor->SetVisibility(this->State);
+
+        if (this->State == vtkOrientationMarkerWidget::Outside || !this->Moving)
+        {
+            this->Interactor->Render();
+            return;
+        }
+
+        // based on the state set when the left mouse button is clicked,
+        // adjust the renderer's viewport
+        switch (this->State)
+        {
+        case vtkOrientationMarkerWidget::AdjustingP1:
+            this->ResizeBottomLeft(X, Y);
+            break;
+        case vtkOrientationMarkerWidget::AdjustingP2:
+            this->ResizeBottomRight(X, Y);
+            break;
+        case vtkOrientationMarkerWidget::AdjustingP3:
+            this->ResizeTopRight(X, Y);
+            break;
+        case vtkOrientationMarkerWidget::AdjustingP4:
+            this->ResizeTopLeft(X, Y);
+            break;
+        case vtkOrientationMarkerWidget::Translating:
+            this->MoveWidget(X, Y);
+            break;
+        }
+
+        this->UpdateOutline();
+        this->EventCallbackCommand->SetAbortFlag(1);
+        this->InvokeEvent(vtkCommand::InteractionEvent, nullptr);
+        this->Interactor->Render();
+    }
+};
+
+vtkStandardNewMacro(CustomOrientationMarkerWidget);
+
+class CustomInteractorStyle : public vtkInteractorStyleRubberBand3D
+{
+public:
+    static CustomInteractorStyle* New();
+    vtkTypeMacro(CustomInteractorStyle, vtkInteractorStyleRubberBand3D);
+
+public:
+    void OnLeftButtonDown() override
+    {
+        std::cout << __FUNCTION__ << std::endl;
+        Superclass::OnLeftButtonDown();
+    }
+
+    void OnLeftButtonUp() override
+    {
+        std::cout << __FUNCTION__ << std::endl;
+        Superclass::OnLeftButtonUp();
+    }
+
+    void OnMouseMove() override
+    {
+        // std::cout << __FUNCTION__ << std::endl;
+        Superclass::OnMouseMove();
+    }
+};
+
+vtkStandardNewMacro(CustomInteractorStyle);
+} // namespace
+
+// 在 vtkOrientationMarkerWidget 区域内按下鼠标左键时，并不会让Style的左键按下事件响应
+// 但是抬起时又会让Style的左键抬起事件响应
+
+int main(int, char*[])
+{
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(1., 0., 0.);
+
+    vtkNew<vtkRenderer> ren;
+    ren->AddActor(actor);
+    ren->SetBackground(.1, .2, .3);
+    ren->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(ren);
+    renWin->SetSize(800, 600);
+
+    vtkNew<CustomInteractorStyle> style;
+    vtkNew<vtkRenderWindowInteractor> iRen;
+    iRen->SetRenderWindow(renWin);
+    iRen->SetInteractorStyle(style);
+
+    vtkNew<vtkAxesActor> axes;
+    vtkNew<CustomOrientationMarkerWidget> om2;
+    // vtkNew<vtkOrientationMarkerWidget> om2;
+    om2->SetOrientationMarker(axes);
+    om2->SetViewport(0.5, 0, 1.0, 0.5);
+    om2->SetInteractor(iRen);
+    om2->EnabledOn();
+    om2->InteractiveOn();
+
+    renWin->Render();
+    iRen->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST405
+
 #ifdef TEST501
 
 #include <vtkActor.h>
@@ -1416,3 +1648,68 @@ int main(int argc, char* argv[])
 }
 
 #endif // TEST601
+
+#ifdef TEST701
+
+#include <vtkActor.h>
+#include <vtkCallbackCommand.h>
+#include <vtkCaptionActor2D.h>
+#include <vtkCaptionRepresentation.h>
+#include <vtkCaptionWidget.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNew.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+#include <vtkTextActor.h>
+#include <vtkTextProperty.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkSphereSource> sphereSource;
+    sphereSource->SetRadius(1.);
+    sphereSource->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputConnection(sphereSource->GetOutputPort());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(1., 0., 0.);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+    renderWindowInteractor->Initialize(); // 使用 vtkCaptionWidget 之前，必须初始化交互器，或者调用一次 vtkRenderWindow->Render()
+
+    double pos[3] = { 1., 0, 0 };
+    vtkNew<vtkCaptionRepresentation> captionRepresentation;
+    captionRepresentation->GetCaptionActor2D()->SetCaption("Test caption");
+    captionRepresentation->GetCaptionActor2D()->GetTextActor()->GetTextProperty()->SetFontSize(100);
+    captionRepresentation->SetAnchorPosition(pos); // 世界坐标
+
+    vtkNew<vtkCaptionWidget> captionWidget;
+    captionWidget->SetInteractor(renderWindowInteractor);
+    captionWidget->SetRepresentation(captionRepresentation);
+    captionWidget->On();
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST701
