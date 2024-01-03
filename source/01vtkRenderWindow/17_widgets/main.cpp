@@ -1,7 +1,7 @@
 /**
  * 101. vtkLegendScaleActor 比例尺
  * 102. 通过继承重写vtkLegendScaleActor的函数，指定主比例尺的位置
- * 103. 比例尺的比例
+ * 103. 比例尺的比例计算方法
  *
  * 201. vtkScalarBarActor 色卡
  * 202. 修复色卡相邻两个颜色相同的问题
@@ -27,7 +27,7 @@
  *
  */
 
-#define TEST701
+#define TEST103
 
 #ifdef TEST101
 
@@ -321,6 +321,7 @@ int main(int, char*[])
 
 #include <vtkActor.h>
 #include <vtkCamera.h>
+#include <vtkCoordinate.h>
 #include <vtkCubeSource.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkLegendScaleActor.h>
@@ -331,6 +332,8 @@ int main(int, char*[])
 #include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
 
+namespace {
+
 class CustomStyle : public vtkInteractorStyleTrackballCamera
 {
 public:
@@ -340,19 +343,46 @@ public:
 protected:
     void OnLeftButtonUp() override
     {
-        Superclass::OnLeftButtonUp();
-
-        if (this->Interactor && this->GetCurrentRenderer())
+        if (this->CurrentRenderer)
         {
-            auto renderer = this->GetCurrentRenderer();
-            auto camera   = renderer->GetActiveCamera();
-            std::cout << "-----------------------------------------------\n";
-            camera->Print(std::cout);
+            auto size = this->CurrentRenderer->GetSize();
+
+            auto rulerLeft   = size[0] * 0.33333; // 比例尺左端的屏幕坐标
+            auto rulerRight  = size[0] * 0.66667; // 比例尺右端的屏幕坐标(如果不是0.66667，比例可能会有一点偏差)
+            auto rulerHeight = 15.0;              // 比例尺y方向的屏幕坐标
+
+            double left[3] {}, right[3] {};
+
+            vtkNew<vtkCoordinate> coordinate;
+            coordinate->SetCoordinateSystemToDisplay();
+
+            coordinate->SetValue(rulerLeft, rulerHeight, 0.);
+            auto xLeft = coordinate->GetComputedWorldValue(this->CurrentRenderer);
+            left[0]    = xLeft[0];
+            left[1]    = xLeft[1];
+            left[2]    = xLeft[2];
+
+            coordinate->SetValue(rulerRight, rulerHeight, 0.);
+            auto xRight = coordinate->GetComputedWorldValue(this->CurrentRenderer);
+            right[0]    = xRight[0];
+            right[1]    = xRight[1];
+            right[2]    = xRight[2];
+
+            auto dx = right[0] - left[0];
+            auto dy = right[1] - left[1];
+            auto dz = right[2] - left[2];
+
+            // 将比例尺的左端和右端转换为世界坐标，然后计算这两个世界坐标之间的距离
+            // 比例尺在世界坐标系中的长度就是比例尺的比例
+            std::cout << std::hypot(dx, dy, dz) << '\n';
         }
+
+        Superclass::OnLeftButtonUp();
     }
 };
 
 vtkStandardNewMacro(CustomStyle);
+} // namespace
 
 int main(int, char*[])
 {
@@ -371,27 +401,22 @@ int main(int, char*[])
     scale->RightAxisVisibilityOff();
     scale->TopAxisVisibilityOff();
 
-    // renderer
     vtkNew<vtkRenderer> renderer;
     renderer->SetBackground(.1, .2, .3);
     renderer->AddActor(actor);
     renderer->AddActor(scale);
     renderer->ResetCamera();
-    renderer->GetActiveCamera()->SetParallelProjection(true); // 平行投影
+    renderer->GetActiveCamera()->ParallelProjectionOff();
 
-    // RenderWindow
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
     renWin->SetSize(800, 600);
 
-    // RenderWindowInteractor
+    vtkNew<CustomStyle> style;
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
-
-    vtkNew<CustomStyle> style;
     iren->SetInteractorStyle(style);
 
-    // 数据交互
     renWin->Render();
     iren->Start();
 

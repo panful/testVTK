@@ -1058,7 +1058,7 @@ int main()
     polys->InsertNextCell({ 0, 1, 2 });
 
     vtkNew<vtkCellArray> lines;
-    lines->InsertNextCell({ 3,4 });
+    lines->InsertNextCell({ 3, 4 });
 
     vtkNew<vtkPolyData> polyData;
     polyData->SetPoints(points);
