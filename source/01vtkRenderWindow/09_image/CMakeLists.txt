@@ -18,6 +18,7 @@ find_package(VTK
         InteractionWidgets  # vtkWidgetRepresentation
         RenderingImage      # vtkImageResliceMapper
         ImagingMath         # vtkImageMagnitude
+        FiltersGeometry     # vtkImageDataGeometryFilter
     QUIET
 )
 

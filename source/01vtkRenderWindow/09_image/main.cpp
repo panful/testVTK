@@ -14,9 +14,11 @@
  * 501. vtkImageLuminance 将彩色图像转换为灰度图
  * 502. vtkImageMagnitude 将彩色图像转换为灰度图
  *
+ * 601. 2D图像3维化，高程图
+ *
  */
 
-#define TEST502
+#define TEST601
 
 #ifdef TEST101
 
@@ -761,3 +763,76 @@ int main(int, char*[])
 }
 
 #endif // TEST502
+
+#ifdef TEST601
+
+#include <vtkActor.h>
+#include <vtkBMPReader.h>
+#include <vtkCamera.h>
+#include <vtkDataSetMapper.h>
+#include <vtkImageData.h>
+#include <vtkImageDataGeometryFilter.h>
+#include <vtkImageLuminance.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkMergeFilter.h>
+#include <vtkNew.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkWarpScalar.h>
+
+// https://examples.vtk.org/site/Cxx/Images/ImageWarp/
+
+int main(int argc, char* argv[])
+{
+    vtkNew<vtkBMPReader> reader;
+    reader->SetFileName("../resources/masonry.bmp");
+    reader->Update();
+
+    vtkNew<vtkImageLuminance> luminance;
+    luminance->SetInputConnection(reader->GetOutputPort());
+    luminance->Update();
+
+    vtkNew<vtkImageDataGeometryFilter> geometry;
+    geometry->SetInputConnection(luminance->GetOutputPort());
+    geometry->Update();
+
+    vtkNew<vtkWarpScalar> warp;
+    warp->SetInputConnection(geometry->GetOutputPort());
+    warp->SetScaleFactor(-0.1);
+    warp->Update();
+
+    vtkNew<vtkMergeFilter> merge;
+    merge->SetGeometryInputData(warp->GetOutput());
+    merge->SetScalarsData(vtkDataSet::SafeDownCast(reader->GetOutput()));
+    merge->GlobalWarningDisplayOff();
+    merge->Update();
+
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputConnection(merge->GetOutputPort());
+    mapper->SetScalarRange(0, 255);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkRenderer> ren;
+    ren->AddActor(actor);
+    ren->ResetCamera();
+    ren->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(ren);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST601
