@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 101. vtkCamera
  *
  * 201. 相机旋转原理
@@ -21,13 +21,16 @@
  * 504. 窗口缩放，图元不缩放，即图元始终和显示器比例一致
  *
  * 601. vtkCoordinate 坐标转换
+ * 602. 世界坐标转换为屏幕坐标
+ * 603. 将屏幕坐标转换为世界坐标，然后将这些顶点连接为一条线
+ * 604. 屏幕坐标转换为世界坐标原理
  */
 
 // vtk是行矩阵
 // https://blog.csdn.net/liushao1031177/article/details/116903698
 // https://www.cnblogs.com/ybqjymy/p/13925462.html
 
-#define TEST501
+#define TEST602
 
 #ifdef TEST101
 
@@ -1842,3 +1845,446 @@ int main(int, char*[])
 }
 
 #endif // TEST504
+
+#ifdef TEST601
+
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkCoordinate.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+namespace {
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    void OnLeftButtonDown() override
+    {
+        Superclass::OnLeftButtonDown();
+
+        if (!this->Interactor || !this->CurrentRenderer)
+        {
+            return;
+        }
+
+        int displayPos[2] {};
+        this->Interactor->GetEventPosition(displayPos); // 整个窗口的屏幕坐标，左下角(0,0)
+
+        vtkNew<vtkCoordinate> coordinate;
+        coordinate->SetValue(displayPos[0], displayPos[1], 0.);
+        coordinate->SetCoordinateSystemToDisplay();
+
+        auto worldPos = coordinate->GetComputedWorldValue(this->CurrentRenderer);       // 世界坐标
+        auto viewportPos = coordinate->GetComputedViewportValue(this->CurrentRenderer); // viewport屏幕坐标，超出当前vtkRenderer时会有负值
+        auto localDisplayPos = coordinate->GetComputedLocalDisplayValue(this->CurrentRenderer); // 左上角(0,0)屏幕坐标
+
+        std::cout << "-------------------------------------------------\n";
+        std::cout << "Display Position:\t" << displayPos[0] << ' ' << displayPos[1] << '\n';
+        std::cout << "World Position:\t\t" << worldPos[0] << ' ' << worldPos[1] << ' ' << worldPos[2] << '\n';
+        std::cout << "Viewport Position:\t" << viewportPos[0] << ' ' << viewportPos[1] << '\n';
+        std::cout << "LocalDisplay Position:\t" << localDisplayPos[0] << ' ' << localDisplayPos[1] << '\n';
+    }
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+int main(int, char*[])
+{
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->SetViewport(.2, .2, .8, .8); // 窗口是(1000,1000) viewport是(600,600)
+    renderer->GetActiveCamera()->ParallelProjectionOn();
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(1000, 1000);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<MyStyle> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST601
+
+#ifdef TEST602
+
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkCoordinate.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkMatrix4x4.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkVector.h>
+#include <vtkVectorOperators.h>
+
+namespace {
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    void OnLeftButtonDown() override
+    {
+        Superclass::OnLeftButtonDown();
+
+        if (!this->Interactor || !this->CurrentRenderer)
+        {
+            return;
+        }
+
+        int eventPos[2] {};
+        this->Interactor->GetEventPosition(eventPos);
+
+        auto size   = this->CurrentRenderer->GetSize();
+        auto camera = this->CurrentRenderer->GetActiveCamera();
+
+        auto aspect  = this->CurrentRenderer->GetTiledAspectRatio();
+        auto viewMat = camera->GetViewTransformMatrix();
+        auto projMat = camera->GetProjectionTransformMatrix(aspect, 0., 1.);
+
+        // 第一次显示时，立方体的前右上角顶点
+        double point[] { .5, .5, .5, 1. };
+
+        vtkNew<vtkMatrix4x4> vpMat;
+        viewMat->Multiply4x4(projMat, viewMat, vpMat);
+
+        // 世界坐标转NDC坐标
+        auto displayPos = vpMat->MultiplyPoint(point);
+        displayPos[0]   = displayPos[0] / displayPos[3];
+        displayPos[1]   = displayPos[1] / displayPos[3];
+        displayPos[2]   = displayPos[2] / displayPos[3];
+
+        // NDC转屏幕坐标
+        auto x = static_cast<int>((displayPos[0] + 1.) / 2. * size[0]);
+        auto y = static_cast<int>((displayPos[1] + 1.) / 2. * size[1]);
+
+        std::cout << "-------------------------------------------------\n";
+        std::cout << "NDC position:\t\t" << displayPos[0] << ' ' << displayPos[1] << ' ' << displayPos[2] << '\n';
+        std::cout << "event position:\t\t" << eventPos[0] << ' ' << eventPos[1] << '\n';
+        std::cout << "display position:\t" << x << ' ' << y << '\n';
+    }
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+int main(int, char*[])
+{
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    // for (vtkIdType i = 0; i < source->GetOutput()->GetNumberOfPoints(); ++i)
+    // {
+    //     auto pt = source->GetOutput()->GetPoint(i);
+    //     std::cout << pt[0] << ' ' << pt[1] << ' ' << pt[2] << '\n';
+    // }
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->GetActiveCamera()->ParallelProjectionOn();
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<MyStyle> style;
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST602
+
+#ifdef TEST603
+
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkCoordinate.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLineSource.h>
+#include <vtkPoints.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+namespace {
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    void OnRightButtonDown() override
+    {
+        Superclass::OnRightButtonDown();
+
+        if (!this->Interactor || !this->CurrentRenderer)
+        {
+            return;
+        }
+
+        int displayPos[2] {};
+        this->Interactor->GetEventPosition(displayPos);
+
+        vtkNew<vtkCoordinate> coordinate;
+        coordinate->SetValue(displayPos[0], displayPos[1], 0.);
+        coordinate->SetCoordinateSystemToDisplay();
+
+        auto worldPos = coordinate->GetComputedWorldValue(this->CurrentRenderer);
+
+        m_points->InsertNextPoint(worldPos);
+        std::cout << "point: " << worldPos[0] << '\t' << worldPos[1] << '\t' << worldPos[2] << '\n';
+    }
+
+    void OnMiddleButtonUp() override
+    {
+        Superclass::OnMiddleButtonUp();
+
+        if (!this->Interactor || !this->CurrentRenderer)
+        {
+            return;
+        }
+
+        vtkNew<vtkLineSource> line;
+        line->SetPoints(m_points);
+        line->Update();
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(line->GetOutput());
+
+        static vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(1., 0., 0.);
+
+        this->CurrentRenderer->AddActor(actor);
+        this->Interactor->Render();
+    }
+
+private:
+    vtkSmartPointer<vtkPoints> m_points { vtkSmartPointer<vtkPoints>::New() };
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+// 无论怎样变换相机，在相机状态相同时，拾取到的所有点都在一个平面上（相机近裁剪平面）
+
+int main(int, char*[])
+{
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->GetActiveCamera()->ParallelProjectionOn();
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<MyStyle> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST603
+
+#ifdef TEST604
+
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkCoordinate.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkMatrix4x4.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkVector.h>
+#include <vtkVectorOperators.h>
+
+namespace {
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    void OnLeftButtonDown() override
+    {
+        Superclass::OnLeftButtonDown();
+
+        if (!this->Interactor || !this->CurrentRenderer)
+        {
+            return;
+        }
+
+        int displayPos[2] {};
+        this->Interactor->GetEventPosition(displayPos); // 整个窗口的屏幕坐标，左下角(0,0)
+
+        auto size   = this->CurrentRenderer->GetSize();
+        auto camera = this->CurrentRenderer->GetActiveCamera();
+
+        vtkVector3d cameraPos, cameraFocalPos;
+        camera->GetPosition(cameraPos.GetData());
+        camera->GetFocalPoint(cameraFocalPos.GetData());
+
+        double clipRange[2] {};
+        camera->GetClippingRange(clipRange);
+
+        auto cameraDir     = -(cameraPos - cameraFocalPos).Normalized();
+        auto nearClipPlane = cameraPos + cameraDir * clipRange[0];
+
+        vtkNew<vtkCoordinate> coordinate;
+        coordinate->SetValue(displayPos[0], displayPos[1], 0.);
+        coordinate->SetCoordinateSystemToDisplay();
+
+        // 世界坐标的z分量就是相机的近裁剪平面对应的z值
+        auto worldPos = coordinate->GetComputedWorldValue(this->CurrentRenderer); // 世界坐标
+
+        //--------------------------------------------------------------------------------------
+        // 自己实现屏幕坐标转世界坐标（暂时不支持透视投影，vtkRenderer不填满整个窗口
+        // 屏幕坐标在vtkRenderer中的标准坐标[-1,1]
+        double NViewPos[4] = { (displayPos[0] * 2. - size[0]) / size[0], (displayPos[1] * 2. - size[1]) / size[1], 0., 1. };
+
+        auto aspect  = this->CurrentRenderer->GetTiledAspectRatio();
+        auto viewMat = camera->GetViewTransformMatrix();
+        auto projMat = camera->GetProjectionTransformMatrix(aspect, 0., 1.);
+
+        vtkNew<vtkMatrix4x4> invertViewMat;
+        vtkNew<vtkMatrix4x4> invertProjMat;
+        vtkMatrix4x4::Invert(viewMat, invertViewMat);
+        vtkMatrix4x4::Invert(projMat, invertProjMat);
+
+        auto projPos = invertProjMat->MultiplyPoint(NViewPos);
+        projPos[0]   = projPos[0] / projPos[3];
+        projPos[1]   = projPos[1] / projPos[3];
+        projPos[2]   = projPos[2] / projPos[3];
+
+        // 屏幕坐标转世界坐标
+        auto worldPos2 = invertViewMat->MultiplyPoint(projPos);
+        worldPos2[0]   = worldPos2[0] / worldPos2[3];
+        worldPos2[1]   = worldPos2[1] / worldPos2[3];
+        worldPos2[2]   = worldPos2[2] / worldPos2[3];
+
+        std::cout << "-------------------------------------------------\n";
+        std::cout << "Display Position:\t" << displayPos[0] << ' ' << displayPos[1] << '\n';
+        std::cout << "World Position:\t\t" << worldPos[0] << ' ' << worldPos[1] << ' ' << worldPos[2] << '\n';
+        std::cout << "World Position2:\t" << worldPos2[0] << ' ' << worldPos2[1] << ' ' << worldPos2[2] << '\n';
+        std::cout << "Near clip plane:\t" << nearClipPlane[2] << '\n';
+    }
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+int main(int, char*[])
+{
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->GetActiveCamera()->ParallelProjectionOn();
+    renderer->ResetCamera();
+    // renderer->GetActiveCamera()->SetClippingRange(.2, 100.);
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<MyStyle> style;
+    // style->AutoAdjustCameraClippingRangeOff();
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST604
