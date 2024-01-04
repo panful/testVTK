@@ -17,6 +17,7 @@ find_package(VTK
         RenderingAnnotation # vtkCaptionActor2D
         InteractionWidgets  # vtkOrientationMarkerWidget
         IOImage             # vtkDICOMImageReader
+        CommonComputationalGeometry     # vtkParametricSpline
     QUIET
 )
 

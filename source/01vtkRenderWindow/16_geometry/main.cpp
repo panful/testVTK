@@ -21,9 +21,10 @@
  *
  * 901. vtkParametricSuperEllipsoid vtkParametricFunctionSource 超椭球体
  * 902. vtkRectilinearGrid 通过给定XYZ方向上的坐标，生成一个体数据
+ * 903. vtkParametricSpline vtkParametricFunctionSource 样条曲线
  */
 
-#define TEST902
+#define TEST903
 
 #ifdef TEST101
 
@@ -1063,3 +1064,64 @@ int main()
 }
 
 #endif // TEST902
+
+#ifdef TEST903
+
+#include <vtkActor.h>
+#include <vtkParametricFunctionSource.h>
+#include <vtkParametricSpline.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+int main(int, char*[])
+{
+    // 样条曲线的顶点
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0., 0., 0.);
+    points->InsertNextPoint(1., 1., 0.);
+    points->InsertNextPoint(2., 1., 0.);
+    points->InsertNextPoint(3., 0., 0.);
+
+    vtkNew<vtkParametricSpline> spline;
+    spline->SetPoints(points);
+
+    vtkNew<vtkParametricFunctionSource> functionSource;
+    functionSource->SetUResolution(20); // 设置线段个数
+    functionSource->SetParametricFunction(spline);
+    functionSource->Update();
+
+    auto nc = functionSource->GetOutput()->GetNumberOfCells();
+    auto np = functionSource->GetOutput()->GetNumberOfPoints();
+    std::cout << "Points:\t" << np << "\nCells:\t" << nc << '\n';
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(functionSource->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST903
