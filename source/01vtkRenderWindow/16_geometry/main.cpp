@@ -11,6 +11,7 @@
  * 302. vtkLineSource           折线
  *
  * 401. vtkArrowSource          箭头
+ * 402. vtkArrowSource          设置箭头的位置、方向
  *
  * 501. vtkPointSource          在一个球体内生成一堆点精灵
  * 502. vtkBoundedPointSource   在一个立方体包围盒内生成一堆顶点
@@ -21,7 +22,7 @@
  *
  */
 
-#define TEST303
+#define TEST402
 
 #ifdef TEST101
 
@@ -521,6 +522,143 @@ int main(int, char*[])
 }
 
 #endif // TEST401
+
+#ifdef TEST402
+
+#include <vtkActor.h>
+#include <vtkArrowSource.h>
+#include <vtkDataSetMapper.h>
+#include <vtkMinimalStandardRandomSequence.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+#include <vtkTransform.h>
+#include <vtkTransformPolyDataFilter.h>
+
+/// @brief 通过指定起始位置和终点位置创建一个箭头
+/// @param start
+/// @param end
+/// @return
+vtkSmartPointer<vtkDataSetMapper> createArrow(double* start, double* end)
+{
+    auto arrowSource = vtkSmartPointer<vtkArrowSource>::New();
+
+    // Compute a basis
+    double normalizedX[3];
+    double normalizedY[3];
+    double normalizedZ[3];
+
+    // The X axis is a vector from start to end
+    vtkMath::Subtract(end, start, normalizedX);
+    double length = vtkMath::Norm(normalizedX);
+    vtkMath::Normalize(normalizedX);
+
+    // The Z axis is an arbitrary vector cross X
+    vtkNew<vtkMinimalStandardRandomSequence> rng;
+    rng->SetSeed(8775070);
+    double arbitrary[3];
+    for (auto i = 0; i < 3; ++i)
+    {
+        rng->Next();
+        arbitrary[i] = rng->GetRangeValue(-10, 10);
+    }
+    vtkMath::Cross(normalizedX, arbitrary, normalizedZ);
+    vtkMath::Normalize(normalizedZ);
+
+    // The Y axis is Z cross X
+    vtkMath::Cross(normalizedZ, normalizedX, normalizedY);
+    vtkNew<vtkMatrix4x4> matrix;
+
+    // Create the direction cosine matrix
+    matrix->Identity();
+    for (auto i = 0; i < 3; i++)
+    {
+        matrix->SetElement(i, 0, normalizedX[i]);
+        matrix->SetElement(i, 1, normalizedY[i]);
+        matrix->SetElement(i, 2, normalizedZ[i]);
+    }
+
+    // Apply the transforms
+    vtkNew<vtkTransform> transform;
+    transform->Translate(start);
+    transform->Concatenate(matrix);
+    transform->Scale(length, length, length);
+
+    // Transform the polydata
+    vtkNew<vtkTransformPolyDataFilter> transformPD;
+    transformPD->SetTransform(transform);
+    transformPD->SetInputConnection(arrowSource->GetOutputPort());
+
+    vtkNew<vtkDataSetMapper> arrowMapper;
+    arrowMapper->SetInputConnection(transformPD->GetOutputPort());
+
+    return arrowMapper;
+}
+
+int main()
+{
+    // 自定义位置
+    double start[] = { 1, 0, 10 };
+    double end[]   = { 20, -10, 10 };
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(createArrow(start, end));
+    actor->GetProperty()->SetColor(1., 0., 0.);
+
+    //-------------------------------------------------------------------------
+    // 创建两个球，用来标记箭头的起点和终点
+    vtkNew<vtkActor> startActor;
+    {
+        vtkNew<vtkSphereSource> source;
+        source->SetCenter(start);
+        source->Update();
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(source->GetOutput());
+
+        startActor->SetMapper(mapper);
+        startActor->GetProperty()->SetColor(0, 1, 0);
+    }
+
+    vtkNew<vtkActor> endActor;
+    {
+        vtkNew<vtkSphereSource> source;
+        source->SetCenter(end);
+        source->Update();
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(source->GetOutput());
+
+        endActor->SetMapper(mapper);
+        endActor->GetProperty()->SetColor(0, 0, 1);
+    }
+
+    //-------------------------------------------------------------------------
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->AddActor(startActor);
+    renderer->AddActor(endActor);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return 0;
+}
+
+#endif // TEST402
 
 #ifdef TEST501
 
