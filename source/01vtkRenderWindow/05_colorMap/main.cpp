@@ -1,9 +1,9 @@
 ﻿/*
  * 100 上下左右四视图，格点、格心数据，线框、面显示模式的区别
- * 101 vtkLookupTable 颜色查找表 
- * 102 
+ * 101 vtkLookupTable 颜色查找表
+ * 102
  * 103 scalars范围超出lookuptable的范围时，超出部分不显示或指定颜色
- * 104 
+ * 104
  * 105 给vtkPolyData添加多个vtkDataArray，指定某个Array映射颜色
  *
  * 300 vtkGlyph3D 官方示例 矢量图(箭头)
@@ -16,6 +16,7 @@
  * 307 动态开启关闭矢量图颜色映射
  * 308
  * 309 线框网格矢量图箭头方向，箭头起始段末端翻转，闭合多边形的内法线、外法线
+ * 310 vtkHedgeHog 从矢量数据创建定向线，类似vtkGlyph3D
  *
  * 500 粒子追踪（迹线）
  * 501 拉格朗日粒子追踪，官方示例
@@ -41,7 +42,7 @@
  * 802 带交互的流体模拟
  */
 
-#define TEST802
+#define TEST310
 
 #ifdef TEST100
 
@@ -1560,6 +1561,72 @@ int main(int, char*[])
 }
 
 #endif // TEST309
+
+#ifdef TEST310
+
+#include <vtkActor.h>
+#include <vtkDoubleArray.h>
+#include <vtkHedgeHog.h>
+#include <vtkNew.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkDoubleArray> vectors;
+    vectors->SetNumberOfComponents(3);
+    vectors->InsertNextTuple3(1., 1., 0.);
+    vectors->InsertNextTuple3(2., 2., 0.);
+    vectors->InsertNextTuple3(3., 3., 0.);
+    vectors->InsertNextTuple3(4., 4., 0.);
+
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0., 0., 0.);
+    points->InsertNextPoint(1., 0., 0.);
+    points->InsertNextPoint(1., 1., 0.);
+    points->InsertNextPoint(0., 1., 0.);
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->GetPointData()->SetVectors(vectors);
+
+    vtkNew<vtkHedgeHog> hedgehog;
+    hedgehog->SetInputData(polyData);
+    hedgehog->SetScaleFactor(0.1);
+
+    vtkNew<vtkPolyDataMapper> sgridMapper;
+    sgridMapper->SetInputConnection(hedgehog->GetOutputPort());
+
+    vtkNew<vtkActor> sgridActor;
+    sgridActor->SetMapper(sgridMapper);
+    sgridActor->GetProperty()->SetColor(1., 0., 0.);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(sgridActor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+    renWin->SetWindowName("HedgeHog");
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST310
 
 #ifdef TEST500
 
