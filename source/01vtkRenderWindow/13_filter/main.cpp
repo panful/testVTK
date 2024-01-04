@@ -26,6 +26,7 @@
  * 503. vtkExtractCells 提取指定单元，类似设置间隔
  * 504. vtkSelectPolyData 选择多边形网格的一部分，生成选择标量
  * 505. vtkExtractUnstructuredGrid
+ * 506. vtkRectilinearGridGeometryFilter 从直线网格中提取几何体（点、线、面、体）
  *
  * 601. vtkDataSetSurfaceFilter 将 vtkUnstructuredGrid 转换为 vtkPolyData，还可以将体网格转换为表面数据，从而简化模型
  * 602. vtkGeometryFilter 从数据集中提取边界，可以将任何数据转换为多边形数据，类似vtkDataSetSurfaceFilter
@@ -42,7 +43,7 @@
  * 803. PerlinNoise 使用 vtkSampleFunction 生成噪声图片
  */
 
-#define TEST803
+#define TEST506
 
 #ifdef TEST001
 
@@ -2074,6 +2075,88 @@ int main(int, char*[])
 }
 
 #endif // TEST504
+
+#ifdef TEST506
+
+#include <array>
+#include <vtkActor.h>
+#include <vtkDataSetMapper.h>
+#include <vtkDoubleArray.h>
+#include <vtkNew.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRectilinearGrid.h>
+#include <vtkRectilinearGridGeometryFilter.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main()
+{
+    std::array<double, 5> x = { 0, 1, 2, 3, 4 };
+    std::array<double, 4> y = { 5, 6, 7, 8 };
+    std::array<double, 3> z = { 9, 10, 11 };
+
+    // 通过定义三个指定x-y-z方向坐标的阵列来创建直线栅格。
+    vtkNew<vtkDoubleArray> xCoords;
+    for (auto&& i : x)
+    {
+        xCoords->InsertNextValue(i);
+    }
+    vtkNew<vtkDoubleArray> yCoords;
+    for (auto&& i : y)
+    {
+        yCoords->InsertNextValue(i);
+    }
+    vtkNew<vtkDoubleArray> zCoords;
+    for (auto&& i : z)
+    {
+        zCoords->InsertNextValue(i);
+    }
+
+    vtkNew<vtkRectilinearGrid> rgrid;
+    rgrid->SetDimensions(int(x.size()), int(y.size()), int(z.size()));
+    rgrid->SetXCoordinates(xCoords);
+    rgrid->SetYCoordinates(yCoords);
+    rgrid->SetZCoordinates(zCoords);
+
+    // 从直线网格中提取几何体，通过指定SetExtent()可以提取到点、线、面、体
+    vtkNew<vtkRectilinearGridGeometryFilter> plane;
+    plane->SetInputData(rgrid);
+    plane->SetExtent(0, 4, 0, 0, 0, 2); // 提取XYZ方向上的坐标序号，X提取第0到第4个，Y只要第0个，Z提取第0到第2个，相当于提取了一个平面
+    plane->Update();
+
+    vtkNew<vtkDataSetMapper> rgridMapper;
+    rgridMapper->SetInputData(plane->GetOutput());
+
+    vtkNew<vtkActor> wireActor;
+    wireActor->SetMapper(rgridMapper);
+    wireActor->GetProperty()->SetRepresentationToWireframe();
+    wireActor->GetProperty()->SetColor(1., 0., 0.);
+
+    double bounds[6] {};
+    wireActor->GetBounds(bounds);
+    std::cout << "Bounds: " << bounds[0] << ' ' << bounds[1] << ' ' << bounds[2] << ' ' << bounds[3] << ' ' << bounds[4] << ' ' << bounds[5] << '\n';
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(wireActor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST506
 
 #ifdef TEST601
 
