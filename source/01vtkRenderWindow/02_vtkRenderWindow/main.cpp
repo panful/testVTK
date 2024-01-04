@@ -56,13 +56,13 @@
 62.
 
 64.DICOM  MPR 医学ct图四象限
-65.vtkBorderWidget事件
+
 66.shared actor 多个vtkRenderWindow共享actor
-67.vtkBoxWidget 一个立方体框线盒子，可以将物体包裹起来
+
 
 */
 
-#define TEST66
+#define TEST65
 
 // 在cmake加上vtk_module_autoinit就不需要在此处再初始化vtk模块
 // #include <vtkAutoInit.h>
@@ -3782,144 +3782,6 @@ int main()
 }
 #endif // TEST64
 
-#ifdef TEST65
-
-#include <vtkActor.h>
-#include <vtkBorderRepresentation.h>
-#include <vtkBorderWidget.h>
-#include <vtkCallbackCommand.h>
-#include <vtkCommand.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkObjectFactory.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkSphereSource.h>
-#include <vtkWidgetCallbackMapper.h>
-#include <vtkWidgetEvent.h>
-
-namespace {
-class vtkCustomBorderWidget : public vtkBorderWidget
-{
-public:
-    static vtkCustomBorderWidget* New();
-    vtkTypeMacro(vtkCustomBorderWidget, vtkBorderWidget);
-
-    // static void SelectAction(vtkAbstractWidget*);
-    // static void TranslateAction(vtkAbstractWidget*);
-    // static void EndSelectAction(vtkAbstractWidget*);
-    static void MoveAction(vtkAbstractWidget*);
-    // static void HoverLeaveAction(vtkAbstractWidget*);
-
-    static void EndSelectAction(vtkAbstractWidget* w);
-
-    vtkCustomBorderWidget();
-};
-
-vtkStandardNewMacro(vtkCustomBorderWidget);
-
-} // namespace
-
-// void SelectionChangedCallbackFunction(vtkObject* caller,
-//     long unsigned int eventId,
-//     void* clientData, void* callData) {}
-
-int main(int, char*[])
-{
-    vtkNew<vtkNamedColors> colors;
-
-    // Sphere
-    vtkNew<vtkSphereSource> sphereSource;
-    sphereSource->SetRadius(4.0);
-    sphereSource->Update();
-
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputConnection(sphereSource->GetOutputPort());
-
-    vtkNew<vtkActor> actor;
-    actor->SetMapper(mapper);
-    actor->GetProperty()->SetColor(colors->GetColor3d("DarkOliveGreen").GetData());
-
-    // A renderer and render window
-    vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->SetSize(800, 600);
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("BorderWidget");
-
-    // An interactor
-    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-    renderWindowInteractor->SetRenderWindow(renderWindow);
-
-    vtkNew<vtkCustomBorderWidget> borderWidget;
-    borderWidget->SetInteractor(renderWindowInteractor);
-    borderWidget->CreateDefaultRepresentation();
-    borderWidget->SelectableOff();
-
-    // Add the actors to the scene
-    renderer->AddActor(actor);
-    renderer->SetBackground(colors->GetColor3d("SteelBlue").GetData());
-
-    // Render an image (lights and cameras are created automatically)
-    renderWindowInteractor->Initialize();
-    renderWindow->Render();
-    borderWidget->On();
-
-    // vtkNew<vtkCallbackCommand> selectionChangedCallback;
-    // selectionChangedCallback->SetCallback(SelectionChangedCallbackFunction);
-    // borderWidget->AddObserver(vtkWidgetEvent::Move, selectionChangedCallback);
-
-    // Begin mouse interaction
-    renderWindowInteractor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-namespace {
-vtkCustomBorderWidget::vtkCustomBorderWidget()
-{
-    // 在此处设置了回调函数，才可以调用到action
-    this->CallbackMapper->SetCallbackMethod(
-        vtkCommand::MiddleButtonReleaseEvent, vtkWidgetEvent::EndSelect, this, vtkCustomBorderWidget::EndSelectAction);
-    this->CallbackMapper->SetCallbackMethod(vtkCommand::MouseMoveEvent, vtkWidgetEvent::Move, this, vtkCustomBorderWidget::MoveAction);
-}
-
-void vtkCustomBorderWidget::EndSelectAction(vtkAbstractWidget* w)
-{
-    vtkBorderWidget* borderWidget = dynamic_cast<vtkBorderWidget*>(w);
-
-    // Get the actual box coordinates/planes
-    // vtkNew<vtkPolyData> polydata;
-
-    // Get the bottom left corner
-    // auto lowerLeft =
-    //    static_cast<vtkBorderRepresentation*>(borderWidget->GetRepresentation())
-    //    ->GetPosition();
-    // std::cout << "Lower left: " << lowerLeft[0] << " " << lowerLeft[1]
-    //    << std::endl;
-
-    // auto upperRight =
-    //     static_cast<vtkBorderRepresentation*>(borderWidget->GetRepresentation())
-    //     ->GetPosition2();
-    // std::cout << "Upper right: " << upperRight[0] << " " << upperRight[1]
-    //     << std::endl;
-
-    vtkBorderWidget::EndSelectAction(w);
-}
-
-void vtkCustomBorderWidget::MoveAction(vtkAbstractWidget* w)
-{
-    std::cout << "test\n";
-    vtkBorderWidget::MoveAction(w);
-}
-
-} // namespace
-
-#endif // TEST65
 
 #ifdef TEST66
 
@@ -4036,87 +3898,4 @@ int main(int, char*[])
 
 #endif // TEST66
 
-#ifdef TEST67
 
-#include <vtkActor.h>
-#include <vtkBoxWidget.h>
-#include <vtkCommand.h>
-#include <vtkConeSource.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkTransform.h>
-
-namespace {
-class vtkMyCallback : public vtkCommand
-{
-public:
-    static vtkMyCallback* New()
-    {
-        return new vtkMyCallback;
-    }
-
-    virtual void Execute(vtkObject* caller, unsigned long, void*)
-    {
-        // Here we use the vtkBoxWidget to transform the underlying coneActor
-        // (by manipulating its transformation matrix).
-        vtkNew<vtkTransform> t;
-        vtkBoxWidget* widget = reinterpret_cast<vtkBoxWidget*>(caller);
-        widget->GetTransform(t);
-        widget->GetProp3D()->SetUserTransform(t);
-    }
-};
-} // namespace
-
-int main(int vtkNotUsed(argc), char* vtkNotUsed(argv)[])
-{
-    vtkNew<vtkNamedColors> colors;
-
-    vtkNew<vtkConeSource> cone;
-
-    vtkNew<vtkPolyDataMapper> coneMapper;
-    coneMapper->SetInputConnection(cone->GetOutputPort());
-
-    vtkNew<vtkActor> coneActor;
-    coneActor->SetMapper(coneMapper);
-    coneActor->GetProperty()->SetColor(colors->GetColor3d("BurlyWood").GetData());
-
-    vtkNew<vtkRenderer> renderer;
-    renderer->AddActor(coneActor);
-    renderer->SetBackground(colors->GetColor3d("Blue").GetData());
-
-    vtkNew<vtkRenderWindow> window;
-    window->AddRenderer(renderer);
-    window->SetSize(300, 300);
-    window->SetWindowName("BoxWidget");
-
-    vtkNew<vtkRenderWindowInteractor> interactor;
-    interactor->SetRenderWindow(window);
-
-    vtkNew<vtkInteractorStyleTrackballCamera> style;
-    interactor->SetInteractorStyle(style);
-
-    vtkNew<vtkBoxWidget> boxWidget;
-    boxWidget->SetInteractor(interactor);
-
-    boxWidget->SetProp3D(coneActor);
-    boxWidget->SetPlaceFactor(1.25); // Make the box 1.25x larger than the actor
-    boxWidget->PlaceWidget();
-
-    vtkNew<vtkMyCallback> callback;
-    boxWidget->AddObserver(vtkCommand::InteractionEvent, callback);
-
-    boxWidget->On();
-
-    window->Render();
-    interactor->Start();
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST67

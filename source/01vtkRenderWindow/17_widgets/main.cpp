@@ -19,7 +19,9 @@
  *
  * 501. vtkButtonWidget 按钮
  *
- * 601. vtkBorderWidget 边框，vtkLogoWidget vtkTextWidget vtkScalarBarWidget 等继承自 vtkBorderWidget
+ * 601. vtkBorderWidget 边框小部件，vtkLogoWidget vtkTextWidget vtkScalarBarWidget 等继承自 vtkBorderWidget
+ * 602. vtkBorderWidget 事件回调设置
+ * 603. vtkBoxWidget vtkBoxWidget2 将一个vtkProp放在长方体中，用鼠标操作长方体的小部件
  *
  * 701. vtkCaptionWidget 标注某一个点，用一个带线框及箭头的文本信息来标注某一对象，鼠标可拖动标注的点和文本信息
  * 702. vtkTextWidget 在渲染场景中生成一串标识文本，可以随意调整该文本在渲染场景中的位置，缩放其大小等。
@@ -27,7 +29,7 @@
  *
  */
 
-#define TEST103
+#define TEST602
 
 #ifdef TEST101
 
@@ -1673,6 +1675,194 @@ int main(int argc, char* argv[])
 }
 
 #endif // TEST601
+
+#ifdef TEST602
+
+#include <vtkActor.h>
+#include <vtkBorderRepresentation.h>
+#include <vtkBorderWidget.h>
+#include <vtkCallbackCommand.h>
+#include <vtkCommand.h>
+#include <vtkNew.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+#include <vtkWidgetCallbackMapper.h>
+#include <vtkWidgetEvent.h>
+
+namespace {
+class vtkCustomBorderWidget : public vtkBorderWidget
+{
+public:
+    static vtkCustomBorderWidget* New();
+    vtkTypeMacro(vtkCustomBorderWidget, vtkBorderWidget);
+
+    // static void SelectAction(vtkAbstractWidget*);
+    // static void TranslateAction(vtkAbstractWidget*);
+    // static void EndSelectAction(vtkAbstractWidget*);
+    // static void MoveAction(vtkAbstractWidget*);
+    // static void HoverLeaveAction(vtkAbstractWidget*);
+    // static void EndSelectAction(vtkAbstractWidget* w);
+
+    static void EndSelectAction(vtkAbstractWidget* w)
+    {
+        vtkBorderWidget* borderWidget = dynamic_cast<vtkBorderWidget*>(w);
+
+        auto lowerLeft = static_cast<vtkBorderRepresentation*>(borderWidget->GetRepresentation())->GetPosition();
+        std::cout << "Lower left: " << lowerLeft[0] << " " << lowerLeft[1] << std::endl;
+
+        auto upperRight = static_cast<vtkBorderRepresentation*>(borderWidget->GetRepresentation())->GetPosition2();
+        std::cout << "Upper right: " << upperRight[0] << " " << upperRight[1] << std::endl;
+
+        vtkBorderWidget::EndSelectAction(w);
+    }
+
+protected:
+    vtkCustomBorderWidget()
+    {
+        // 在此处设置了回调函数，才可以调用到action
+        this->CallbackMapper->SetCallbackMethod(
+            vtkCommand::MiddleButtonReleaseEvent, vtkWidgetEvent::EndSelect, this, vtkCustomBorderWidget::EndSelectAction);
+    }
+};
+
+vtkStandardNewMacro(vtkCustomBorderWidget);
+
+// void SelectionChangedCallbackFunction(vtkObject* caller, long unsigned int eventId, void* clientData, void* callData)
+// {
+//     std::cout << "Event Callback\n";
+// }
+
+} // namespace
+
+int main(int, char*[])
+{
+    vtkNew<vtkSphereSource> sphereSource;
+    sphereSource->SetRadius(4.0);
+    sphereSource->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputConnection(sphereSource->GetOutputPort());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(1., 0., 0.);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetWindowName("BorderWidget");
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->Initialize();
+
+    vtkNew<vtkCustomBorderWidget> borderWidget;
+    borderWidget->SetInteractor(renderWindowInteractor);
+    borderWidget->CreateDefaultRepresentation();
+    borderWidget->SelectableOff();
+    borderWidget->On();
+
+    // vtkNew<vtkCallbackCommand> selectionChangedCallback;
+    // selectionChangedCallback->SetCallback(SelectionChangedCallbackFunction);
+    // borderWidget->AddObserver(vtkWidgetEvent::Move, selectionChangedCallback);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST602
+
+#ifdef TEST603
+
+#include <vtkActor.h>
+#include <vtkBoxWidget.h>
+#include <vtkCommand.h>
+#include <vtkConeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNew.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkTransform.h>
+
+namespace {
+class vtkMyCallback : public vtkCommand
+{
+public:
+    static vtkMyCallback* New()
+    {
+        return new vtkMyCallback;
+    }
+
+    virtual void Execute(vtkObject* caller, unsigned long, void*)
+    {
+        // 盒子被拉伸时，盒子包裹的物体也跟着拉伸
+        vtkNew<vtkTransform> t;
+        vtkBoxWidget* widget = reinterpret_cast<vtkBoxWidget*>(caller);
+        widget->GetTransform(t);
+        widget->GetProp3D()->SetUserTransform(t);
+    }
+};
+} // namespace
+
+// 可以使用 GetPlanes() 获取盒子的六个平面，用于选择、剪切、裁剪或其他依赖于隐式函数的操作
+// 可以使用 GetTransform() 对vtkProp 进行线性变换
+
+int main()
+{
+    vtkNew<vtkConeSource> cone;
+
+    vtkNew<vtkPolyDataMapper> coneMapper;
+    coneMapper->SetInputConnection(cone->GetOutputPort());
+
+    vtkNew<vtkActor> coneActor;
+    coneActor->SetMapper(coneMapper);
+    coneActor->GetProperty()->SetColor(1., 0., 0.);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(coneActor);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> window;
+    window->AddRenderer(renderer);
+    window->SetSize(800, 600);
+    window->SetWindowName("BoxWidget");
+
+    vtkNew<vtkRenderWindowInteractor> interactor;
+    interactor->SetRenderWindow(window);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    interactor->SetInteractorStyle(style);
+
+    vtkNew<vtkBoxWidget> boxWidget;
+    boxWidget->SetInteractor(interactor);
+    boxWidget->SetProp3D(coneActor);
+    boxWidget->SetPlaceFactor(1.25); // 盒子是vtkProp的几倍
+    boxWidget->PlaceWidget();
+    boxWidget->On();
+
+    vtkNew<vtkMyCallback> callback;
+    boxWidget->AddObserver(vtkCommand::InteractionEvent, callback);
+
+    window->Render();
+    interactor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST603
 
 #ifdef TEST701
 
