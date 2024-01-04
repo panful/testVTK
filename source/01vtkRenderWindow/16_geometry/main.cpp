@@ -8,7 +8,8 @@
  *
  * 301. vtkLineSource           线段
  * 302. vtkLineSource           虚线
- * 302. vtkLineSource           折线
+ * 303. vtkLineSource           折线
+ * 304. vtkLine                 vtkCellArray->InsertNextCell(vtkLine);
  *
  * 401. vtkArrowSource          箭头
  * 402. vtkArrowSource          设置箭头的位置、方向
@@ -19,10 +20,10 @@
  * 601. vtkPlaneSource          生成一个平面（矩形、四边形、菱形）
  *
  * 901. vtkParametricSuperEllipsoid vtkParametricFunctionSource 超椭球体
- *
+ * 902. vtkRectilinearGrid 通过给定XYZ方向上的坐标，生成一个体数据
  */
 
-#define TEST402
+#define TEST902
 
 #ifdef TEST101
 
@@ -471,6 +472,80 @@ int main(int, char*[])
 
 #endif // TEST303
 
+#ifdef TEST304
+
+#include <vtkActor.h>
+#include <vtkCellArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLine.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+int main(int argc, char* argv[])
+{
+    // 创建三个坐标点
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(1.0, 0.0, 0.0); // 返回第一个点的ID：0
+    points->InsertNextPoint(0.0, 0.0, 1.0); // 返回第二个点的ID：1
+    points->InsertNextPoint(0.0, 0.0, 0.0); // 返回第三个点的ID：2
+
+    // 每两个坐标点之间分别创建一条线
+    // SetId()的第一个参数是线段的端点ID，第二个参数是连接的点的ID
+    vtkNew<vtkLine> line0;
+    line0->GetPointIds()->SetId(0, 0);
+    line0->GetPointIds()->SetId(1, 1);
+
+    vtkNew<vtkLine> line1;
+    line1->GetPointIds()->SetId(0, 1);
+    line1->GetPointIds()->SetId(1, 2);
+
+    vtkNew<vtkLine> line2;
+    line2->GetPointIds()->SetId(0, 2);
+    line2->GetPointIds()->SetId(1, 0);
+
+    // 创建单元数组，用于存储以上创建的线段
+    vtkNew<vtkCellArray> lines;
+    lines->InsertNextCell(line0);
+    lines->InsertNextCell(line1);
+    lines->InsertNextCell(line2);
+
+    vtkNew<vtkPolyData> polydata;
+    polydata->SetPoints(points);
+    polydata->SetLines(lines);
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polydata);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkRenderer> render;
+    render->AddActor(actor);
+    render->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(render);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renderWindow);
+    iren->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST304
+
 #ifdef TEST401
 
 #include <vtkActor.h>
@@ -908,3 +983,83 @@ int main(int, char*[])
 }
 
 #endif // TEST901
+
+#ifdef TEST902
+
+#include <array>
+#include <vtkActor.h>
+#include <vtkDataSetMapper.h>
+#include <vtkDoubleArray.h>
+#include <vtkNew.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRectilinearGrid.h>
+#include <vtkRectilinearGridGeometryFilter.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main()
+{
+    // XYZ方向上坐标的范围
+    std::array<double, 5> x = { 0, 1, 2, 3, 4 };
+    std::array<double, 4> y = { 5, 6, 7, 8 };
+    std::array<double, 3> z = { 9, 10, 11 };
+
+    vtkNew<vtkDoubleArray> xCoords;
+    for (auto&& i : x)
+    {
+        xCoords->InsertNextValue(i);
+    }
+    vtkNew<vtkDoubleArray> yCoords;
+    for (auto&& i : y)
+    {
+        yCoords->InsertNextValue(i);
+    }
+    vtkNew<vtkDoubleArray> zCoords;
+    for (auto&& i : z)
+    {
+        zCoords->InsertNextValue(i);
+    }
+
+    vtkNew<vtkRectilinearGrid> rgrid;
+    rgrid->SetDimensions(int(x.size()), int(y.size()), int(z.size()));
+    rgrid->SetXCoordinates(xCoords);
+    rgrid->SetYCoordinates(yCoords);
+    rgrid->SetZCoordinates(zCoords);
+
+    auto nc = rgrid->GetNumberOfCells();  // 单元都是VTK_VOXEL（立方体），由8个顶点构成
+    auto np = rgrid->GetNumberOfPoints(); // 顶点的个数是网格三个方向上纬度的乘积
+    std::cout << "Points:\t" << np << "\nCells:\t" << nc << '\n';
+
+    vtkNew<vtkDataSetMapper> rgridMapper;
+    rgridMapper->SetInputData(rgrid);
+
+    vtkNew<vtkActor> wireActor;
+    wireActor->SetMapper(rgridMapper);
+    wireActor->GetProperty()->SetRepresentationToWireframe();
+    wireActor->GetProperty()->SetColor(1., 0., 0.);
+
+    double bounds[6] {};
+    wireActor->GetBounds(bounds);
+    std::cout << "Bounds: " << bounds[0] << ' ' << bounds[1] << ' ' << bounds[2] << ' ' << bounds[3] << ' ' << bounds[4] << ' ' << bounds[5] << '\n';
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(wireActor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST902

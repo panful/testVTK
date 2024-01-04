@@ -3,6 +3,7 @@ set(target_name "01_16_geometry")
 find_package(VTK
     COMPONENTS
         CommonCore
+        CommonColor
         FiltersSources
         InteractionStyle
         RenderingCore
