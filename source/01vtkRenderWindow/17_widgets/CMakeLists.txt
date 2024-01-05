@@ -13,6 +13,7 @@ find_package(VTK
         RenderingAnnotation     # vtkLegendScaleActor
         IOImage                 # vtkJPEGReader
         InteractionWidgets      # vtkLogoRepresentation
+        RenderingLabel          # vtkLabelPlacementMapper
     QUIET
 )
 

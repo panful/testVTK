@@ -26,10 +26,10 @@
  * 701. vtkCaptionWidget 标注某一个点，用一个带线框及箭头的文本信息来标注某一对象，鼠标可拖动标注的点和文本信息
  * 702. vtkTextWidget 在渲染场景中生成一串标识文本，可以随意调整该文本在渲染场景中的位置，缩放其大小等。
  * 703. vtkBalloonWidget 当鼠标停留在渲染场景中的某个Actor一段时间后，会弹出提示信息。所提示的信息，除了可以用文本表示，也可以用图像表示
- *
+ * 704. vtkPointSetToLabelHierarchy 给物体添加一个标签文本用来标记
  */
 
-#define TEST602
+#define TEST704
 
 #ifdef TEST101
 
@@ -1928,3 +1928,145 @@ int main(int, char*[])
 }
 
 #endif // TEST701
+
+#ifdef TEST704
+
+#include <vtkActor.h>
+#include <vtkActor2D.h>
+#include <vtkGlyph3DMapper.h>
+#include <vtkIntArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLabelPlacementMapper.h>
+#include <vtkPointData.h>
+#include <vtkPointSetToLabelHierarchy.h>
+#include <vtkPointSource.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkProperty2D.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+#include <vtkStringArray.h>
+#include <vtkTextProperty.h>
+
+namespace {
+/**
+ * Convert points to glyphs.
+ *
+ * @param points - The points to glyph.
+ * @param scale - The scale, used to determine the size of the glyph.
+ * representing the point, expressed as a fraction of the largest side of the
+ * bounding box surrounding the points. e.g. 0.05.
+ *
+ * @return The actor.
+ */
+vtkSmartPointer<vtkActor> PointToGlyph(vtkPoints* points, double const& scale);
+
+} // namespace
+
+int main(int, char*[])
+{
+    // Create a point set.
+    vtkNew<vtkPointSource> pointSource;
+    pointSource->SetNumberOfPoints(6);
+    pointSource->Update();
+
+    // Add label array.
+    vtkNew<vtkStringArray> labels;
+    labels->SetNumberOfValues(6);
+    labels->SetName("labels");
+    labels->SetValue(0, "Priority 10");
+    labels->SetValue(1, "Priority 7");
+    labels->SetValue(2, "Priority 6");
+    labels->SetValue(3, "Priority 4");
+    labels->SetValue(4, "Priority 4");
+    labels->SetValue(5, "Priority 4");
+    pointSource->GetOutput()->GetPointData()->AddArray(labels);
+
+    // Add priority array.
+    vtkNew<vtkIntArray> sizes;
+    sizes->SetNumberOfValues(6);
+    sizes->SetName("sizes");
+    sizes->SetValue(0, 10);
+    sizes->SetValue(1, 7);
+    sizes->SetValue(2, 6);
+    sizes->SetValue(3, 4);
+    sizes->SetValue(4, 4);
+    sizes->SetValue(5, 4);
+    pointSource->GetOutput()->GetPointData()->AddArray(sizes);
+
+    // Map the points to spheres
+    auto sphereActor = PointToGlyph(pointSource->GetOutput()->GetPoints(), 0.05);
+    sphereActor->GetProperty()->SetColor(1., 0., 0.);
+
+    // Generate the label hierarchy.
+    vtkNew<vtkPointSetToLabelHierarchy> pointSetToLabelHierarchyFilter;
+    pointSetToLabelHierarchyFilter->SetInputConnection(pointSource->GetOutputPort());
+    pointSetToLabelHierarchyFilter->SetLabelArrayName("labels");   // 标签文本
+    pointSetToLabelHierarchyFilter->SetPriorityArrayName("sizes"); // 优先级，渲染时大的会覆盖小的
+    pointSetToLabelHierarchyFilter->Update();
+
+    vtkNew<vtkLabelPlacementMapper> labelMapper;
+    labelMapper->SetInputConnection(pointSetToLabelHierarchyFilter->GetOutputPort());
+
+    vtkNew<vtkActor2D> labelActor;
+    labelActor->SetMapper(labelMapper);
+    labelActor->GetProperty()->SetColor(0., 1., 0.);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(sphereActor);
+    renderer->AddActor(labelActor);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+    renderWindow->SetWindowName("LabelPlacementMapper");
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+namespace {
+
+vtkSmartPointer<vtkActor> PointToGlyph(vtkPoints* points, double const& scale)
+{
+    auto bounds   = points->GetBounds();
+    double maxLen = 0;
+    for (int i = 1; i < 3; ++i)
+    {
+        maxLen = std::max(bounds[i + 1] - bounds[i], maxLen);
+    }
+
+    vtkNew<vtkSphereSource> sphereSource;
+    sphereSource->SetRadius(scale * maxLen);
+
+    vtkNew<vtkPolyData> pd;
+    pd->SetPoints(points);
+
+    vtkNew<vtkGlyph3DMapper> mapper;
+    mapper->SetInputData(pd);
+    mapper->SetSourceConnection(sphereSource->GetOutputPort());
+    mapper->ScalarVisibilityOff();
+    mapper->ScalingOff();
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    return actor;
+}
+
+} // namespace
+
+#endif // TEST704
