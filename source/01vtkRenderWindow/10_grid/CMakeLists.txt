@@ -4,6 +4,7 @@ set(target_name "01_10_grid")
 find_package(VTK
     COMPONENTS
         CommonCore
+        CommonColor
         CommonDataModel
         FiltersSources
         InteractionStyle
@@ -19,6 +20,8 @@ find_package(VTK
         IOGeometry          # vtkFLUENTReader
         RenderingAnnotation # vtkScalarBarActor
         IOXML               # vtkXMLUnstructuredGridReader
+        IOImport            # vtkImporter
+        IOExport            # vtkGLTFExporter
     QUIET
 )
 

@@ -16,9 +16,12 @@
  *
  * 401. vtkPolyData vtkDataSet vtkUnstructuredGrid vtkStructuredGrid 互相转换
  * 402. vtkPolyData 设置多种单元(line poly...)，获取单元的索引
+ *
+ * 501. 加载glTF类型的模型
+ * 502. 加载Obj类型的模型，并导出为glTF
  */
 
-#define TEST401
+#define TEST502
 
 #ifdef TEST101
 
@@ -1194,3 +1197,90 @@ int main()
 }
 
 #endif // TEST402
+
+#ifdef TEST501
+
+#include <vtkGLTFImporter.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNew.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main(int argc, char* argv[])
+{
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    vtkNew<vtkGLTFImporter> importer;
+    importer->SetFileName("../resources/gltf/FlightHelmet/FlightHelmet.gltf");
+    // importer->SetFileName("../resources/gltf/airplane/airplane.gltf");
+    // importer->SetFileName("../resources/gltf/truck/CesiumMilkTruck.gltf");
+    importer->SetRenderWindow(renderWindow);
+    importer->Update();
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST501
+
+#ifdef TEST502
+
+#include <vtkGLTFExporter.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNew.h>
+#include <vtkOBJImporter.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main(int argc, char* argv[])
+{
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    vtkNew<vtkOBJImporter> importer;
+    importer->SetFileName("../resources/obj/airplane/11803_Airplane_v1_l1.obj");
+    importer->SetFileNameMTL("../resources/obj/airplane/11803_Airplane_v1_l1.mtl");
+    importer->SetTexturePath("../resources/obj/airplane");
+    importer->SetRenderWindow(renderWindow);
+    importer->Update();
+
+    renderer->ResetCamera();
+
+    vtkNew<vtkGLTFExporter> exporter;
+    exporter->SetFileName("airplane/airplane.gltf");
+    exporter->SetActiveRenderer(renderer);
+    exporter->SetRenderWindow(renderWindow);
+    exporter->Write();
+
+    std::cout << "Write airplane.gltf success\n";
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST502
