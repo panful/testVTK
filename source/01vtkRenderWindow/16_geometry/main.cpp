@@ -19,12 +19,14 @@
  *
  * 601. vtkPlaneSource          生成一个平面（矩形、四边形、菱形）
  *
+ * 900. https://examples.vtk.org/site/Cxx/GeometricObjects/ParametricObjectsDemo/
  * 901. vtkParametricSuperEllipsoid vtkParametricFunctionSource 超椭球体
  * 902. vtkRectilinearGrid 通过给定XYZ方向上的坐标，生成一个体数据
  * 903. vtkParametricSpline vtkParametricFunctionSource 样条曲线
+ * 904. vtkParametricTorus 圆环体
  */
 
-#define TEST903
+#define TEST904
 
 #ifdef TEST101
 
@@ -1125,3 +1127,53 @@ int main(int, char*[])
 }
 
 #endif // TEST903
+
+#ifdef TEST904
+
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkParametricFunctionSource.h>
+#include <vtkParametricTorus.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkParametricTorus> surface;
+
+    vtkNew<vtkParametricFunctionSource> source;
+    source->SetUResolution(20);
+    source->SetVResolution(20);
+    source->SetParametricFunction(surface);
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->EdgeVisibilityOn();
+
+    vtkNew<vtkRenderer> leftRenderer;
+    leftRenderer->SetBackground(.1, .2, .3);
+    leftRenderer->AddActor(actor);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(leftRenderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST904
