@@ -1,21 +1,25 @@
 
 /**
- * 1. 引用计数 主动释放vtk智能指针
- * 2. vtk智能指针的使用
- * 3. vtkNew 和 vtkSmartPointer 函数参数为智能指针
- * 4. AddObserver 使用lambda表达式和继承自vtkCommand
- * 5. vtk的观察者模式 AddObserver 实现方法
- * 6. vtkTimeStamp 记录数据修改的时间
- * 7. vtkNew基类，调用子类的函数
- * 8. class中的成员变量是裸指针，引用计数仍会加1，并不会被析构
- * 9. 从 vtkActor vtkPolyDataMapper... 继承
+ * 101. 引用计数 主动释放vtk智能指针
+ * 102. vtk智能指针的使用
+ * 103. vtkNew 和 vtkSmartPointer 函数参数为智能指针
+ *
+ * 201. AddObserver 使用lambda表达式和继承自vtkCommand
+ * 202. vtk的观察者模式 AddObserver 实现方法
+ * 203. vtk AddObserver 的执行流程
+ *
+ * 301. vtkTimeStamp 记录数据修改的时间 vtkObject::Modified()
+ *
+ * 401. vtkNew<vtkActor> 实际调用 vtkActor 的子类 vtkOpenGLActor
+ * 402. class中的成员变量是裸指针，引用计数仍会加1，并不会被析构
+ * 403. 从 vtkActor vtkPolyDataMapper... 继承重写父类函数
  *
  * vtkSmartPointer vtkObject vtkCommand vtkTimeStamp vtkDataArray vtkDataObject vtkAlgorithm
  */
 
-#define TEST9
+#define TEST501
 
-#ifdef TEST1
+#ifdef TEST101
 
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
@@ -95,9 +99,9 @@ int main(int, char*[])
 
     return 0;
 }
-#endif // TEST1
+#endif // TEST101
 
-#ifdef TEST2
+#ifdef TEST102
 
 #include <vector>
 #include <vtkNew.h>
@@ -217,9 +221,9 @@ int main(int, char*[])
 
     return 0;
 }
-#endif // TEST2
+#endif // TEST102
 
-#ifdef TEST3
+#ifdef TEST103
 
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
@@ -301,9 +305,9 @@ int main(int, char*[])
 
     return 0;
 }
-#endif // TEST3
+#endif // TEST103
 
-#ifdef TEST4
+#ifdef TEST201
 
 #include <vtkActor.h>
 #include <vtkCallbackCommand.h>
@@ -381,9 +385,9 @@ int main(int, char*[])
     return 0;
 }
 
-#endif // TEST4
+#endif // TEST201
 
-#ifdef TEST5
+#ifdef TEST202
 
 #include <iostream>
 #include <map>
@@ -441,11 +445,96 @@ int main()
 
     obj.Update();
 }
-#endif // TEST5
+#endif // TEST202
 
-#ifdef TEST6
+#ifdef TEST203
+
+#include <vtkActor.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+namespace {
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    void OnLeftButtonDown() override
+    {
+        std::cout << "Left button down\n";
+        Superclass::OnLeftButtonDown(); // 内部会调用vtkCommand::StartInteractionEvent的回调函数
+    }
+};
+
+vtkStandardNewMacro(MyStyle);
+
+//-----------------------------------------------------------------
+class MyCommand : public vtkCommand
+{
+public:
+    static MyCommand* New();
+    vtkTypeMacro(MyCommand, vtkCommand);
+
+    // 通过AddObserver()添加回调后，当对应的事件被执行，该函数就会被调用
+    void Execute(vtkObject* caller, unsigned long, void*) override
+    {
+        std::cout << "Callback\n";
+    }
+};
+
+vtkStandardNewMacro(MyCommand);
+} // namespace
+
+int main(int, char*[])
+{
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<MyStyle> style;
+    iren->SetInteractorStyle(style);
+
+    // 给指定事件添加一个回调
+    // 子类会继承父类的所有事件，如果对象没有该事件，添加的回调就不会被调用
+    vtkNew<MyCommand> callback;
+    style->AddObserver(vtkCommand::StartInteractionEvent, callback);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST203
+
+#ifdef TEST301
 
 #include <vtkCubeSource.h>
+#include <vtkObjectFactory.h>
 
 // void vtkObject::Modified() 调用修改时间
 // vtkObject的成员变量 vtkTimeStamp MTime; 用来跟踪修改时间
@@ -456,22 +545,25 @@ int main(int, char*[])
     source->Update();
     std::cout << source->GetMTime() << std::endl;
     std::cout << source->GetMTime() << std::endl;
-    source->SetXLength(2.0);
-    std::cout << source->GetMTime() << std::endl;
-    std::cout << source->GetMTime() << std::endl;
-    source->Update();
-    std::cout << source->GetMTime() << std::endl;
+    source->SetXLength(2.0); // 内部会调用 Modify()
     std::cout << source->GetMTime() << std::endl;
     source->Update();
     std::cout << source->GetMTime() << std::endl;
+    source->Update();
+    std::cout << source->GetMTime() << std::endl;
+    source->SetYLength(2.0);
+    source->Update();
+    std::cout << source->GetMTime() << std::endl;
+    source->SetYLength(2.0); // 和上一次设置的值一样，不会修改 MTime
+    source->Update();        // MTime和上一次的一样，所以此处并不会真的Update
     std::cout << source->GetMTime() << std::endl;
 
     return 0;
 }
 
-#endif // TEST6
+#endif // TEST301
 
-#ifdef TEST7
+#ifdef TEST401
 
 #include <iostream>
 
@@ -557,9 +649,9 @@ BaseRenderer* BaseRenderer::New()
 #endif
 }
 
-#endif // TEST7
+#endif // TEST401
 
-#ifdef TEST8
+#ifdef TEST402
 
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
@@ -665,20 +757,20 @@ int main()
     }
 }
 
-#endif // TESt8
+#endif // TESt402
 
-#ifdef TEST9
+#ifdef TEST403
 
 #include <vtkActor.h>
 #include <vtkCubeSource.h>
 #include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkOpenGLActor.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
-#include <vtkOpenGLActor.h>
 
 namespace {
 class MyActor : public vtkOpenGLActor
@@ -727,4 +819,4 @@ int main(int, char*[])
     return 0;
 }
 
-#endif // TEST9
+#endif // TEST403
