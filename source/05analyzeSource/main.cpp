@@ -8,17 +8,17 @@
  * 6. 多边形的边框
  * 7. 只有一个图层，有多个vtkRenderer
  * 8. 多个vtkRenderer，多个图层，让后面的vtkRenderer始终在之前的上面
- * 9. 
+ * 9.
  * 10.拾取vtkProp vtkPropPicker
  * 11.顺序无关透明，深度剥离
  * 12.打印shader code
  * 13.同一个面的正面和背面设置不同的属性
- * 14.
- * 
+ * 14.隐藏线消除 hidden line removal(HLR)
+ *
  * 201. vtkAlgorithm vtkExecutive vtkInformation 管道端口的作用
  */
 
-#define TEST201
+#define TEST14
 
 #ifdef TEST1
 
@@ -861,7 +861,6 @@ int main()
 
 #endif // TEST8
 
-
 #ifdef TEST10
 
 #include <vtkActor.h>
@@ -1379,6 +1378,106 @@ int main()
 
 #endif // TEST13
 
+#ifdef TEST14
+
+#include <vtkActor.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+/// @brief 创建由12条线构成的立方体
+/// @return
+vtkSmartPointer<vtkPolyData> CreateWireframe()
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0, 0, 1);
+    points->InsertNextPoint(1, 0, 1);
+    points->InsertNextPoint(1, 1, 1);
+    points->InsertNextPoint(0, 1, 1);
+    points->InsertNextPoint(0, 0, 0);
+    points->InsertNextPoint(1, 0, 0);
+    points->InsertNextPoint(1, 1, 0);
+    points->InsertNextPoint(0, 1, 0);
+
+    vtkNew<vtkCellArray> cells;
+    cells->InsertNextCell({ 0, 1 });
+    cells->InsertNextCell({ 1, 2 });
+    cells->InsertNextCell({ 2, 3 });
+    cells->InsertNextCell({ 3, 0 });
+    cells->InsertNextCell({ 4, 5 });
+    cells->InsertNextCell({ 5, 6 });
+    cells->InsertNextCell({ 6, 7 });
+    cells->InsertNextCell({ 7, 4 });
+    cells->InsertNextCell({ 2, 6 });
+    cells->InsertNextCell({ 3, 7 });
+    cells->InsertNextCell({ 4, 0 });
+    cells->InsertNextCell({ 1, 5 });
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetLines(cells);
+
+    return polyData;
+}
+
+/// @brief 创建由6个面构成的立方体
+/// @return
+vtkSmartPointer<vtkPolyData> CreateSurface()
+{
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    return source->GetOutput();
+}
+
+// 判断当前是否开启UseHiddenLineRemoval以及是否存在线框图元
+// 创建vtkHiddenLineRemovalPass，先绘制不是线框的图元，然后设置偏移（为了保证线框清晰）
+// 再以多边形形式绘制线框图元（使用glColorMask关闭颜色写入），最后再以线框形式绘制线框图元，并恢复之前的偏移值
+// vtkOpenGLRenderer.cxx [480] void vtkOpenGLRenderer::DeviceRenderOpaqueGeometry(vtkFrameBufferObjectBase* fbo)
+// vtkHiddenLineRemovalPass [51] void vtkHiddenLineRemovalPass::Render(const vtkRenderState* s)
+// 注意：只有原本是面数据以线框渲染才可以隐藏线消除
+
+int main(int, char*[])
+{
+    vtkNew<vtkPolyDataMapper> mapper;
+    // mapper->SetInputData(CreateWireframe());
+    mapper->SetInputData(CreateSurface());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetRepresentationToWireframe(); // 以线框形式渲染
+    actor->GetProperty()->SetColor(0., 1., 0.);
+    actor->GetProperty()->LightingOff();
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->UseHiddenLineRemovalOn(); // 消除隐藏线
+    renderer->SetBackground(.1, .2, .3);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST14
+
 #ifdef TEST201
 
 #include <vtkActor.h>
@@ -1392,7 +1491,7 @@ int main()
 #include <vtkSmartPointer.h>
 
 // vtkAlgorithm 有一个函数 ProcessRequest()，通过它来执行实际的算法
-// 常用的算法都会执行一个函数 RequestData()，在它内部生成实际的数据 
+// 常用的算法都会执行一个函数 RequestData()，在它内部生成实际的数据
 
 int main(int, char*[])
 {
