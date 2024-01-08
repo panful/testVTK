@@ -29,7 +29,8 @@
  * 506. vtkRectilinearGridGeometryFilter 从直线网格中提取几何体（点、线、面、体）
  * 507. vtkPolyDataSilhouette 提取观察者视角下物体的轮廓
  * 508. vtkFeatureEdges 提取网格(多边形数据)的特征边
- * 509.
+ * 509. vtkExtractEdges 提取构成网格所有单元边界
+ * 510. vtkOutlineFilter 生成一个输入网格的包围盒
  *
  * 601. vtkDataSetSurfaceFilter 将 vtkUnstructuredGrid 转换为 vtkPolyData，还可以将体网格转换为表面数据，从而简化模型
  * 602. vtkGeometryFilter 从数据集中提取边界（3D单元提取2D面），可以将任何数据转换为多边形数据，类似 vtkDataSetSurfaceFilter
@@ -47,7 +48,7 @@
  * 803. PerlinNoise 使用 vtkSampleFunction 生成噪声图片
  */
 
-#define TEST508
+#define TEST511
 
 #ifdef TEST001
 
@@ -2338,7 +2339,7 @@ vtkSmartPointer<vtkPolyData> CreatePolyData(PrimitiveType pt)
 
 int main(int, char*[])
 {
-    auto polyData = CreatePolyData(PrimitiveType::Line);
+    auto polyData = CreatePolyData(PrimitiveType::Disk);
 
     // 边界边：只被一个多边形或者一条边包围的边
     // 特征边：需要设置一个特征角的阈值，当包含同一条边的两个三角形的法向量的夹角大于该阈值时，即为一个特征边
@@ -2407,6 +2408,392 @@ int main(int, char*[])
 }
 
 #endif // TEST508
+
+#ifdef TEST509
+
+#include <vtkActor.h>
+#include <vtkArrowSource.h>
+#include <vtkDiskSource.h>
+#include <vtkExtractEdges.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNew.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+
+namespace {
+
+enum class PrimitiveType
+{
+    Poly,   // 四边形，面
+    Line,   // 四边形，线框
+    Disk,   // 圆盘
+    Sphere, // 球面
+    Arrow,  // 箭头
+    Box,    // 开口的盒子（5个四边形）
+    Plane,  // 一个'田'字线框
+};
+
+/// @details 生成vtkFeatureEdges的输入图形
+vtkSmartPointer<vtkPolyData> CreatePolyData(PrimitiveType pt)
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0., 0., 0.);
+    points->InsertNextPoint(1., 0., 0.);
+    points->InsertNextPoint(1., 1., 0.);
+    points->InsertNextPoint(0., 1., 0.);
+
+    vtkNew<vtkCellArray> polyCells;
+    polyCells->InsertNextCell({ 0, 1, 2, 3 });
+
+    vtkNew<vtkCellArray> lineCells;
+    lineCells->InsertNextCell({ 0, 1 });
+    lineCells->InsertNextCell({ 1, 2 });
+    lineCells->InsertNextCell({ 2, 3 });
+    lineCells->InsertNextCell({ 3, 0 });
+
+    vtkNew<vtkPolyData> polys;
+    polys->SetPoints(points);
+    polys->SetPolys(polyCells);
+
+    vtkNew<vtkPolyData> lines;
+    lines->SetPoints(points);
+    lines->SetLines(lineCells);
+
+    vtkNew<vtkDiskSource> disk;
+    disk->Update();
+
+    vtkNew<vtkSphereSource> sphere;
+    sphere->Update();
+
+    vtkNew<vtkArrowSource> arrow;
+    arrow->Update();
+
+    vtkNew<vtkPoints> box_points;
+    box_points->InsertNextPoint(0., 0., 1.);
+    box_points->InsertNextPoint(1., 0., 1.);
+    box_points->InsertNextPoint(1., 1., 1.);
+    box_points->InsertNextPoint(0., 1., 1.);
+    box_points->InsertNextPoint(0., 0., 0.);
+    box_points->InsertNextPoint(1., 0., 0.);
+    box_points->InsertNextPoint(1., 1., 0.);
+    box_points->InsertNextPoint(0., 1., 0.);
+
+    vtkNew<vtkCellArray> box_cells;
+    box_cells->InsertNextCell({ 0, 1, 2, 3 });
+    box_cells->InsertNextCell({ 1, 5, 6, 2 });
+    box_cells->InsertNextCell({ 5, 4, 7, 6 });
+    box_cells->InsertNextCell({ 4, 0, 3, 7 });
+    box_cells->InsertNextCell({ 4, 5, 1, 0 });
+
+    vtkNew<vtkPolyData> box;
+    box->SetPoints(box_points);
+    box->SetPolys(box_cells);
+
+    vtkNew<vtkPoints> plane_points;
+    plane_points->InsertNextPoint(0., 0., 0.);
+    plane_points->InsertNextPoint(0., 1., 0.);
+    plane_points->InsertNextPoint(0., 2., 0.);
+    plane_points->InsertNextPoint(1., 0., 0.);
+    plane_points->InsertNextPoint(1., 1., 0.);
+    plane_points->InsertNextPoint(1., 2., 0.);
+    plane_points->InsertNextPoint(2., 0., 0.);
+    plane_points->InsertNextPoint(2., 1., 0.);
+    plane_points->InsertNextPoint(2., 2., 0.);
+
+    vtkNew<vtkCellArray> plane_cells;
+    plane_cells->InsertNextCell({ 0, 1, 2 });
+    plane_cells->InsertNextCell({ 3, 4, 5 });
+    plane_cells->InsertNextCell({ 6, 7, 8 });
+    plane_cells->InsertNextCell({ 0, 3, 6 });
+    plane_cells->InsertNextCell({ 1, 4, 7 });
+    plane_cells->InsertNextCell({ 2, 5, 8 });
+
+    vtkNew<vtkPolyData> plane;
+    plane->SetPoints(plane_points);
+    plane->SetLines(plane_cells);
+
+    switch (pt)
+    {
+    case PrimitiveType::Poly:
+        return polys;
+    case PrimitiveType::Line:
+        return lines;
+    case PrimitiveType::Disk:
+        return disk->GetOutput();
+    case PrimitiveType::Sphere:
+        return sphere->GetOutput();
+    case PrimitiveType::Arrow:
+        return arrow->GetOutput();
+    case PrimitiveType::Box:
+        return box;
+    case PrimitiveType::Plane:
+        return plane;
+    default:
+        return polys;
+    }
+}
+} // namespace
+
+int main(int, char*[])
+{
+    auto polyData = CreatePolyData(PrimitiveType::Disk);
+
+    vtkNew<vtkExtractEdges> extracter;
+    extracter->SetInputData(polyData);
+    extracter->UseAllPointsOff(); // 如果关闭，输入的某些点可能不会在输出中，因为某些点不一定用到，顶点ID也会变化
+    extracter->Update();
+
+    auto numberOfEdges = extracter->GetOutput()->GetNumberOfCells();
+    std::cout << "Number of Edges: " << numberOfEdges << '\n';
+
+    //---------------------------------------------------------------------------------
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0., 1., 0.);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(1., 0., 0.);
+    actor->GetProperty()->LightingOff();
+
+    vtkNew<vtkPolyDataMapper> edgeMapper;
+    edgeMapper->SetInputData(extracter->GetOutput());
+
+    vtkNew<vtkActor> edgeActor;
+    edgeActor->SetMapper(edgeMapper);
+    edgeActor->GetProperty()->LightingOff();
+
+    //----------------------------------------------------------------------------------
+    // 左边是原始图形，右边是提取的边界
+    vtkNew<vtkRenderer> leftRenderer;
+    leftRenderer->AddActor(actor);
+    leftRenderer->SetBackground(.1, .2, .3);
+    leftRenderer->SetViewport(0., 0., .5, 1.);
+    leftRenderer->ResetCamera();
+
+    vtkNew<vtkRenderer> rightRenderer;
+    rightRenderer->AddActor(edgeActor);
+    rightRenderer->SetBackground(.3, .2, .1);
+    rightRenderer->SetViewport(.5, 0., 1., 1.);
+    rightRenderer->SetActiveCamera(leftRenderer->GetActiveCamera());
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(leftRenderer);
+    renderWindow->AddRenderer(rightRenderer);
+    renderWindow->SetSize(1200, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST509
+
+#ifdef TEST510
+
+#include <vtkActor.h>
+#include <vtkArrowSource.h>
+#include <vtkDiskSource.h>
+#include <vtkExtractEdges.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNew.h>
+#include <vtkOutlineFilter.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+
+namespace {
+
+enum class PrimitiveType
+{
+    Poly,   // 四边形，面
+    Line,   // 四边形，线框
+    Disk,   // 圆盘
+    Sphere, // 球面
+    Arrow,  // 箭头
+    Box,    // 开口的盒子（5个四边形）
+    Plane,  // 一个'田'字线框
+};
+
+/// @details 生成vtkFeatureEdges的输入图形
+vtkSmartPointer<vtkPolyData> CreatePolyData(PrimitiveType pt)
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0., 0., 0.);
+    points->InsertNextPoint(1., 0., 0.);
+    points->InsertNextPoint(1., 1., 0.);
+    points->InsertNextPoint(0., 1., 0.);
+
+    vtkNew<vtkCellArray> polyCells;
+    polyCells->InsertNextCell({ 0, 1, 2, 3 });
+
+    vtkNew<vtkCellArray> lineCells;
+    lineCells->InsertNextCell({ 0, 1 });
+    lineCells->InsertNextCell({ 1, 2 });
+    lineCells->InsertNextCell({ 2, 3 });
+    lineCells->InsertNextCell({ 3, 0 });
+
+    vtkNew<vtkPolyData> polys;
+    polys->SetPoints(points);
+    polys->SetPolys(polyCells);
+
+    vtkNew<vtkPolyData> lines;
+    lines->SetPoints(points);
+    lines->SetLines(lineCells);
+
+    vtkNew<vtkDiskSource> disk;
+    disk->Update();
+
+    vtkNew<vtkSphereSource> sphere;
+    sphere->Update();
+
+    vtkNew<vtkArrowSource> arrow;
+    arrow->Update();
+
+    vtkNew<vtkPoints> box_points;
+    box_points->InsertNextPoint(0., 0., 1.);
+    box_points->InsertNextPoint(1., 0., 1.);
+    box_points->InsertNextPoint(1., 1., 1.);
+    box_points->InsertNextPoint(0., 1., 1.);
+    box_points->InsertNextPoint(0., 0., 0.);
+    box_points->InsertNextPoint(1., 0., 0.);
+    box_points->InsertNextPoint(1., 1., 0.);
+    box_points->InsertNextPoint(0., 1., 0.);
+
+    vtkNew<vtkCellArray> box_cells;
+    box_cells->InsertNextCell({ 0, 1, 2, 3 });
+    box_cells->InsertNextCell({ 1, 5, 6, 2 });
+    box_cells->InsertNextCell({ 5, 4, 7, 6 });
+    box_cells->InsertNextCell({ 4, 0, 3, 7 });
+    box_cells->InsertNextCell({ 4, 5, 1, 0 });
+
+    vtkNew<vtkPolyData> box;
+    box->SetPoints(box_points);
+    box->SetPolys(box_cells);
+
+    vtkNew<vtkPoints> plane_points;
+    plane_points->InsertNextPoint(0., 0., 0.);
+    plane_points->InsertNextPoint(0., 1., 0.);
+    plane_points->InsertNextPoint(0., 2., 0.);
+    plane_points->InsertNextPoint(1., 0., 0.);
+    plane_points->InsertNextPoint(1., 1., 0.);
+    plane_points->InsertNextPoint(1., 2., 0.);
+    plane_points->InsertNextPoint(2., 0., 0.);
+    plane_points->InsertNextPoint(2., 1., 0.);
+    plane_points->InsertNextPoint(2., 2., 0.);
+
+    vtkNew<vtkCellArray> plane_cells;
+    plane_cells->InsertNextCell({ 0, 1, 2 });
+    plane_cells->InsertNextCell({ 3, 4, 5 });
+    plane_cells->InsertNextCell({ 6, 7, 8 });
+    plane_cells->InsertNextCell({ 0, 3, 6 });
+    plane_cells->InsertNextCell({ 1, 4, 7 });
+    plane_cells->InsertNextCell({ 2, 5, 8 });
+
+    vtkNew<vtkPolyData> plane;
+    plane->SetPoints(plane_points);
+    plane->SetLines(plane_cells);
+
+    switch (pt)
+    {
+    case PrimitiveType::Poly:
+        return polys;
+    case PrimitiveType::Line:
+        return lines;
+    case PrimitiveType::Disk:
+        return disk->GetOutput();
+    case PrimitiveType::Sphere:
+        return sphere->GetOutput();
+    case PrimitiveType::Arrow:
+        return arrow->GetOutput();
+    case PrimitiveType::Box:
+        return box;
+    case PrimitiveType::Plane:
+        return plane;
+    default:
+        return polys;
+    }
+}
+} // namespace
+
+int main(int, char*[])
+{
+    auto polyData = CreatePolyData(PrimitiveType::Arrow);
+
+    vtkNew<vtkOutlineFilter> outLine;
+    outLine->SetInputData(polyData);
+    outLine->GenerateFacesOff();   // 是否将边框以面的形式生成
+    outLine->SetCompositeStyle(0); // 复合数据集创建边框的样式
+    outLine->Update();
+
+    auto numberOfEdges = outLine->GetOutput()->GetNumberOfCells();
+    std::cout << "Number of Edges: " << numberOfEdges << '\n';
+
+    //---------------------------------------------------------------------------------
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0., 1., 0.);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(1., 0., 0.);
+    actor->GetProperty()->LightingOff();
+
+    vtkNew<vtkPolyDataMapper> edgeMapper;
+    edgeMapper->SetInputData(outLine->GetOutput());
+
+    vtkNew<vtkActor> edgeActor;
+    edgeActor->SetMapper(edgeMapper);
+    edgeActor->GetProperty()->LightingOff();
+
+    //----------------------------------------------------------------------------------
+    // 左边是原始图形，右边是提取的边界
+    vtkNew<vtkRenderer> leftRenderer;
+    leftRenderer->AddActor(actor);
+    leftRenderer->SetBackground(.1, .2, .3);
+    leftRenderer->SetViewport(0., 0., .5, 1.);
+    leftRenderer->ResetCamera();
+
+    vtkNew<vtkRenderer> rightRenderer;
+    rightRenderer->AddActor(edgeActor);
+    rightRenderer->SetBackground(.3, .2, .1);
+    rightRenderer->SetViewport(.5, 0., 1., 1.);
+    rightRenderer->SetActiveCamera(leftRenderer->GetActiveCamera());
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(leftRenderer);
+    renderWindow->AddRenderer(rightRenderer);
+    renderWindow->SetSize(1200, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST510
 
 #ifdef TEST601
 
