@@ -20,6 +20,7 @@
  * 401. vtkCellDataToPointData 单元数据转顶点数据
  * 402. vtkPointDataToCellData 顶点数据转单元数据
  * 403. vtkCellCenters 获取单元中心即格心，并用球体标注格心
+ * 404. vtkCenterOfMass 网格的质心
  *
  * 501. vtkExtractGeometry vtkExtractPolyDataGeometry 提取被视锥体包围(或没有包围)的单元格
  * 502. vtkClipPolyData 一般用于裁剪输入平面的一侧，保留另一侧
@@ -48,7 +49,7 @@
  * 803. PerlinNoise 使用 vtkSampleFunction 生成噪声图片
  */
 
-#define TEST511
+#define TEST404
 
 #ifdef TEST001
 
@@ -1737,6 +1738,52 @@ int main(int, char*[])
 }
 
 #endif // TEST403
+
+#ifdef TEST404
+
+#include <vtkCenterOfMass.h>
+#include <vtkDoubleArray.h>
+#include <vtkNew.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+
+int main(int, char*[])
+{
+    // 四个顶点数据
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0, 0, 0);
+    points->InsertNextPoint(1, 0, 0);
+    points->InsertNextPoint(0, 1, 0);
+    points->InsertNextPoint(1, 1, 0);
+
+    // 每个顶点的标量数据
+    vtkNew<vtkDoubleArray> scalars;
+    scalars->InsertNextValue(1.);
+    scalars->InsertNextValue(2.);
+    scalars->InsertNextValue(3.);
+    scalars->InsertNextValue(4.);
+
+    vtkNew<vtkPolyData> polydata;
+    polydata->SetPoints(points);
+    polydata->GetPointData()->SetScalars(scalars);
+
+    // 计算输入网格的质心
+    vtkNew<vtkCenterOfMass> centerOfMassFilter;
+    centerOfMassFilter->SetInputData(polydata);       // 输入图形不需要单元数据，只要顶点数据
+    centerOfMassFilter->SetUseScalarsAsWeights(true); // 是否使用标量作为权重，如果开启但是没有标量数据会报错
+    centerOfMassFilter->Update();
+
+    // 获取质心
+    double center[3];
+    centerOfMassFilter->GetCenter(center);
+
+    std::cout << "Center of mass is " << center[0] << " " << center[1] << " " << center[2] << std::endl;
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST404
 
 #ifdef TEST501
 

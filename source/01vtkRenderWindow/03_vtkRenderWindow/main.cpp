@@ -10,7 +10,7 @@
 9. 命令模式
 10.
 11.获取OpenGL版本  https://gitlab.kitware.com/vtk/vtk/-/blob/v9.1.0/Rendering/OpenGL2/Testing/Cxx/TestWindowBlits.cxx
-12.网格中心vtkCenterOfMass
+
 13.
 14.从输入的多个polydata获取交集并集差集vtkBooleanOperationPolyDataFilter
 15.
@@ -957,46 +957,7 @@ int main(int argc, char* argv[])
 
 #endif // TEST11
 
-#ifdef TEST12
 
-#include <vtkCenterOfMass.h>
-#include <vtkDoubleArray.h>
-#include <vtkNew.h>
-#include <vtkPointData.h>
-#include <vtkPoints.h>
-#include <vtkPolyData.h>
-
-#include <cmath>
-#include <limits>
-
-int main(int, char* [])
-{
-    // Create a point set of a square
-    vtkNew<vtkPoints> points;
-    points->InsertNextPoint(0, 0, 0);
-    points->InsertNextPoint(1, 0, 0);
-    points->InsertNextPoint(0, 1, 0);
-    points->InsertNextPoint(1, 1, 0);
-
-    vtkNew<vtkPolyData> polydata;
-    polydata->SetPoints(points);
-
-    // Compute the center of mass
-    vtkNew<vtkCenterOfMass> centerOfMassFilter;
-    centerOfMassFilter->SetInputData(polydata);
-    centerOfMassFilter->SetUseScalarsAsWeights(false);
-    centerOfMassFilter->Update();
-
-    double center[3];
-    centerOfMassFilter->GetCenter(center);
-
-    std::cout << "Center of mass is " << center[0] << " " << center[1] << " "
-        << center[2] << std::endl;
-
-    return EXIT_SUCCESS;
-}
-
-#endif // TEST12
 
 #ifdef TEST14
 
