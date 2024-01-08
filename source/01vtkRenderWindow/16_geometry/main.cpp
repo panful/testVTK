@@ -21,12 +21,12 @@
  *
  * 900. https://examples.vtk.org/site/Cxx/GeometricObjects/ParametricObjectsDemo/
  * 901. vtkParametricSuperEllipsoid vtkParametricFunctionSource 超椭球体
- * 902. vtkRectilinearGrid 通过给定XYZ方向上的坐标，生成一个体数据
+ * 902. vtkRectilinearGrid 通过给定XYZ方向上的坐标，生成一个体数据(有很多立方体堆积而成，一个立方体是一个单元)
  * 903. vtkParametricSpline vtkParametricFunctionSource 样条曲线
  * 904. vtkParametricTorus 圆环体
  */
 
-#define TEST904
+#define TEST902
 
 #ifdef TEST101
 

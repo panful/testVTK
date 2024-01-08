@@ -21,6 +21,9 @@ find_package(VTK
         CommonComputationalGeometry     # vtkParametricSuperEllipsoid
         IOLegacy                        # vtkDataObjectWriter
         IOImage                         # vtkJPEGWriter
+        FiltersHybrid                   # vtkPolyDataSilhouette
+        IOXML                           # vtkXMLPolyDataReader
+        IOPLY                           # vtkPLYReader
     QUIET
 )
 

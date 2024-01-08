@@ -25,11 +25,14 @@
  * 502. vtkClipPolyData 一般用于裁剪输入平面的一侧，保留另一侧
  * 503. vtkExtractCells 提取指定单元，类似设置间隔
  * 504. vtkSelectPolyData 选择多边形网格的一部分，生成选择标量
- * 505. vtkExtractUnstructuredGrid
+ * 505. vtkExtractUnstructuredGrid 提取非结构化网格的子集
  * 506. vtkRectilinearGridGeometryFilter 从直线网格中提取几何体（点、线、面、体）
+ * 507. vtkPolyDataSilhouette 提取观察者视角下物体的轮廓
+ * 508. vtkFeatureEdges 提取网格(多边形数据)的特征边
+ * 509.
  *
  * 601. vtkDataSetSurfaceFilter 将 vtkUnstructuredGrid 转换为 vtkPolyData，还可以将体网格转换为表面数据，从而简化模型
- * 602. vtkGeometryFilter 从数据集中提取边界，可以将任何数据转换为多边形数据，类似vtkDataSetSurfaceFilter
+ * 602. vtkGeometryFilter 从数据集中提取边界（3D单元提取2D面），可以将任何数据转换为多边形数据，类似 vtkDataSetSurfaceFilter
  * 603. vtkDataSetToDataObjectFilter 将数据集(vtkDataSet)转换为数据对象(vtkDataObject)
  * 604. vtkDataObjectToDataSetFilter 将数据对象(vtkDataObject)转换为数据集(vtkDataSet) vtkFieldDataToAttributeDataFilter
  * 605. 序列化反序列化vtk数据
@@ -37,13 +40,14 @@
  * 701.vtkLODProp3D 对于绘制大型网格可以提高渲染效率
  * 702.decimation多边形削减、网格简化 vtkDecimate vtkDecimatePro vtkQuadricClustering vtkQuardricDecimation
  * 703.平滑过滤器 vtkWindowedSincPolyDataFilter vtkSmoothPolyDataFilter
+ * 704.vtkCleanPolyData
  *
  * 801. vtkSampleFunction生成 vtkImageData 求等值面（几何数据）
  * 802. vtkSampleFunction生成 vtkImageData 转几何数据
  * 803. PerlinNoise 使用 vtkSampleFunction 生成噪声图片
  */
 
-#define TEST506
+#define TEST508
 
 #ifdef TEST001
 
@@ -2158,6 +2162,252 @@ int main()
 
 #endif // TEST506
 
+#ifdef TEST507
+
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkParametricFunctionSource.h>
+#include <vtkParametricTorus.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkPolyDataSilhouette.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+// 每一帧都会计算，模型比较大时会非常卡
+
+int main(int argc, char* argv[])
+{
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkParametricTorus> surface;
+    vtkNew<vtkParametricFunctionSource> source;
+    source->SetUResolution(20);
+    source->SetVResolution(20);
+    source->SetParametricFunction(surface);
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+    mapper->ScalarVisibilityOff();
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(1., 0., 0.);
+    renderer->AddActor(actor);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkPolyDataSilhouette> silhouette;
+    silhouette->SetInputData(source->GetOutput());
+    silhouette->SetCamera(renderer->GetActiveCamera());
+    silhouette->SetEnableFeatureAngle(0);
+
+    vtkNew<vtkPolyDataMapper> mapper2;
+    mapper2->SetInputConnection(silhouette->GetOutputPort());
+
+    vtkNew<vtkActor> actor2;
+    actor2->SetMapper(mapper2);
+    actor2->GetProperty()->SetColor(0., 1., 0.);
+    actor2->GetProperty()->SetLineWidth(5);
+    renderer->AddActor(actor2);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renderWindow);
+    iren->SetInteractorStyle(style);
+
+    renderer->ResetCamera();
+    renderWindow->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST507
+
+#ifdef TEST508
+
+#include <vtkActor.h>
+#include <vtkArrowSource.h>
+#include <vtkDiskSource.h>
+#include <vtkFeatureEdges.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNew.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+
+namespace {
+
+enum class PrimitiveType
+{
+    Poly,   // 四边形，面
+    Line,   // 四边形，线框
+    Disk,   // 圆盘
+    Sphere, // 球面
+    Arrow,  // 箭头
+    Box,    // 开口的盒子（5个四边形）
+};
+
+/// @details 生成vtkFeatureEdges的输入图形
+vtkSmartPointer<vtkPolyData> CreatePolyData(PrimitiveType pt)
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0., 0., 0.);
+    points->InsertNextPoint(1., 0., 0.);
+    points->InsertNextPoint(1., 1., 0.);
+    points->InsertNextPoint(0., 1., 0.);
+
+    vtkNew<vtkCellArray> polyCells;
+    polyCells->InsertNextCell({ 0, 1, 2, 3 });
+
+    vtkNew<vtkCellArray> lineCells;
+    lineCells->InsertNextCell({ 0, 1 });
+    lineCells->InsertNextCell({ 1, 2 });
+    lineCells->InsertNextCell({ 2, 3 });
+    lineCells->InsertNextCell({ 3, 0 });
+
+    vtkNew<vtkPolyData> polys;
+    polys->SetPoints(points);
+    polys->SetPolys(polyCells);
+
+    vtkNew<vtkPolyData> lines;
+    lines->SetPoints(points);
+    lines->SetLines(lineCells);
+
+    vtkNew<vtkDiskSource> disk;
+    disk->Update();
+
+    vtkNew<vtkSphereSource> sphere;
+    sphere->Update();
+
+    vtkNew<vtkArrowSource> arrow;
+    arrow->Update();
+
+    vtkNew<vtkPoints> box_points;
+    box_points->InsertNextPoint(0., 0., 1.);
+    box_points->InsertNextPoint(1., 0., 1.);
+    box_points->InsertNextPoint(1., 1., 1.);
+    box_points->InsertNextPoint(0., 1., 1.);
+    box_points->InsertNextPoint(0., 0., 0.);
+    box_points->InsertNextPoint(1., 0., 0.);
+    box_points->InsertNextPoint(1., 1., 0.);
+    box_points->InsertNextPoint(0., 1., 0.);
+
+    vtkNew<vtkCellArray> box_cells;
+    box_cells->InsertNextCell({ 0, 1, 2, 3 });
+    box_cells->InsertNextCell({ 1, 5, 6, 2 });
+    box_cells->InsertNextCell({ 5, 4, 7, 6 });
+    box_cells->InsertNextCell({ 4, 0, 3, 7 });
+    box_cells->InsertNextCell({ 4, 5, 1, 0 });
+
+    vtkNew<vtkPolyData> box;
+    box->SetPoints(box_points);
+    box->SetPolys(box_cells);
+
+    switch (pt)
+    {
+    case PrimitiveType::Poly:
+        return polys;
+    case PrimitiveType::Line:
+        return lines;
+    case PrimitiveType::Disk:
+        return disk->GetOutput();
+    case PrimitiveType::Sphere:
+        return sphere->GetOutput();
+    case PrimitiveType::Arrow:
+        return arrow->GetOutput();
+    case PrimitiveType::Box:
+        return box;
+    default:
+        return polys;
+    }
+}
+} // namespace
+
+int main(int, char*[])
+{
+    auto polyData = CreatePolyData(PrimitiveType::Line);
+
+    // 边界边：只被一个多边形或者一条边包围的边
+    // 特征边：需要设置一个特征角的阈值，当包含同一条边的两个三角形的法向量的夹角大于该阈值时，即为一个特征边
+    // 流行边：只被两个多边形包含的边
+    // 非流形边：被三个或者三个以上多边形包围的边
+    vtkNew<vtkFeatureEdges> featureEdges;
+    featureEdges->SetInputData(polyData);
+    featureEdges->BoundaryEdgesOn();
+    featureEdges->FeatureEdgesOn();
+    featureEdges->ManifoldEdgesOn();
+    featureEdges->NonManifoldEdgesOn();
+    featureEdges->SetFeatureAngle(0.); // 特征边夹角阈值（默认30°）
+    featureEdges->PassLinesOff();      // 如果开启，输入的Lines单元都将被传递到输出中
+    featureEdges->ColoringOn();        // 根据边界类型着色
+    featureEdges->Update();
+
+    auto numberOfEdges = featureEdges->GetOutput()->GetNumberOfCells();
+    std::cout << "Number of Edges: " << numberOfEdges << '\n';
+
+    //---------------------------------------------------------------------------------
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0., 1., 0.);
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(1., 0., 0.);
+    actor->GetProperty()->LightingOff();
+
+    vtkNew<vtkPolyDataMapper> edgeMapper;
+    edgeMapper->SetInputData(featureEdges->GetOutput());
+
+    vtkNew<vtkActor> edgeActor;
+    edgeActor->SetMapper(edgeMapper);
+    edgeActor->GetProperty()->LightingOff();
+
+    //----------------------------------------------------------------------------------
+    // 左边是原始图形，右边是提取的边界
+    vtkNew<vtkRenderer> leftRenderer;
+    leftRenderer->AddActor(actor);
+    leftRenderer->SetBackground(.1, .2, .3);
+    leftRenderer->SetViewport(0., 0., .5, 1.);
+    leftRenderer->ResetCamera();
+
+    vtkNew<vtkRenderer> rightRenderer;
+    rightRenderer->AddActor(edgeActor);
+    rightRenderer->SetBackground(.3, .2, .1);
+    rightRenderer->SetViewport(.5, 0., 1., 1.);
+    rightRenderer->SetActiveCamera(leftRenderer->GetActiveCamera());
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(leftRenderer);
+    renderWindow->AddRenderer(rightRenderer);
+    renderWindow->SetSize(1200, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST508
+
 #ifdef TEST601
 
 #include <vtkActor.h>
@@ -2265,7 +2515,7 @@ int main()
 #include <vtkSmartPointer.h>
 #include <vtkUnstructuredGrid.h>
 
-int main()
+vtkSmartPointer<vtkDataObject> CreateUns()
 {
     vtkNew<vtkPoints> points;
     // 0,1,2
@@ -2304,17 +2554,24 @@ int main()
     vtkIdType ids_hexahedron[] { 7, 8, 9, 10, 11, 12, 13, 14 };
     usg->InsertNextCell(VTK_HEXAHEDRON, 8, ids_hexahedron);
 
+    std::cout << "Before\nPoints\t" << usg->GetNumberOfPoints() << "\nCells\t" << usg->GetNumberOfCells() << '\n';
+
+    return usg;
+}
+
+// 原本6面体是1个单元，可以从6面体提取6个边界（面）
+
+int main()
+{
     vtkNew<vtkGeometryFilter> filter;
-    filter->SetInputData(usg);
+    filter->SetInputData(CreateUns());
+    // filter->SetExcludedFacesData() // 设置提取时需要排除的单元列表
     filter->Update();
 
     auto output = filter->GetOutput();
-
-    std::cout << "UnstructuredGrid\nPoints\t" << usg->GetNumberOfPoints() << "\nCells\t" << usg->GetNumberOfCells() << '\n';
-    std::cout << "PolyData\nPoints\t" << output->GetNumberOfPoints() << "\nCells\t" << output->GetNumberOfCells() << '\n';
+    std::cout << "After:\nPoints\t" << output->GetNumberOfPoints() << "\nCells\t" << output->GetNumberOfCells() << '\n';
 
     vtkNew<vtkDataSetMapper> mapper;
-    // mapper->SetInputData(usg);
     mapper->SetInputData(output);
 
     vtkNew<vtkActor> actor;
