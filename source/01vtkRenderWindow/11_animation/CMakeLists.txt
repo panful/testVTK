@@ -14,6 +14,7 @@ find_package(VTK
         RenderingOpenGL2
         loguru
         ParallelMPI
+        FiltersModeling     # vtkCollisionDetectionFilter
     QUIET
 )
 
