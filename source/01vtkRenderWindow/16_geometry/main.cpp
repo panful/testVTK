@@ -879,7 +879,6 @@ int main(int, char*[])
 
 int main(int, char*[])
 {
-
     vtkNew<vtkPlaneSource> source;
     source->SetOutputPointsPrecision(vtkAlgorithm::SINGLE_PRECISION); // 设置输出点的精度（单精度、双精度）
     source->SetResolution(10, 10);     // 由多少个格子组成，注意是格子不是线的个数，格子比线的个数少1（X和Y方向）

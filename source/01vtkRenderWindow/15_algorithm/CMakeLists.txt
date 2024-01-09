@@ -16,6 +16,7 @@ find_package(VTK
         FiltersSources      # vtkCubeSource
         FiltersExtraction   # vtkExtractCells
         ImagingHybrid       # vtkSurfaceReconstructionFilter
+        FiltersPoints                   # vtkBoundedPointSource
     QUIET
 )
 
