@@ -10,14 +10,16 @@
  * 401. 多边形每条边的外法向量
  * 402. vtkPolyDataNormals 生成多边形的法线
  *
- * 501. vtkSurfaceReconstructionFilter 从无组织的点重建曲面
+ * 501. vtkSurfaceReconstructionFilter 从无组织的点集重建曲面
  * 502. vtkDelaunay2D 对输入的点集进行三角剖分，输出是一个 vtkPolyData 单元是三角形（或线段、顶点）
  * 503. vtkDelaunay3D 对输入的点集进行三角剖分，输出是一个 vtkUnstructuredGrid 单元是四面体（或三角形、线段、顶点）
  * 504. vtkDelaunay2D 对输入数据集的指定区域进行三角剖分，或者对指定区域不进行三角剖分
  *
+ * 601. vtkTriangleFilter 将输入的多边形三角化，分解单元
+ *
  */
 
-#define TEST504
+#define TEST601
 
 #ifdef TEST101
 
@@ -1363,3 +1365,201 @@ int main()
 }
 
 #endif // TEST504
+
+#ifdef TEST601
+
+#include <vector>
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPlaneSource.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRegularPolygonSource.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkTriangleFilter.h>
+
+namespace {
+
+enum class PrimitiveType
+{
+    Vert,   // 一堆顶点，所有顶点只有一个单元
+    Verts,  // 一堆顶点，几个顶点则几个单元
+    Lines,  // 四条线构成一个四边形
+    Line,   // 一条折线构成一个四边形
+    Poly,   // 四边形
+    Strip,  // 三角形带
+    Plane,  // 四边形构成的平面
+    Circle, // 圆（一个多边形）
+};
+
+vtkSmartPointer<vtkPolyData> GenPolyData(PrimitiveType pt)
+{
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkCellArray> verts;
+    std::vector<vtkIdType> tmpCell;
+    for (size_t i = 0; i < 10; ++i)
+    {
+        for (size_t j = 0; j < 10; ++j)
+        {
+            points->InsertNextPoint(static_cast<double>(i), static_cast<double>(j), 0.);
+            vtkIdType id = i * 10 + j;
+            verts->InsertNextCell(1, &id);
+            tmpCell.emplace_back(id);
+        }
+    }
+
+    vtkNew<vtkCellArray> vert;
+    vert->InsertNextCell(static_cast<vtkIdType>(tmpCell.size()), tmpCell.data());
+
+    vtkNew<vtkCellArray> lines;
+    lines->InsertNextCell({ 0, 90 });
+    lines->InsertNextCell({ 90, 99 });
+    lines->InsertNextCell({ 99, 9 });
+    lines->InsertNextCell({ 9, 0 });
+
+    vtkNew<vtkCellArray> line;
+    line->InsertNextCell({ 0, 90, 99, 9, 0 });
+
+    vtkNew<vtkCellArray> polys;
+    polys->InsertNextCell({ 0, 90, 99, 9 });
+
+    // 三角形带实际只有一个单元，但是有多个三角形
+    // 经过三角形过滤器之后就会将每个三角形作为一个单元
+    vtkNew<vtkCellArray> strips;
+    strips->InsertNextCell({ 9, 0, 19, 10, 29, 20, 99, 90 });
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+
+    vtkNew<vtkRegularPolygonSource> regular;
+    regular->SetNumberOfSides(10);
+    regular->SetRadius(5.0);
+    regular->GeneratePolygonOn();
+    regular->GeneratePolylineOff();
+    regular->Update();
+
+    vtkNew<vtkPlaneSource> plane;
+    plane->SetResolution(10, 10);
+    plane->SetPoint1(10., 0., 0.);
+    plane->SetPoint2(0., 10., 0.);
+    plane->Update();
+
+    switch (pt)
+    {
+    case PrimitiveType::Vert:
+        polyData->SetVerts(vert);
+        break;
+    case PrimitiveType::Verts:
+        polyData->SetVerts(verts);
+        break;
+    case PrimitiveType::Lines:
+        polyData->SetLines(lines);
+        break;
+    case PrimitiveType::Line:
+        polyData->SetLines(line);
+        break;
+    case PrimitiveType::Strip:
+        polyData->SetStrips(strips);
+        break;
+    case PrimitiveType::Poly:
+        polyData->SetPolys(polys);
+        break;
+    case PrimitiveType::Plane:
+        return plane->GetOutput();
+    case PrimitiveType::Circle:
+        return regular->GetOutput();
+    default:
+        break;
+    }
+
+    return polyData;
+}
+
+} // namespace
+
+// vtkTriangleFilter 可以将多边形分解为多个三角形
+// 将三角形带分解为多个三角形
+// 将折线（一个单元多个线条）分解为多个线条（每个线条一个单元）
+// 将顶点单元分解为多个顶点（同折线）
+// 不能将一堆顶点构造为三角形（只能对多边形三角化）
+
+int main()
+{
+    auto polyData = GenPolyData(PrimitiveType::Circle);
+
+    vtkNew<vtkTriangleFilter> filter;
+    filter->SetInputData(polyData);
+    filter->PassLinesOn(); // 如果开启会将输入的折线分解为单独的线段，关闭则不会有任何线类型的单元输出，默认开启
+    filter->PassVertsOn(); // 如果开启，会将输入的顶点单元分解为单独的顶点单元，关闭则不会输出任何顶点单元，默认开启
+    filter->Update();
+
+    //----------------------------------------------------------
+    // 输入数据集
+    auto np = polyData->GetNumberOfPoints();
+    auto nc = polyData->GetNumberOfCells();
+    double bounds[6] {};
+    polyData->GetBounds(bounds);
+    std::cout << "Points:\t" << np << "\tCells:\t" << nc << '\n'
+              << "Bounds:\t" << bounds[0] << ' ' << bounds[1] << '\t' << bounds[2] << ' ' << bounds[3] << '\t' << bounds[4] << ' ' << bounds[5]
+              << '\n';
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+    mapper->ScalarVisibilityOff();
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(1., 0., 0.);
+    actor->GetProperty()->SetPointSize(4.f);
+    actor->GetProperty()->EdgeVisibilityOn();
+
+    //----------------------------------------------------------
+    // 过滤器的结果
+    auto np2 = filter->GetOutput()->GetNumberOfPoints();
+    auto nc2 = filter->GetOutput()->GetNumberOfCells();
+    filter->GetOutput()->GetBounds(bounds);
+    std::cout << "Points:\t" << np2 << "\tCells:\t" << nc2 << '\n'
+              << "Bounds:\t" << bounds[0] << ' ' << bounds[1] << '\t' << bounds[2] << ' ' << bounds[3] << '\t' << bounds[4] << ' ' << bounds[5]
+              << '\n';
+
+    vtkNew<vtkPolyDataMapper> filterMapper;
+    filterMapper->SetInputData(filter->GetOutput());
+
+    vtkNew<vtkActor> filterActor;
+    filterActor->SetMapper(filterMapper);
+    filterActor->GetProperty()->SetColor(0., 1., 0.);
+    filterActor->GetProperty()->EdgeVisibilityOn();
+
+    //----------------------------------------------------------
+    vtkNew<vtkRenderer> leftRender;
+    leftRender->AddActor(actor);
+    leftRender->SetViewport(0., 0., .5, 1.);
+    leftRender->SetBackground(.1, .2, .3);
+    leftRender->ResetCamera();
+
+    vtkNew<vtkRenderer> rightRender;
+    rightRender->AddActor(filterActor);
+    rightRender->SetViewport(.5, 0., 1., 1.);
+    rightRender->SetBackground(.3, .2, .1);
+    rightRender->SetActiveCamera(leftRender->GetActiveCamera());
+    rightRender->ResetCamera();
+
+    vtkNew<vtkRenderWindow> rw;
+    rw->AddRenderer(leftRender);
+    rw->AddRenderer(rightRender);
+    rw->SetSize(1200, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> rwi;
+    rwi->SetRenderWindow(rw);
+    rwi->SetInteractorStyle(style);
+
+    rw->Render();
+    rwi->Start();
+
+    return 0;
+}
+
+#endif // TEST601
