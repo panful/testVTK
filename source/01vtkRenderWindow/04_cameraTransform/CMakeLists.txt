@@ -3,6 +3,7 @@ set(target_name "01_04_CameraTransform")
 find_package(VTK
     COMPONENTS
         CommonCore
+        CommonColor
         CommonDataModel
         FiltersSources
         InteractionStyle
@@ -14,6 +15,9 @@ find_package(VTK
         loguru
         ParallelMPI
         RenderingAnnotation # vtkLegendScaleActor
+        FiltersHybrid       # vtkImplicitModeller
+        RenderingLOD        # vtkLODActor
+        FiltersModeling     # vtkRotationalExtrusionFilter
     QUIET
 )
 
