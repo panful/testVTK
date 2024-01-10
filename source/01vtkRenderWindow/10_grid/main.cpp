@@ -18,7 +18,8 @@
  * 402. vtkPolyData 设置多种单元(line poly...)，获取单元的索引
  *
  * 501. 加载glTF类型的模型
- * 502. 加载Obj类型的模型，并导出为glTF
+ * 502. 获取glTF模型的 vtkActor
+ * 503. 加载Obj类型的模型，并导出为glTF
  */
 
 #define TEST502
@@ -1207,6 +1208,11 @@ int main()
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 
+// vtkGLTFImporter 源码分析：
+// vtkGLTFImporter->Update() => vtkImporter::ReadData()
+// 依次加载 actors, cameras, lights, properties 到设置的 SetRenderWindow 的第一个 vtkRenderer
+// 将模型文件中的数据设置到 vtkRenderer 之后，渲染流程和普通渲染没啥区别
+
 int main(int argc, char* argv[])
 {
     vtkNew<vtkRenderer> renderer;
@@ -1228,6 +1234,12 @@ int main(int argc, char* argv[])
     importer->SetRenderWindow(renderWindow);
     importer->Update();
 
+    auto na = importer->GetNumberOfAnimations();
+    auto nc = importer->GetNumberOfCameras();
+    std::cout << "Number of animations:\t" << na << "\nNumber of Camera:\t" << nc << '\n';
+
+    renderer->GetActors();
+
     renderWindow->Render();
     renderWindowInteractor->Start();
 
@@ -1237,6 +1249,61 @@ int main(int argc, char* argv[])
 #endif // TEST501
 
 #ifdef TEST502
+
+#include <vtkActorCollection.h>
+#include <vtkGLTFImporter.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNew.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main(int argc, char* argv[])
+{
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    vtkNew<vtkGLTFImporter> importer;
+    importer->SetFileName("../resources/gltf/FlightHelmet/FlightHelmet.gltf");
+    // importer->SetFileName("../resources/gltf/airplane/airplane.gltf");
+    // importer->SetFileName("../resources/gltf/truck/CesiumMilkTruck.gltf");
+    importer->SetRenderWindow(renderWindow);
+    importer->Update();
+
+    auto na = importer->GetNumberOfAnimations();
+    auto nc = importer->GetNumberOfCameras();
+    std::cout << "Number of animations:\t" << na << "\nNumber of Camera:\t" << nc << '\n';
+
+    auto actors = renderer->GetActors();
+    actors->InitTraversal(); // 必须初始化遍历
+    std::cout << "Number of actors:\t" << actors->GetNumberOfItems() << '\n';
+    while (auto actor = actors->GetNextActor())
+    {
+        actor->GetProperty()->SetColor(1., 0., 0.);
+        // actor->GetProperty()->EdgeVisibilityOn();
+        // actor->GetProperty()->LightingOff();
+        // actor->GetProperty()->SetRepresentationToWireframe();
+    }
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST502
+
+#ifdef TEST503
 
 #include <vtkGLTFExporter.h>
 #include <vtkInteractorStyleTrackballCamera.h>
@@ -1283,4 +1350,4 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 
-#endif // TEST502
+#endif // TEST503
