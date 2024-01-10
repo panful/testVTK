@@ -40,6 +40,7 @@
 
  vtkOpenGLRenderer.cxx                  [298]   UpdateGeometry()
  vtkOpenGLPolyDataMapper.cxx            [3845]  BuildBufferObjects() 顶点着色器的输入 vertexMC normalMC scalarColor tcoord tangentMC
+ vtkDataSetMapper.cxx                   [120]   Render() vtkUnstructuredGrid 等类型的网格会先转换为 vtkPolyData 然后渲染
 
 创建VBO IBO，加载顶点、拓扑数据
  vtkOpenGLVertexBufferObjectGroup.cxx   [322]   BuildAllVBOs()

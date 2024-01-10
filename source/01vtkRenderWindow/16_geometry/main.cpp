@@ -33,7 +33,7 @@
  * 904. vtkParametricTorus  圆环体
  */
 
-#define TEST701
+#define TEST702
 
 #ifdef TEST101
 
@@ -1221,6 +1221,7 @@ vtkSmartPointer<vtkUnstructuredGrid> MakeQuadraticPolygon()
 
 #include <vtkActor.h>
 #include <vtkDataSetMapper.h>
+#include <vtkDataSetSurfaceFilter.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkProperty.h>
 #include <vtkQuadraticTriangle.h>
@@ -1241,23 +1242,36 @@ int main(int, char*[])
         aCell->GetPoints()->SetPoint(i, *(pcoords + 3 * i), *(pcoords + 3 * i + 1), *(pcoords + 3 * i + 2));
     }
 
-    std::cout << "Cell points:\t" << aCell->GetNumberOfPoints() << '\n';
-    std::cout << "Cell edges:\t" << aCell->GetNumberOfEdges() << '\n';
-    std::cout << "Cell faces:\t" << aCell->GetNumberOfFaces() << '\n';
+    std::cout << "NonLinearCell points:\t" << aCell->GetNumberOfPoints() << '\n';
+    std::cout << "NonLinearCell edges:\t" << aCell->GetNumberOfEdges() << '\n';
+    std::cout << "NonLinearCell faces:\t" << aCell->GetNumberOfFaces() << '\n';
 
     vtkNew<vtkUnstructuredGrid> ug;
     ug->SetPoints(aCell->GetPoints());
     ug->InsertNextCell(aCell->GetCellType(), aCell->GetPointIds());
 
-    std::cout << "Grid points:\t" << ug->GetNumberOfPoints() << '\n';
-    std::cout << "Grid cells:\t" << ug->GetNumberOfCells() << '\n';
+    std::cout << "UnsGrid points:\t" << ug->GetNumberOfPoints() << '\n';
+    std::cout << "UnsGrid cells:\t" << ug->GetNumberOfCells() << '\n';
 
+    //---------------------------------------------------------------------
+    // vtkQuadraticTriangle 是 vtkUnstructuredGrid 类型的网格单元
+    // 会在 vtkDataSetMapper 中通过 vtkDataSetSurfaceFilter 转换为 vtkPolyData 数据然后渲染
+    // 一个 vtkQuadraticTriangle 渲染出来实际有4个单元
+    vtkNew<vtkDataSetSurfaceFilter> filter;
+    filter->SetInputData(ug);
+    filter->Update();
+
+    std::cout << "PolyData points: " << filter->GetOutput()->GetNumberOfPoints() << '\n';
+    std::cout << "PolyData cells: " << filter->GetOutput()->GetNumberOfCells() << '\n';
+
+    //---------------------------------------------------------------------
     vtkNew<vtkDataSetMapper> mapper;
     mapper->SetInputData(ug);
 
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
     actor->GetProperty()->SetColor(0, 1, 0);
+    actor->GetProperty()->EdgeVisibilityOn();
 
     vtkNew<vtkRenderer> renderer;
     renderer->AddActor(actor);

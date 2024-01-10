@@ -13,6 +13,7 @@ find_package(VTK
         CommonComputationalGeometry     # vtkParametricSuperEllipsoid
         FiltersPoints                   # vtkBoundedPointSource
         RenderingLabel                  # vtkLabeledDataMapper
+        FiltersGeometry                 # vtkDataSetSurfaceFilter
     QUIET
 )
 
