@@ -12,6 +12,7 @@ find_package(VTK
         ParallelMPI
         CommonComputationalGeometry     # vtkParametricSuperEllipsoid
         FiltersPoints                   # vtkBoundedPointSource
+        RenderingLabel                  # vtkLabeledDataMapper
     QUIET
 )
 
