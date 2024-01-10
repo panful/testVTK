@@ -1236,6 +1236,7 @@ int main(int, char*[])
 #include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
 
+// vtkOrientationMarkerWidget 源码分析：
 // vtkOrientationMarkerWidget 的构造函数中，创建了一个 vtkRenderer
 // 通过设置 Interactor，并设置 Enabled 为On时，将这个 vtkRenderer 添加到当前窗口中
 // 通过判断光标位置来决定当前光标的显示形状，Widget的边框是否显示等
@@ -1623,6 +1624,7 @@ int main(int, char*[])
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
 
+// vtkBorderWidget 源码分析：
 // vtkBorderRepresentation 继承自 vtkWidgetRepresentation
 // vtkWidgetRepresentation 继承自 vtkProp
 // vtkBorderWidget 绘制时，实际就是绘制它的成员 vtkBorderRepresentation
