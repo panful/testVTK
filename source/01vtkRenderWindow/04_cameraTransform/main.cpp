@@ -1,6 +1,7 @@
 ﻿/**
  * 101. vtkCamera
- * 102. 可视化相机
+ * 102. 可视化相机的旋转操作 Elevation Azimuth Roll
+ * 103. vtkCameraActor 可视化相机的Frustum
  *
  * 201. 相机旋转原理
  * 202. 相机平移原理
@@ -31,7 +32,7 @@
 // https://blog.csdn.net/liushao1031177/article/details/116903698
 // https://www.cnblogs.com/ybqjymy/p/13925462.html
 
-#define TEST102
+#define TEST103
 
 #ifdef TEST101
 
@@ -505,6 +506,84 @@ int main()
 }
 
 #endif // TEST102
+
+#ifdef TEST103
+
+#include <vtkCamera.h>
+#include <vtkCameraActor.h>
+#include <vtkMapper.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPlanes.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSphereSource.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkNamedColors> namedColors;
+
+    // Sphere
+    vtkNew<vtkSphereSource> sphereSource;
+    sphereSource->SetRadius(400);
+    sphereSource->Update();
+
+    vtkNew<vtkPolyDataMapper> sphereMapper;
+    sphereMapper->SetInputConnection(sphereSource->GetOutputPort());
+    vtkNew<vtkActor> sphereActor;
+    sphereActor->SetMapper(sphereMapper);
+    sphereActor->GetProperty()->SetDiffuseColor(namedColors->GetColor3d("Tomato").GetData());
+
+    // Camera
+    vtkNew<vtkCamera> camera;
+
+    vtkNew<vtkCameraActor> cameraActor;
+    cameraActor->SetCamera(camera);
+    cameraActor->GetProperty()->SetColor(namedColors->GetColor3d("Black").GetData());
+
+    // (Xmin,Xmax,Ymin,Ymax,Zmin,Zmax).
+    auto bounds = cameraActor->GetBounds();
+    std::cout << "bounds: " << bounds[0] << " " << bounds[1] << " " << bounds[2] << " " << bounds[3] << " " << bounds[4] << " " << bounds[5]
+              << std::endl;
+
+    // Visualize
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+    renderWindow->SetWindowName("CameraActor");
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderer->AddActor(sphereActor);
+    // Compute the active camera parameters
+    renderer->ResetCamera();
+
+    // Set the camera parameters for the camera actor
+    camera->DeepCopy(renderer->GetActiveCamera());
+    renderer->AddActor(cameraActor);
+
+    // Position the camera so that we can see the camera actor
+    renderer->GetActiveCamera()->SetPosition(1, 0, 0);
+    renderer->GetActiveCamera()->SetFocalPoint(0, 0, 0);
+    renderer->GetActiveCamera()->SetViewUp(0, 1, 0);
+    renderer->GetActiveCamera()->Azimuth(30);
+    renderer->GetActiveCamera()->Elevation(30);
+
+    renderer->ResetCamera();
+    renderer->SetBackground(namedColors->GetColor3d("SlateGray").GetData());
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST103
 
 #ifdef TEST201
 
