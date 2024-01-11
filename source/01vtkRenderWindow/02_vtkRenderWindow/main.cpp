@@ -33,9 +33,6 @@
 25.
 26.纹理，光照
 
-32.
-33.vtkMaskPoints 对输入的数据进行挑拣筛选
-
 38.plot https://kitware.github.io/vtk-examples/site/Cxx/Plotting/LinePlot/
 
 43.reverse access ,从经过算法(vtkAlgorithm,vtkPolyDataAlgorithm)变换的数据中获取源数据（vtkPolyData,vtkDataSet）
@@ -1297,170 +1294,7 @@ int main()
 
 
 
-#ifdef TEST33
 
-#include <vtkAlgorithmOutput.h>
-#include <vtkCellArray.h>
-#include <vtkMaskFields.h>
-#include <vtkMaskPoints.h>
-#include <vtkMaskPointsFilter.h>
-#include <vtkMaskPolyData.h>
-#include <vtkPoints.h>
-#include <vtkPolyData.h>
-#include <vtkSmartPointer.h>
-#include <vtkSphereSource.h>
-
-#include <array>
-
-namespace {
-std::array<float, 8 * 3> vertices { 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0,
-
-    0, 2, 0, 1, 2, 0, 1, 3, 0, 0, 3, 0 };
-
-std::array<long long, 7 * 2> indices { 0, 1, 1, 2, 2, 3, 3, 4,
-
-    4, 5, 5, 6, 6, 7 };
-} // namespace
-
-int main()
-{
-    // vtkMaskPoints 对dataset的vtkPoints数据进行筛选
-    {
-        vtkNew<vtkPolyData> polyData;
-        vtkNew<vtkPoints> points;
-        vtkNew<vtkCellArray> lines;
-        vtkNew<vtkCellArray> verts;
-
-        for (size_t i = 0; i < vertices.size(); i += 3)
-        {
-            points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
-        }
-
-        for (size_t i = 0; i < indices.size(); i += 2)
-        {
-            lines->InsertNextCell({ indices[i], indices[i + 1] });
-        }
-
-        for (size_t i = 0; i < 8; i++)
-        {
-            vtkIdType pts = i;
-            verts->InsertNextCell(1, &pts);
-        }
-
-        polyData->SetPoints(points);
-        // polyData->SetLines(lines);
-        polyData->SetVerts(verts);
-
-        std::cout << "num points:\t" << polyData->GetNumberOfPoints() << '\n';
-        std::cout << "num cells:\t" << polyData->GetNumberOfCells() << '\n';
-        std::cout << "num lines:\t" << polyData->GetNumberOfLines() << '\n';
-        std::cout << "num verts:\t" << polyData->GetNumberOfVerts() << '\n';
-
-        for (size_t i = 0; i < polyData->GetNumberOfPoints(); i++)
-        {
-            auto pt = polyData->GetPoints()->GetPoint(i);
-            std::cout << "point " << i << " : " << pt[0] << '\t' << pt[1] << '\t' << pt[2] << '\n';
-        }
-
-        std::cout << "------------------------------------\n";
-
-        // 筛选数据
-        vtkNew<vtkMaskPoints> maskPoints;
-        maskPoints->SetInputData(polyData);
-        maskPoints->SetOnRatio(3); // 提取第3n个顶点，n从0开始，3n小于顶点个数
-        maskPoints->Update();
-
-        if (auto outPolyData = maskPoints->GetOutput())
-        {
-            std::cout << "num points:\t" << outPolyData->GetNumberOfPoints() << '\n';
-            std::cout << "num cells:\t" << outPolyData->GetNumberOfCells() << '\n';
-            std::cout << "num lines:\t" << outPolyData->GetNumberOfLines() << '\n';
-            std::cout << "num verts:\t" << outPolyData->GetNumberOfVerts() << '\n';
-
-            for (size_t i = 0; i < outPolyData->GetNumberOfPoints(); i++)
-            {
-                auto pt = outPolyData->GetPoints()->GetPoint(i);
-                std::cout << "point " << i << " : " << pt[0] << '\t' << pt[1] << '\t' << pt[2] << '\n';
-            }
-        }
-
-        std::cout << "------------------------------------\n";
-
-        // 获取源数据
-        if (auto inPolyData = vtkPolyData::SafeDownCast(maskPoints->GetInput()))
-        {
-            std::cout << "num points:\t" << inPolyData->GetNumberOfPoints() << '\n';
-            std::cout << "num cells:\t" << inPolyData->GetNumberOfCells() << '\n';
-            std::cout << "num lines:\t" << inPolyData->GetNumberOfLines() << '\n';
-            std::cout << "num verts:\t" << inPolyData->GetNumberOfVerts() << '\n';
-
-            for (size_t i = 0; i < inPolyData->GetNumberOfPoints(); i++)
-            {
-                auto pt = inPolyData->GetPoints()->GetPoint(i);
-                std::cout << "point " << i << " : " << pt[0] << '\t' << pt[1] << '\t' << pt[2] << '\n';
-            }
-        }
-    }
-
-    std::cout << "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-
-    // vtkMaskPolyData 对dataset的单元数据（cell）进行筛选
-    {
-        vtkNew<vtkPolyData> polyData;
-        vtkNew<vtkPoints> points;
-        vtkNew<vtkCellArray> lines;
-
-        for (size_t i = 0; i < vertices.size(); i += 3)
-        {
-            points->InsertNextPoint(vertices[i], vertices[i + 1], vertices[i + 2]);
-        }
-
-        for (size_t i = 0; i < indices.size(); i += 2)
-        {
-            lines->InsertNextCell({ indices[i], indices[i + 1] });
-        }
-
-        polyData->SetPoints(points);
-        polyData->SetLines(lines);
-
-        std::cout << "num points:\t" << polyData->GetNumberOfPoints() << '\n';
-        std::cout << "num cells:\t" << polyData->GetNumberOfCells() << '\n';
-        std::cout << "num lines:\t" << polyData->GetNumberOfLines() << '\n';
-        std::cout << "num verts:\t" << polyData->GetNumberOfVerts() << '\n';
-
-        std::cout << "------------------------------------\n";
-
-        vtkNew<vtkMaskPolyData> maskPolyData;
-        maskPolyData->SetInputData(polyData);
-        maskPolyData->SetOnRatio(2);
-        maskPolyData->Update();
-
-        if (auto outPolyData = maskPolyData->GetOutput())
-        {
-            std::cout << "num points:\t" << outPolyData->GetNumberOfPoints() << '\n';
-            std::cout << "num cells:\t" << outPolyData->GetNumberOfCells() << '\n';
-            std::cout << "num lines:\t" << outPolyData->GetNumberOfLines() << '\n';
-            std::cout << "num verts:\t" << outPolyData->GetNumberOfVerts() << '\n';
-        }
-    }
-
-    std::cout << "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-
-    // vtkMaskFields
-    {
-        vtkNew<vtkPolyData> polyData;
-        vtkNew<vtkMaskFields> maskArrays;
-        maskArrays->SetInputData(polyData);
-        maskArrays->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "Normals");
-        maskArrays->CopyFieldOff(1, "");
-        maskArrays->CopyAttributesOn();
-        maskArrays->Update();
-    }
-
-    return 0;
-}
-
-#endif // TEST33
 
 #ifdef TEST38
 
@@ -3102,5 +2936,3 @@ int main(int, char*[])
 }
 
 #endif // TEST66
-
-

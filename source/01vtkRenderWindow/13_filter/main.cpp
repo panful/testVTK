@@ -33,6 +33,7 @@
  * 509. vtkExtractEdges 提取构成网格所有单元边界
  * 510. vtkOutlineFilter 生成一个输入网格的包围盒
  * 511. vtkSelectVisiblePoints 提取可见的点
+ * 512. vtkMaskPoints vtkMaskPolyData vtkMaskFields 提取符合条件的数据（可以随机提取）
  *
  * 601. vtkDataSetSurfaceFilter 将 vtkUnstructuredGrid 转换为 vtkPolyData，还可以将体网格转换为表面数据，从而简化模型
  * 602. vtkGeometryFilter 从数据集中提取边界（3D单元提取2D面），可以将任何数据转换为多边形数据，类似 vtkDataSetSurfaceFilter
@@ -48,7 +49,7 @@
  * 803. PerlinNoise 使用 vtkSampleFunction 生成噪声图片
  */
 
-#define TEST511
+#define TEST512
 
 #ifdef TEST001
 
@@ -2948,6 +2949,94 @@ int main(int, char*[])
 }
 
 #endif // TEST511
+
+#ifdef TEST512
+
+#include <vtkCellArray.h>
+#include <vtkDoubleArray.h>
+#include <vtkMaskFields.h>
+#include <vtkMaskPoints.h>
+#include <vtkMaskPolyData.h>
+#include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkSmartPointer.h>
+
+int main()
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0., 0., 0.);
+    points->InsertNextPoint(0., 1., 0.);
+    points->InsertNextPoint(1., 0., 0.);
+    points->InsertNextPoint(1., 1., 0.);
+    points->InsertNextPoint(2., 0., 0.);
+    points->InsertNextPoint(2., 1., 0.);
+    points->InsertNextPoint(3., 0., 0.);
+    points->InsertNextPoint(3., 1., 0.);
+
+    vtkNew<vtkCellArray> cells;
+    cells->InsertNextCell({ 0, 2, 1 });
+    cells->InsertNextCell({ 2, 3, 1 });
+    cells->InsertNextCell({ 2, 4, 3 });
+    cells->InsertNextCell({ 4, 5, 3 });
+    cells->InsertNextCell({ 4, 6, 5 });
+    cells->InsertNextCell({ 6, 7, 5 });
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+    polyData->GetPointData()->SetActiveScalars("0");
+    auto GenArray = [p = polyData.Get()]()
+    {
+        for (vtkIdType i = 0; i < 6; ++i)
+        {
+            vtkNew<vtkDoubleArray> arr;
+            arr->SetName(std::to_string(i).c_str());
+            for (vtkIdType j = 0; j < p->GetNumberOfPoints(); ++j)
+            {
+                arr->InsertNextValue(0.);
+            }
+            p->GetPointData()->AddArray(arr);
+        }
+    };
+    GenArray();
+
+    //----------------------------------------------------------------------
+    vtkNew<vtkMaskPoints> maskPoints;
+    maskPoints->SetInputData(polyData);
+    maskPoints->SetOnRatio(3);        // 提取第3n个顶点，n从0开始，3n小于顶点个数
+    maskPoints->SetOffset(0);         // 从哪个点开始提取（随机提取时忽略）
+    maskPoints->SetRandomMode(false); // 是否随机提取点
+    maskPoints->SetRandomSeed(0);
+    maskPoints->SetRandomModeType(0);
+    maskPoints->GenerateVerticesOn();         // 生成点单元（否则只是位置数据，没有单元）
+    maskPoints->SetSingleVertexPerCell(true); // 开启则一个顶点是一个单元，否则所有的顶点是一个单元
+    maskPoints->Update();
+    std::cout << maskPoints->GetOutput()->GetNumberOfPoints() << '\n';
+
+    //----------------------------------------------------------------------
+    vtkNew<vtkMaskPolyData> maskPolyData;
+    maskPolyData->SetInputData(polyData);
+    maskPolyData->SetOnRatio(2); // 提取第2n个单元，n从0开始，2n小于单元个数
+    maskPolyData->SetOffset(2);  // 从那个单元开始，默认是0
+    maskPolyData->Update();
+    std::cout << maskPolyData->GetOutput()->GetNumberOfCells() << '\n';
+
+    //----------------------------------------------------------------------
+    // 控制输入数据集中的那些数据被复制到输出，输出将只包含标记为打开的数据
+    vtkNew<vtkMaskFields> maskArrays;
+    maskArrays->SetInputData(polyData);
+    // maskArrays->CopyAllOn();                                 // 打开所有
+    // maskArrays->CopyFieldsOn();                              // Field 全打开
+    // maskArrays->CopyFieldOn(vtkMaskFields::POINT_DATA, "1"); // 指定某个 Field 打开
+    // maskArrays->CopyAttributesOn();                          // 所有 Attribute 打开
+    // maskArrays->CopyAttributeOn(vtkMaskFields::POINT_DATA, vtkDataSetAttributes::SCALARS); // 指定 Point 的 SCALARS 打开
+    maskArrays->Update();
+
+    return 0;
+}
+
+#endif // TEST512
 
 #ifdef TEST601
 
