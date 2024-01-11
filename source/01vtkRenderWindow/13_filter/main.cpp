@@ -32,6 +32,7 @@
  * 508. vtkFeatureEdges 提取网格(多边形数据)的特征边
  * 509. vtkExtractEdges 提取构成网格所有单元边界
  * 510. vtkOutlineFilter 生成一个输入网格的包围盒
+ * 511. vtkSelectVisiblePoints 提取可见的点
  *
  * 601. vtkDataSetSurfaceFilter 将 vtkUnstructuredGrid 转换为 vtkPolyData，还可以将体网格转换为表面数据，从而简化模型
  * 602. vtkGeometryFilter 从数据集中提取边界（3D单元提取2D面），可以将任何数据转换为多边形数据，类似 vtkDataSetSurfaceFilter
@@ -39,17 +40,15 @@
  * 604. vtkDataObjectToDataSetFilter 将数据对象(vtkDataObject)转换为数据集(vtkDataSet) vtkFieldDataToAttributeDataFilter
  * 605. 序列化反序列化vtk数据
  *
- * 701.vtkLODProp3D 对于绘制大型网格可以提高渲染效率
- * 702.decimation多边形削减、网格简化 vtkDecimate vtkDecimatePro vtkQuadricClustering vtkQuardricDecimation
- * 703.平滑过滤器 vtkWindowedSincPolyDataFilter vtkSmoothPolyDataFilter
- * 704.vtkCleanPolyData
+ * 701. vtkLODProp3D 对于绘制大型网格可以提高渲染效率
+ * 702.
  *
  * 801. vtkSampleFunction生成 vtkImageData 求等值面（几何数据）
  * 802. vtkSampleFunction生成 vtkImageData 转几何数据
  * 803. PerlinNoise 使用 vtkSampleFunction 生成噪声图片
  */
 
-#define TEST404
+#define TEST511
 
 #ifdef TEST001
 
@@ -2841,6 +2840,114 @@ int main(int, char*[])
 }
 
 #endif // TEST510
+
+#ifdef TEST511
+
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNamedColors.h>
+#include <vtkNew.h>
+#include <vtkPointSource.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSelectVisiblePoints.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+
+#include <iostream>
+#include <string>
+
+namespace {
+class MyInteractor : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyInteractor* New();
+    vtkTypeMacro(MyInteractor, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnLeftButtonDown() override
+    {
+        this->VisibleFilter->Update();
+        std::cout << "There are currently: " << this->VisibleFilter->GetOutput()->GetNumberOfPoints() << " visible." << std::endl;
+        // Forward events
+        vtkInteractorStyleTrackballCamera::OnLeftButtonDown();
+    }
+
+    void SetVisibleFilter(vtkSmartPointer<vtkSelectVisiblePoints> vis)
+    {
+        this->VisibleFilter = vis;
+    }
+
+private:
+    vtkSmartPointer<vtkSelectVisiblePoints> VisibleFilter;
+};
+
+vtkStandardNewMacro(MyInteractor);
+
+} // namespace
+
+int main(int, char*[])
+{
+    vtkNew<vtkNamedColors> colors;
+
+    vtkNew<vtkSphereSource> sphereSource;
+    sphereSource->SetCenter(5.0, 0, 0);
+    sphereSource->Update();
+
+    vtkNew<vtkPointSource> pointSource;
+    pointSource->SetRadius(2.0);
+    pointSource->SetNumberOfPoints(200);
+    pointSource->Update();
+
+    // Create an actor and mapper.
+    vtkNew<vtkPolyDataMapper> sphereMapper;
+    sphereMapper->SetInputConnection(sphereSource->GetOutputPort());
+
+    vtkNew<vtkActor> sphereActor;
+    sphereActor->SetMapper(sphereMapper);
+    sphereActor->GetProperty()->SetColor(colors->GetColor3d("MistyRose").GetData());
+
+    vtkNew<vtkPolyDataMapper> pointsMapper;
+    pointsMapper->SetInputConnection(pointSource->GetOutputPort());
+
+    vtkNew<vtkActor> pointsActor;
+    pointsActor->SetMapper(pointsMapper);
+    sphereActor->GetProperty()->SetColor(colors->GetColor3d("Honeydew").GetData());
+
+    // Create a renderer, render window, and interactor.
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(sphereActor);
+    renderer->AddActor(pointsActor);
+    renderer->SetBackground(colors->GetColor3d("ivory_black").GetData());
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetWindowName("SelectVisiblePoints");
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    // 是在CPU上计算点的可见性，获取选择区域（默认整个窗口）的Z-Buffer，然后遍历所有点
+    vtkNew<vtkSelectVisiblePoints> selectVisiblePoints;
+    selectVisiblePoints->SetInputConnection(pointSource->GetOutputPort());
+    selectVisiblePoints->SetRenderer(renderer);
+    selectVisiblePoints->Update();
+
+    vtkNew<MyInteractor> style;
+    renderWindowInteractor->SetInteractorStyle(style);
+    style->SetVisibleFilter(selectVisiblePoints);
+
+    // Render and interact.
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST511
 
 #ifdef TEST601
 
