@@ -3,9 +3,10 @@
  * 2. vtkInteractorStyleJoystickCamera 长按左键一直旋转、右键一直缩放、中键一直平移，定时器的使用
  * 3. 当鼠标处于 vtkOrientationMarkerWidget 内部时，开启定时器旋转
  * 4. 读取事件记录文件并播放事件
+ * 5. 定时器的使用
  */
 
-#define TEST4
+#define TEST5
 
 #ifdef TEST1
 
@@ -515,3 +516,87 @@ int main(int, char*[])
 }
 
 #endif // TEST4
+
+#ifdef TEST5
+
+#include <vtkActor.h>
+#include <vtkCommand.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+namespace {
+class MyCommand : public vtkCommand
+{
+public:
+    static MyCommand* New();
+    vtkTypeMacro(MyCommand, vtkCommand);
+
+    virtual void Execute(vtkObject* caller, unsigned long, void*)
+    {
+        static int counter { 0 };
+        std::cout << counter++ << '\n';
+    }
+};
+
+vtkStandardNewMacro(MyCommand);
+
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    void OnLeftButtonDown() override
+    {
+        std::cout << "left button down\n";
+        Superclass::OnLeftButtonDown();
+    }
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+int main()
+{
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<MyCommand> callback;
+
+    vtkNew<MyStyle> style;
+    style->AddObserver(vtkCommand::TimerEvent, callback);
+    style->UseTimersOn();           // 使用定时器
+    style->SetTimerDuration(10000); // 计时器间隔，毫秒为单位，修改默认值时要小心，可能会出问题
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    style->StartTimer(); // 会将当前交互状态修改为：VTKIS_TIMER，导致Style的某些默认交互事件不能执行
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST5
