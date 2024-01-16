@@ -1,12 +1,12 @@
 
-/*
- * 1 vtk并行处理，并行算法 https://www.kitware.com/vtk-shared-memory-parallelism-tools-2021-updates/
- * 2.异步创建actor std::future 多线程
- * 3.vtkMultiThreader 和 std::thread
- * 4 MPI
- * 5 并行渲染     vtk自带Example Rendering/Parallel/Testing/Cxx/PrmMagnify.cxx  vtkParallelRenderManager
- * 6 并行处理数据 vtk自带Example Examples/ParallelProcessing/Generic/Cxx/ParallelIso.cxx"  vtkMPIController
- * 7 vtkSMPTools
+/**
+ * 1. vtk并行处理，并行算法 https://www.kitware.com/vtk-shared-memory-parallelism-tools-2021-updates/
+ * 2. 异步创建actor std::future 多线程
+ * 3. vtkMultiThreader 和 std::thread
+ * 4. MPI
+ * 5. 并行渲染     vtk自带Example Rendering/Parallel/Testing/Cxx/PrmMagnify.cxx             vtkParallelRenderManager
+ * 6. 并行处理数据 vtk自带Example Examples/ParallelProcessing/Generic/Cxx/ParallelIso.cxx"  vtkMPIController
+ * 7. vtkSMPTools
  */
 
 // \Examples\Infovis\Cxx\ParallelBFS.cxx
@@ -808,3 +808,45 @@ int main(int argc, char* argv[])
 }
 
 #endif // TESt6
+
+#ifdef TEST7
+
+#include <numeric>
+#include <vector>
+#include <vtkSMPTools.h>
+#include <vtkSmartPointer.h>
+#include <vtkTimerLog.h>
+
+// vtkSMPTools 内部有一个线程池，会将任务分配给线程池执行
+
+int main()
+{
+    std::vector<int> vec1(100);
+    std::iota(vec1.begin(), vec1.end(), 0);
+
+    std::vector<int> vec2(vec1.size());
+
+    // 设置并行（多线程）的后端，值可以为："TBB" "OpenMP" "STDThread" "Sequential"
+    // 也可以使用环境变量设置后端：VTK_SMP_BACKEND_IN_USE
+    // vtkSMPTools::SetBackend("Sequential");
+    vtkSMPTools::SetBackend("STDThread");
+
+    vtkNew<vtkTimerLog> timer;
+    timer->StartTimer();
+
+    // 并行计算
+    vtkSMPTools::For(0, static_cast<vtkIdType>(vec1.size()),
+        [vec1, &vec2](auto begin, auto end)
+        {
+            for (auto i = begin; i < end; ++i)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                vec2[i] = vec1[i] * vec1[i];
+            }
+        });
+
+    timer->StopTimer();
+    std::cout << "took time: " << timer->GetElapsedTime() << '\n';
+}
+
+#endif // TEST7
