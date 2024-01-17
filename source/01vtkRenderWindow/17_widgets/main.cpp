@@ -16,6 +16,7 @@
  * 403. vtkCameraOrientationWidget 拾取到某一个方向后，以动画方式跳转到该方向
  * 404. vtkOrientationMarkerWidget 用来操作标记的2D小部件，比如将坐标轴放到该部件中，就可以随意移动坐标轴
  * 405. vtkOrientationMarkerWidget 左键事件屏蔽对父窗口的响应
+ * 406. vtkPolarAxesActor 极坐标轴
  *
  * 501. vtkButtonWidget 按钮
  *
@@ -30,7 +31,7 @@
  * 705. vtkLabeledDataMapper 以文本标记数据集的 点ID 标量 向量等
  */
 
-#define TEST705
+#define TEST406
 
 #ifdef TEST101
 
@@ -1516,6 +1517,77 @@ int main(int, char*[])
 }
 
 #endif // TEST405
+
+#ifdef TEST406
+
+#include <vtkActor.h>
+#include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolarAxesActor.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkTextProperty.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkRenderer> renderer;
+
+    vtkNew<vtkCubeSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkPolarAxesActor> polaxes;
+    polaxes->SetBounds(actor->GetBounds());
+    polaxes->SetPole(.5, 1., 3.);
+    polaxes->SetMaximumRadius(3.);
+    polaxes->SetMinimumAngle(-60.);
+    polaxes->SetMaximumAngle(210.);
+    polaxes->SetRequestedNumberOfRadialAxes(10);
+    polaxes->SetCamera(renderer->GetActiveCamera());
+    polaxes->SetPolarLabelFormat("%6.1f");
+    polaxes->GetLastRadialAxisProperty()->SetColor(0.0, 1.0, 0.0);
+    polaxes->GetSecondaryRadialAxesProperty()->SetColor(0.0, 0.0, 1.0);
+    polaxes->GetPolarArcsProperty()->SetColor(1.0, 0.0, 0.0);
+    polaxes->GetSecondaryPolarArcsProperty()->SetColor(1.0, 0.0, 1.0);
+    polaxes->GetPolarAxisProperty()->SetColor(1.0, 0.5, 0.0);
+    polaxes->GetPolarAxisTitleTextProperty()->SetColor(0.0, 0.0, 0.0);
+    polaxes->GetPolarAxisLabelTextProperty()->SetColor(1.0, 1.0, 0.0);
+    polaxes->GetLastRadialAxisTextProperty()->SetColor(0.0, 0.5, 0.0);
+    polaxes->GetSecondaryRadialAxesTextProperty()->SetColor(0.0, 1.0, 1.0);
+    polaxes->SetScreenSize(9.0);
+
+    renderer->AddActor(actor);
+    renderer->AddActor(polaxes);
+    renderer->ResetCamera();
+    renderer->SetBackground(.4, .5, .6);
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST406
 
 #ifdef TEST501
 

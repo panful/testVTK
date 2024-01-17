@@ -14,6 +14,9 @@ find_package(VTK
         IOImage                 # vtkJPEGReader
         InteractionWidgets      # vtkLogoRepresentation
         RenderingLabel          # vtkLabelPlacementMapper
+        IOGeometry              # vtkBYUReader
+        RenderingLOD            # vtkLODActor
+        FiltersModeling         # vtkOutlineFilter
     QUIET
 )
 
