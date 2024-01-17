@@ -13,10 +13,12 @@ find_package(VTK
         RenderingOpenGL2
         loguru
         ParallelMPI
-        ViewsCore       # vtkDataRepresentation
-        ViewsInfovis    # vtkGraphLayoutView
+        ViewsCore               # vtkDataRepresentation
+        ViewsInfovis            # vtkGraphLayoutView
         RenderingSceneGraph 
-        InfovisLayout   # vtkGraphLayout
+        InfovisLayout           # vtkGraphLayout
+        ChartsCore              # vtkChartXY
+        ViewsContext2D          # vtkContextInteractorStyle
     QUIET
 )
 
