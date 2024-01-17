@@ -1,5 +1,5 @@
 ﻿
-/*
+/**
  * 1. 整个渲染的流程 生成vbo和ibo DrawCall
  * 2. shader源码的生成、修改、编译、uniform的设置
  * 3. 渐变背景色
@@ -8,7 +8,7 @@
  * 6. 多边形的边框
  * 7. 只有一个图层，有多个vtkRenderer
  * 8. 多个vtkRenderer，多个图层，让后面的vtkRenderer始终在之前的上面
- * 9.
+ * 9. 自带的光照
  * 10.拾取vtkProp vtkPropPicker
  * 11.顺序无关透明，深度剥离
  * 12.打印shader code
@@ -19,7 +19,7 @@
  * 201. vtkAlgorithm vtkExecutive vtkInformation 管道端口的作用
  */
 
-#define TEST15
+#define TEST9
 
 #ifdef TEST1
 
@@ -862,6 +862,131 @@ int main()
 }
 
 #endif // TEST8
+
+#ifdef TEST9
+
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkOpenGLPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkShaderProgram.h>
+#include <vtkSphereSource.h>
+
+namespace {
+
+class MyMapper : public vtkOpenGLPolyDataMapper
+{
+public:
+    static MyMapper* New();
+    vtkTypeMacro(MyMapper, vtkOpenGLPolyDataMapper);
+
+    void PrintShaderSource()
+    {
+        for (size_t i = 0; i < PrimitiveEnd; ++i)
+        {
+            if (auto program = this->Primitives[i].Program)
+            {
+                auto vs = program->GetVertexShader()->GetSource();
+                std::cout << vs << std::endl;
+                auto fs = program->GetFragmentShader()->GetSource();
+                std::cout << fs << std::endl;
+            }
+        }
+    }
+};
+
+vtkStandardNewMacro(MyMapper);
+
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    void SetActor(vtkActor* a)
+    {
+        m_actor = a;
+    }
+
+protected:
+    void OnLeftButtonUp() override
+    {
+        MyMapper::SafeDownCast(m_actor->GetMapper())->PrintShaderSource();
+        Superclass::OnLeftButtonUp();
+    }
+
+private:
+    vtkActor* m_actor { nullptr };
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+/**
+ *  默认光照是一个平行于 相机方向 的平行光
+ *
+ *  模型带有法线数据：normalVCVSOutput
+ *  vec3 normalVCVSOutput = normalize(normalVCVSOutput);                    标准化法线
+ *  if (gl_FrontFacing == false) { normalVCVSOutput = -normalVCVSOutput; }  如果是背面则对法线反向
+ *  float df = max(0.0,normalVCVSOutput.z);                                 漫反射系数
+ *  float sf = pow(df, specularPower);                                      镜面反射系数
+ *
+ *  模型没有法线数据：
+ *  vec3 fdx = dFdx(vertexVC.xyz);  获取相邻片段在屏幕空间中的梯度
+ *  vec3 fdy = dFdy(vertexVC.xyz);
+ *  vec3 normalVCVSOutput = normalize(cross(fdx,fdy));  使用叉乘求出法线
+ */
+
+int main()
+{
+    vtkNew<vtkSphereSource> source;
+    // source->GenerateNormalsOff(); // 不生成法线
+    source->Update();
+
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0, 0, 0);
+    points->InsertNextPoint(2, 0, 0);
+    points->InsertNextPoint(1, 2, 0);
+
+    vtkNew<vtkCellArray> cells;
+    cells->InsertNextCell({ 0, 1, 2 });
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+
+    vtkNew<MyMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+    // mapper->SetInputData(polyData);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    // actor->GetProperty()->LightingOff();
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<MyStyle> style;
+    style->SetActor(actor);
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST9
 
 #ifdef TEST10
 

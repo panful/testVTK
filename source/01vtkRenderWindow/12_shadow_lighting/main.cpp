@@ -3,9 +3,10 @@
  * 1. 阴影和光照 https://examples.vtk.org/site/Cxx/Visualization/ShadowsLightsDemo/
  * 2. 关闭默认的光照，让颜色的对比度看起来更明显
  * 3. 光线投射raycast
+ * 4. 自带的光照只和每个三角面倾斜的程度有关，和深度值没关系，越倾斜越暗
  */
 
-#define TEST3
+#define TEST1
 
 #ifdef TEST1
 
@@ -469,3 +470,118 @@ int main()
 }
 
 #endif // TEST3
+
+#ifdef TEST4
+
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkCellArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+namespace {
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    void OnRightButtonUp() override
+    {
+        Superclass::OnRightButtonUp();
+
+        if (this->Interactor)
+        {
+            m_actor1->GetProperty()->SetLighting(!m_actor1->GetProperty()->GetLighting());
+            m_actor2->GetProperty()->SetLighting(!m_actor2->GetProperty()->GetLighting());
+
+            this->Interactor->Render();
+        }
+    }
+
+    void SetActors(vtkActor* a1, vtkActor* a2)
+    {
+        m_actor1 = a1;
+        m_actor2 = a2;
+    }
+
+private:
+    vtkSmartPointer<vtkActor> m_actor1 { nullptr };
+    vtkSmartPointer<vtkActor> m_actor2 { nullptr };
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+int main(int, char*[])
+{
+    // 创建两个Z值不同的四边形
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0, 0, 0);
+    points->InsertNextPoint(1, 0, 0);
+    points->InsertNextPoint(1, 1, 0);
+    points->InsertNextPoint(0, 1, 0);
+
+    vtkNew<vtkPoints> points2;
+    points2->InsertNextPoint(2, 0, 1);
+    points2->InsertNextPoint(3, 0, 1);
+    points2->InsertNextPoint(3, 1, 1);
+    points2->InsertNextPoint(2, 1, 1);
+
+    vtkNew<vtkCellArray> cells;
+    cells->InsertNextCell({ 0, 1, 2, 3 });
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetPolys(cells);
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(polyData);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+
+    vtkNew<vtkPolyData> polyData2;
+    polyData2->SetPoints(points2);
+    polyData2->SetPolys(cells);
+
+    vtkNew<vtkPolyDataMapper> mapper2;
+    mapper2->SetInputData(polyData2);
+
+    vtkNew<vtkActor> actor2;
+    actor2->SetMapper(mapper2);
+    actor2->GetProperty()->SetColor(0, 1, 0);
+
+    //------------------------------------------------------------------
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->AddActor(actor2);
+    renderer->GetActiveCamera()->ParallelProjectionOn();
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<MyStyle> style;
+    style->SetActors(actor, actor2);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST4
