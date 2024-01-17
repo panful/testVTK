@@ -17,6 +17,8 @@ find_package(VTK
         ParallelMPI
         FiltersExtraction   # vtkExtractGeometry
         FiltersGeometry     # vtkDataSetSurfaceFilter
+        ChartsCore              # vtkChartXY
+        ViewsContext2D          # vtkContextInteractorStyle
     QUIET
 )
 

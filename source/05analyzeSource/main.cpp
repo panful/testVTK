@@ -14,11 +14,12 @@
  * 12.打印shader code
  * 13.同一个面的正面和背面设置不同的属性
  * 14.隐藏线消除 hidden line removal(HLR)
+ * 15.vtkChartXY 源码分析
  *
  * 201. vtkAlgorithm vtkExecutive vtkInformation 管道端口的作用
  */
 
-#define TEST14
+#define TEST15
 
 #ifdef TEST1
 
@@ -1478,6 +1479,95 @@ int main(int, char*[])
 }
 
 #endif // TEST14
+
+#ifdef TEST15
+
+#include <vtkChartXY.h>
+#include <vtkContextActor.h>
+#include <vtkContextInteractorStyle.h>
+#include <vtkContextScene.h>
+#include <vtkFloatArray.h>
+#include <vtkPlot.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkTable.h>
+
+// Window => Renderer => Actor
+// vtkContextActor.cxx  [238]   this->Scene->Paint(this->Context)   参数是类型为 vtkContext2D 的成员变量
+// vtkContextScene.cxx  [114]   this->Children->PaintItems(painter)
+// vtkChartXY.cxx       [394]   Paint(vtkContext2D)
+
+// vtkChartXY.cxx       [430]   this->Update()
+// vtkChartXY.cxx       [430]   this->UpdateLayout()
+// vtkChartXY.cxx       [475]   this->PaintChildren(vtkContext2D)
+
+// vtkContextClip.cxx   [52]    this->PaintChildren(vtkContext2D)
+// vtkPlotGrid.cxx      [48]    Paint(vtkContext2D)  坐标轴内部的网格
+// vtkPlotLine.cxx      [43]    Paint(vtkContext2D)  实际的折线
+// vtkAxis.cxx          [299]   Paint(vtkContext2D)  坐标轴（XY轴，坐标轴标题、刻度等）
+
+// vtkContext2D 有一个类型为 vtkContextDevice2D 的成员变量 Device
+// OpenGL函数都在 vtkOpenGLContextDevice2D 中调用
+// vtkOpenGLContextDevice2D 继承自 vtkContextDevice2D
+
+int main(int, char*[])
+{
+    vtkNew<vtkFloatArray> arrX;
+    arrX->SetName("X Axis");
+
+    vtkNew<vtkFloatArray> arrY;
+    arrY->SetName("Y Axis");
+
+    vtkNew<vtkTable> table;
+    table->AddColumn(arrX);
+    table->AddColumn(arrY);
+    table->SetNumberOfRows(3);   // 三行两列数据
+    table->SetValue(0, 0, 0.f);  // X0 三个参数分别表示：行、列、值
+    table->SetValue(0, 1, 0.f);  // Y0
+    table->SetValue(1, 0, 2.f);  // X1
+    table->SetValue(1, 1, 4.f);  // Y1
+    table->SetValue(2, 0, 4.f);  // X2
+    table->SetValue(2, 1, 16.f); // Y2
+
+    vtkNew<vtkChartXY> chart;
+    vtkPlot* line = chart->AddPlot(vtkChart::LINE);
+    line->SetInputData(table, 0, 1); // 第二个参数表示图标的横坐标使用table的第几列数据，第三个参数表示纵轴使用第几列数据
+    line->SetColor(0, 255, 0, 255);
+    line->SetWidth(2.f);
+    line->Update();
+    chart->Update();
+
+    vtkNew<vtkContextScene> scene;
+    scene->AddItem(chart);
+
+    vtkNew<vtkContextActor> actor;
+    actor->SetScene(scene);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+    renderer->SetBackground(.4, .5, .6);
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkContextInteractorStyle> style;
+    style->SetScene(scene);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST15
 
 #ifdef TEST201
 
