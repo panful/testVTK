@@ -1,23 +1,15 @@
-set(target_name "01_02_vtkRenderWindow")
+set(target_name "01_18_texture")
 
 find_package(VTK
     COMPONENTS
-        CommonColor
         CommonCore
-        CommonDataModel
         FiltersSources
         InteractionStyle
-        RenderingContextOpenGL2
         RenderingCore
-        RenderingFreeType
-        RenderingGL2PSOpenGL2
         RenderingOpenGL2
         loguru
         ParallelMPI
-        RenderingAnnotation             # vtkCaptionActor2D
-        InteractionWidgets              # vtkOrientationMarkerWidget
-        IOImage                         # vtkDICOMImageReader
-        CommonComputationalGeometry     # vtkParametricSpline
+        IOImage
     QUIET
 )
 
@@ -28,7 +20,7 @@ endif()
 add_executable(${target_name} "main.cpp")
 target_link_libraries(${target_name} PRIVATE ${VTK_LIBRARIES} )
 
-# 初始化vtk模块，不再需要在源代码中使用 VTK_MODULE_INIT(***)
+# 初始化vtk模块
 vtk_module_autoinit(
     TARGETS ${target_name}
     MODULES ${VTK_LIBRARIES}
