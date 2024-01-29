@@ -5,6 +5,7 @@
  * 201. vtkDiskSource           圆盘
  * 202. vtkRegularPolygonSource 圆 多边形（实心圆、圆圈）
  * 203. vtkSphereSource         球
+ * 204. vtkConeSource           圆锥
  *
  * 301. vtkLineSource           线段
  * 302. vtkLineSource           虚线
@@ -33,7 +34,7 @@
  * 904. vtkParametricTorus  圆环体
  */
 
-#define TEST702
+#define TEST204
 
 #ifdef TEST101
 
@@ -232,6 +233,59 @@ int main(int, char*[])
 }
 
 #endif // TEST203
+
+#ifdef TEST204
+
+#include <vtkActor.h>
+#include <vtkConeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkConeSource> source;
+    source->SetCenter(0., 0., 0.);
+    source->SetDirection(1., 0., 0.);
+    source->SetHeight(2.);
+    source->SetRadius(1.);
+    source->SetResolution(5); // 圆锥的底座有几条棱
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+    actor->GetProperty()->LightingOff();
+    actor->GetProperty()->EdgeVisibilityOn();
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST204
 
 #ifdef TEST301
 
