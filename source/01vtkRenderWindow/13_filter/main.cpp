@@ -12,10 +12,9 @@
  * 204. vtkSimpleElevationFilter 用于简单的高程变换
  *
  * 301. vtkAppendPolyData 合并多个 vtkPolyData
- * 302. 合并带有Scalars、Vectors的vtkPolyData
- * 303. 使用不同方式设置Scalars数据时，合并后的polyData没有Scalars数据
- * 304. vtkMergeFilter
- * 305. vtkAppendFilter
+ * 302. 合并带有Scalars Vectors属性数据的 vtkPolyData
+ * 303. vtkAppendDataSets 合并多个 vtkUnstructuredGrid
+ * 304. vtkAppendFilter vtkMergeFilter vtkMergeDataObjectFilter vtkMultiBlockMergeFilter vtkMergeVectorComponents
  *
  * 401. vtkCellDataToPointData 单元数据转顶点数据
  * 402. vtkPointDataToCellData 顶点数据转单元数据
@@ -49,7 +48,7 @@
  * 803. PerlinNoise 使用 vtkSampleFunction 生成噪声图片
  */
 
-#define TEST512
+#define TEST303
 
 #ifdef TEST001
 
@@ -1125,142 +1124,6 @@ int main()
     polyData0->SetLines(cells0);
     polyData0->GetPointData()->AddArray(scalars0);
     polyData0->GetPointData()->SetActiveScalars("Scalars");
-
-    //----------------------------------------------------------------------
-    // PolyData1
-    vtkNew<vtkPoints> points1;
-    points1->InsertNextPoint(0.0, 0.0, 1.0);
-    points1->InsertNextPoint(1.0, 0.0, 1.0);
-    points1->InsertNextPoint(2.0, 1.0, 1.0);
-    points1->InsertNextPoint(3.0, 1.0, 1.0);
-
-    vtkNew<vtkCellArray> cells1;
-    cells1->InsertNextCell({ 0, 1, 2, 3 });
-
-    vtkNew<vtkDoubleArray> scalars1;
-    scalars1->SetName("Scalars");
-    scalars1->InsertNextValue(4.0);
-    scalars1->InsertNextValue(3.0);
-    scalars1->InsertNextValue(2.0);
-    scalars1->InsertNextValue(1.0);
-
-    vtkNew<vtkPolyData> polyData1;
-    polyData1->SetPoints(points1);
-    polyData1->SetLines(cells1);
-    polyData1->GetPointData()->AddArray(scalars1);
-    polyData1->GetPointData()->SetActiveScalars("Scalars");
-
-    //----------------------------------------------------------------------
-    // PolyData2
-    vtkNew<vtkPoints> points2;
-    points2->InsertNextPoint(0.0, 0.0, 2.0);
-    points2->InsertNextPoint(1.0, 0.0, 2.0);
-    points2->InsertNextPoint(2.0, 1.0, 2.0);
-    points2->InsertNextPoint(3.0, 1.0, 2.0);
-
-    vtkNew<vtkCellArray> cells2;
-    cells2->InsertNextCell({ 0, 1, 2, 3 });
-
-    vtkNew<vtkDoubleArray> scalars2;
-    scalars2->SetName("Scalars");
-    scalars2->InsertNextValue(4.0);
-    scalars2->InsertNextValue(2.0);
-    scalars2->InsertNextValue(2.0);
-    scalars2->InsertNextValue(4.0);
-
-    vtkNew<vtkPolyData> polyData2;
-    polyData2->SetPoints(points2);
-    polyData2->SetLines(cells2);
-    polyData2->GetPointData()->AddArray(scalars2);
-    polyData2->GetPointData()->SetActiveScalars("Scalars");
-
-    //----------------------------------------------------------------------
-    // 合并vtkPolyData
-    vtkNew<vtkAppendPolyData> appendPolyData;
-    appendPolyData->AddInputData(polyData0);
-    appendPolyData->AddInputData(polyData1);
-    appendPolyData->AddInputData(polyData2);
-    appendPolyData->Update();
-
-    vtkNew<vtkLookupTable> lut;
-    lut->SetHueRange(0.67, 0.0);
-    lut->SetRange(1, 4);
-    lut->Build();
-
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputData(appendPolyData->GetOutput());
-    mapper->SetLookupTable(lut);
-    mapper->ScalarVisibilityOn();
-    mapper->SetScalarRange(1, 4);
-
-    vtkNew<vtkActor> actor;
-    actor->SetMapper(mapper);
-
-    //------------------------------------------------------------------------------
-    vtkNew<vtkRenderer> renderer;
-    renderer->AddActor(actor);
-    renderer->ResetCamera();
-
-    vtkNew<vtkRenderWindow> renWin;
-    renWin->AddRenderer(renderer);
-    renWin->SetSize(800, 600);
-
-    vtkNew<vtkRenderWindowInteractor> iren;
-    iren->SetRenderWindow(renWin);
-
-    vtkNew<vtkInteractorStyleTrackballCamera> style;
-    iren->SetInteractorStyle(style);
-
-    renWin->Render();
-    iren->Start();
-
-    return 0;
-}
-
-#endif // TEST302
-
-#ifdef TEST303
-
-#include <vtkActor.h>
-#include <vtkAppendPolyData.h>
-#include <vtkCellArray.h>
-#include <vtkDoubleArray.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkLookupTable.h>
-#include <vtkPointData.h>
-#include <vtkPoints.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkProperty.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-
-int main()
-{
-    //----------------------------------------------------------------------
-    // PolyData0
-    vtkNew<vtkPoints> points0;
-    points0->InsertNextPoint(0.0, 0.0, 0.0);
-    points0->InsertNextPoint(1.0, 0.0, 0.0);
-    points0->InsertNextPoint(2.0, 1.0, 0.0);
-    points0->InsertNextPoint(3.0, 1.0, 0.0);
-
-    vtkNew<vtkCellArray> cells0;
-    cells0->InsertNextCell({ 0, 1, 2, 3 });
-
-    vtkNew<vtkDoubleArray> scalars0;
-    scalars0->SetName("Scalars");
-    scalars0->InsertNextValue(1.0);
-    scalars0->InsertNextValue(2.0);
-    scalars0->InsertNextValue(3.0);
-    scalars0->InsertNextValue(4.0);
-
-    vtkNew<vtkPolyData> polyData0;
-    polyData0->SetPoints(points0);
-    polyData0->SetLines(cells0);
-    polyData0->GetPointData()->AddArray(scalars0);
-    polyData0->GetPointData()->SetActiveScalars("Scalars");
     std::cout << "polyData0\t Scalars:" << polyData0->GetPointData()->GetScalars()->GetNumberOfValues() << '\n';
 
     //----------------------------------------------------------------------
@@ -1300,7 +1163,7 @@ int main()
     cells2->InsertNextCell({ 0, 1, 2, 3 });
 
     vtkNew<vtkDoubleArray> scalars2;
-    // scalars2->SetName("Scalars");
+    scalars2->SetName("Scalars");
     scalars2->InsertNextValue(4.0);
     scalars2->InsertNextValue(2.0);
     scalars2->InsertNextValue(2.0);
@@ -1367,6 +1230,166 @@ int main()
     iren->Start();
 
     return 0;
+}
+
+#endif // TEST302
+
+#ifdef TEST303
+
+#include <vtkActor.h>
+#include <vtkAppendDataSets.h>
+#include <vtkCellData.h>
+#include <vtkDataSetMapper.h>
+#include <vtkDoubleArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNew.h>
+#include <vtkPoints.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkUnstructuredGrid.h>
+
+/// @brief 三角形和四面体组成的非结构网格
+/// @return
+vtkSmartPointer<vtkUnstructuredGrid> CreateUsg0()
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(0, 0, 0);
+    points->InsertNextPoint(2, 0, 0);
+    points->InsertNextPoint(1, 2, 0);
+
+    points->InsertNextPoint(3, 0, 0);
+    points->InsertNextPoint(5, 0, 0);
+    points->InsertNextPoint(4, 0, 2);
+    points->InsertNextPoint(4, 2, 1);
+
+    vtkNew<vtkUnstructuredGrid> usg;
+    usg->SetPoints(points);
+
+    // 三角形
+    vtkIdType ids_triangle[] { 0, 1, 2 };
+    usg->InsertNextCell(VTK_TRIANGLE, 3, ids_triangle);
+
+    // 四面体
+    vtkIdType ids_tetra[] { 3, 4, 5, 6 };
+    usg->InsertNextCell(VTK_TETRA, 4, ids_tetra);
+
+    vtkNew<vtkDoubleArray> scalars;
+    scalars->InsertNextValue(0.);
+    scalars->InsertNextValue(0.);
+
+    usg->GetCellData()->SetScalars(scalars);
+
+    return usg;
+}
+
+/// @brief 一个六面体组成的非结构网格
+/// @return
+vtkSmartPointer<vtkUnstructuredGrid> CreateUsg1()
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(6, 0, 0);
+    points->InsertNextPoint(8, 0, 0);
+    points->InsertNextPoint(8, 0, 2);
+    points->InsertNextPoint(6, 0, 2);
+    points->InsertNextPoint(6, 2, 0);
+    points->InsertNextPoint(9, 2, 0);
+    points->InsertNextPoint(9, 2, 3);
+    points->InsertNextPoint(6, 2, 3);
+
+    vtkNew<vtkUnstructuredGrid> usg;
+    usg->SetPoints(points);
+
+    // 六面体
+    vtkIdType ids_hexahedron[] { 0, 1, 2, 3, 4, 5, 6, 7 };
+    usg->InsertNextCell(VTK_HEXAHEDRON, 8, ids_hexahedron);
+
+    vtkNew<vtkDoubleArray> scalars;
+    scalars->InsertNextValue(1.);
+
+    usg->GetCellData()->SetScalars(scalars);
+
+    return usg;
+}
+
+/// @brief 三棱柱和四棱锥构组成的非结构网格
+/// @return
+vtkSmartPointer<vtkUnstructuredGrid> CreateUsg2()
+{
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(10, 0, 0);
+    points->InsertNextPoint(11, 0, 2);
+    points->InsertNextPoint(12, 0, 0);
+    points->InsertNextPoint(10, 2, 0);
+    points->InsertNextPoint(11, 2, 2);
+    points->InsertNextPoint(12, 2, 0);
+
+    points->InsertNextPoint(13, 0, 0);
+    points->InsertNextPoint(15, 0, 0);
+    points->InsertNextPoint(15, 0, 2);
+    points->InsertNextPoint(13, 0, 2);
+    points->InsertNextPoint(14, 2, 1);
+
+    vtkNew<vtkUnstructuredGrid> usg;
+    usg->SetPoints(points);
+
+    // 三棱柱
+    vtkIdType ids_wedge[] { 0, 1, 2, 3, 4, 5 };
+    usg->InsertNextCell(VTK_WEDGE, 6, ids_wedge);
+
+    // 四棱锥
+    vtkIdType ids_pyramid[] { 6, 7, 8, 9, 10 };
+    usg->InsertNextCell(VTK_PYRAMID, 5, ids_pyramid);
+
+    vtkNew<vtkDoubleArray> scalars;
+    scalars->InsertNextValue(2.);
+    scalars->InsertNextValue(2.);
+
+    usg->GetCellData()->SetScalars(scalars);
+
+    return usg;
+}
+
+int main()
+{
+    vtkNew<vtkAppendDataSets> append;
+    append->AddInputData(CreateUsg0());
+    append->AddInputData(CreateUsg1());
+    append->AddInputData(CreateUsg2());
+    append->SetOutputDataSetType(VTK_UNSTRUCTURED_GRID); // 输出数据类型
+    append->Update();
+
+    auto usgs = append->GetOutput();
+    std::cout << "Number of points: " << usgs->GetNumberOfPoints() << "\nNumber of cells: " << usgs->GetNumberOfCells() << '\n';
+
+    for (vtkIdType i = 0; i < usgs->GetNumberOfCells(); ++i)
+    {
+        std::cout << usgs->GetCell(i)->GetCellType() << '\n';
+    }
+
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(append->GetOutput());
+    mapper->SetScalarRange(0., 2.);
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->SetBackground(.1, .2, .3);
+    renderer->ResetCamera();
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
 }
 
 #endif // TEST303
@@ -2366,20 +2389,20 @@ vtkSmartPointer<vtkPolyData> CreatePolyData(PrimitiveType pt)
 
     switch (pt)
     {
-    case PrimitiveType::Poly:
-        return polys;
-    case PrimitiveType::Line:
-        return lines;
-    case PrimitiveType::Disk:
-        return disk->GetOutput();
-    case PrimitiveType::Sphere:
-        return sphere->GetOutput();
-    case PrimitiveType::Arrow:
-        return arrow->GetOutput();
-    case PrimitiveType::Box:
-        return box;
-    default:
-        return polys;
+        case PrimitiveType::Poly:
+            return polys;
+        case PrimitiveType::Line:
+            return lines;
+        case PrimitiveType::Disk:
+            return disk->GetOutput();
+        case PrimitiveType::Sphere:
+            return sphere->GetOutput();
+        case PrimitiveType::Arrow:
+            return arrow->GetOutput();
+        case PrimitiveType::Box:
+            return box;
+        default:
+            return polys;
     }
 }
 } // namespace
@@ -2566,22 +2589,22 @@ vtkSmartPointer<vtkPolyData> CreatePolyData(PrimitiveType pt)
 
     switch (pt)
     {
-    case PrimitiveType::Poly:
-        return polys;
-    case PrimitiveType::Line:
-        return lines;
-    case PrimitiveType::Disk:
-        return disk->GetOutput();
-    case PrimitiveType::Sphere:
-        return sphere->GetOutput();
-    case PrimitiveType::Arrow:
-        return arrow->GetOutput();
-    case PrimitiveType::Box:
-        return box;
-    case PrimitiveType::Plane:
-        return plane;
-    default:
-        return polys;
+        case PrimitiveType::Poly:
+            return polys;
+        case PrimitiveType::Line:
+            return lines;
+        case PrimitiveType::Disk:
+            return disk->GetOutput();
+        case PrimitiveType::Sphere:
+            return sphere->GetOutput();
+        case PrimitiveType::Arrow:
+            return arrow->GetOutput();
+        case PrimitiveType::Box:
+            return box;
+        case PrimitiveType::Plane:
+            return plane;
+        default:
+            return polys;
     }
 }
 } // namespace
@@ -2759,22 +2782,22 @@ vtkSmartPointer<vtkPolyData> CreatePolyData(PrimitiveType pt)
 
     switch (pt)
     {
-    case PrimitiveType::Poly:
-        return polys;
-    case PrimitiveType::Line:
-        return lines;
-    case PrimitiveType::Disk:
-        return disk->GetOutput();
-    case PrimitiveType::Sphere:
-        return sphere->GetOutput();
-    case PrimitiveType::Arrow:
-        return arrow->GetOutput();
-    case PrimitiveType::Box:
-        return box;
-    case PrimitiveType::Plane:
-        return plane;
-    default:
-        return polys;
+        case PrimitiveType::Poly:
+            return polys;
+        case PrimitiveType::Line:
+            return lines;
+        case PrimitiveType::Disk:
+            return disk->GetOutput();
+        case PrimitiveType::Sphere:
+            return sphere->GetOutput();
+        case PrimitiveType::Arrow:
+            return arrow->GetOutput();
+        case PrimitiveType::Box:
+            return box;
+        case PrimitiveType::Plane:
+            return plane;
+        default:
+            return polys;
     }
 }
 } // namespace

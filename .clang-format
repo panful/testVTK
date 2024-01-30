@@ -55,3 +55,6 @@ MaxEmptyLinesToKeep: 1
 
 # 宏的换行符左对齐
 AlignEscapedNewlines: Left
+
+# switch语句的case缩进
+IndentCaseLabels: true
