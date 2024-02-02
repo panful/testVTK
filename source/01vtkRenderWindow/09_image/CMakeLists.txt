@@ -29,7 +29,8 @@ endif()
 find_package(Qt6 COMPONENTS Core Widgets QUIET)
 
 if(NOT Qt6_FOUND)
-    message(FATAL_ERROR "------------------ Qt6 not found ------------------")
+    message("------------------ Qt6 not found ------------------")
+    return()
 endif()
 
 add_executable(${target_name} "main.cpp")

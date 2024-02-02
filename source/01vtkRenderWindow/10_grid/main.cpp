@@ -20,9 +20,10 @@
  * 501. 加载glTF类型的模型
  * 502. 获取glTF模型的 vtkActor
  * 503. 加载Obj类型的模型，并导出为glTF
+ * 504. glTF 相机
  */
 
-#define TEST502
+#define TEST504
 
 #ifdef TEST101
 
@@ -954,12 +955,12 @@ int vtkPolyDataToUnstructuredGrid::RequestData(vtkInformation*, vtkInformationVe
             {
                 switch (size)
                 {
-                case 3:
-                    return VTK_TRIANGLE;
-                case 4:
-                    return VTK_QUAD;
-                default:
-                    return VTK_POLYGON;
+                    case 3:
+                        return VTK_TRIANGLE;
+                    case 4:
+                        return VTK_QUAD;
+                    default:
+                        return VTK_POLYGON;
                 }
             },
             offset);
@@ -1351,3 +1352,53 @@ int main(int argc, char* argv[])
 }
 
 #endif // TEST503
+
+#ifdef TEST504
+
+#include <vtkCamera.h>
+#include <vtkGLTFImporter.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNew.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main(int argc, char* argv[])
+{
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    vtkNew<vtkGLTFImporter> importer;
+    importer->SetFileName("../resources/gltf/camera.gltf");
+    importer->SetRenderWindow(renderWindow);
+    importer->SetCamera(1); // 设置启用的相机
+    importer->Update();
+
+    // 相机默认在(0,0,0),指向(0,0,-1),向上的方向是(0,1,0)
+    auto camera0    = importer->GetCamera(0);
+    auto position   = camera0->GetPosition(); // 相机节点平移得到
+    auto focalPoint = camera0->GetFocalPoint();
+    auto viewUp     = camera0->GetViewUp();
+
+    auto na = importer->GetNumberOfAnimations();
+    auto nc = importer->GetNumberOfCameras();
+    std::cout << "Number of animations:\t" << na << "\nNumber of Camera:\t" << nc << '\n';
+
+    renderer->GetActors();
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST504
