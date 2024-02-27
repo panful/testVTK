@@ -1,7 +1,7 @@
 ﻿/*
  * 100 上下左右四视图，格点、格心数据，线框、面显示模式的区别
  * 101 vtkLookupTable 颜色查找表
- * 102
+ * 102 vtkColorTransferFunction 生成颜色映射表
  * 103 scalars范围超出lookuptable的范围时，超出部分不显示或指定颜色
  * 104
  * 105 给vtkPolyData添加多个vtkDataArray，指定某个Array映射颜色
@@ -42,7 +42,7 @@
  * 802 带交互的流体模拟
  */
 
-#define TEST310
+#define TEST102
 
 #ifdef TEST100
 
@@ -407,6 +407,142 @@ int main(int, char*[])
 }
 
 #endif // TEST101
+
+#ifdef TEST102
+
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <string>
+
+#include <vtkColorTransferFunction.h>
+#include <vtkDiscretizableColorTransferFunction.h>
+#include <vtkLookupTable.h>
+#include <vtkNew.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkScalarBarActor.h>
+
+#include <vtkjsoncpp/json/json-forwards.h>
+#include <vtkjsoncpp/json/json.h>
+
+using namespace std::string_literals;
+
+int main(int, char*[])
+{
+    //----------------------------------------------------------------------------------
+    // 读取json文件
+    std::ostringstream oss;
+    std::ifstream ifs("../resources/colorMaps.json");
+    oss << ifs.rdbuf();
+
+    auto rawJson = oss.str();
+
+    vtkJson::CharReaderBuilder builder {};
+    builder["collectComments"] = false;
+    std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+
+    std::string formattedErrors;
+    vtkJson::Value value;
+    if (!reader->parse(rawJson.c_str(), rawJson.c_str() + rawJson.length(), &value, &formattedErrors))
+    {
+        std::cerr << formattedErrors << '\n';
+    }
+
+    struct ColorMap
+    {
+        std::string name;
+        std::string colorSpace;
+        std::vector<double> colors;
+        std::array<double, 3> nanColor;
+    };
+
+    std::map<std::string, ColorMap> colorMaps;
+    for (auto const& colorMap : value)
+    {
+        std::vector<double> colors;
+        for (auto const& rgb : colorMap["RGBPoints"])
+        {
+            colors.emplace_back(rgb.asDouble());
+        }
+
+        if (!colors.empty() && colors.size() % 4 == 0)
+        {
+            auto name       = colorMap["Name"].asString();
+            auto colorSpace = colorMap["ColorSpace"].asString();
+
+            std::array<double, 3> nanColor {};
+            size_t i { 0 };
+            for (auto const& rgb : colorMap["NanColor"])
+            {
+                nanColor[i++] = rgb.asDouble();
+            }
+
+            colorMaps.try_emplace(name, ColorMap { name, colorSpace, colors, nanColor });
+        }
+    }
+
+    //----------------------------------------------------------------------------------
+    // 创建lookuptable
+    auto&& colorMap = colorMaps["Cold and Hot"]; // GnYlRd\ Cold and Hot\ Cool to Warm
+    auto&& cc       = colorMap.colors;
+    auto&& cs       = colorMap.colorSpace;
+
+    vtkNew<vtkColorTransferFunction> colorTF;
+    for (size_t i = 0; i < cc.size(); i += 4)
+    {
+        colorTF->AddRGBPoint(cc[i], cc[i + 1], cc[i + 2], cc[i + 3]);
+    }
+    colorTF->SetColorSpace(cs == "RGB"s ? 0 : cs == "HSV"s ? 1 : cs == "Lab"s ? 2 : cs == "Diverging"s ? 3 : 0);
+    colorTF->Build();
+
+    double range[2] {};
+    colorTF->GetRange(range);
+
+    constexpr vtkIdType numOfColors { 256 };
+
+    double tmpTable[numOfColors * 3] {};
+    colorTF->GetTable(range[0], range[1], numOfColors, tmpTable); // 一次获取多个颜色
+
+    vtkNew<vtkLookupTable> lut;
+    lut->SetRange(range);
+    lut->SetNumberOfTableValues(numOfColors);
+    lut->SetNumberOfColors(numOfColors);
+    for (vtkIdType i = 0; i < numOfColors; ++i)
+    {
+        double color[3] {};
+        colorTF->GetColor(range[0] + (range[1] - range[0]) * i / numOfColors, color); // 一次获取一个颜色
+
+        lut->SetTableValue(i, color[0], color[1], color[2]); // 设置lookuptable的所有颜色
+        // lut->SetTableValue(i, tmpTable[i * 3], tmpTable[i * 3 + 1], tmpTable[i * 3 + 2]);
+    }
+    lut->BuildSpecialColors();
+
+    //--------------------------------------------------------------------
+    vtkNew<vtkScalarBarActor> scalarBar;
+    scalarBar->SetLookupTable(lut);
+    scalarBar->SetNumberOfLabels(20);
+    scalarBar->SetMaximumNumberOfColors(numOfColors);
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor2D(scalarBar);
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST102
 
 #ifdef TEST103
 
