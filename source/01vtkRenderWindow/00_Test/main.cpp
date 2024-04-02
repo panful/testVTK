@@ -14,10 +14,13 @@
  * 402. class中的成员变量是裸指针，引用计数仍会加1，并不会被析构
  * 403. 从 vtkActor vtkPolyDataMapper... 继承重写父类函数
  *
+ * 501. vtkFloatArray vtkDoubleArray 的 SetArray 函数使用
+ * 502. vtkPoints 使用 SetData 函数设置顶点数据
+ *
  * vtkSmartPointer vtkObject vtkCommand vtkTimeStamp vtkDataArray vtkDataObject vtkAlgorithm
  */
 
-#define TEST501
+#define TEST502
 
 #ifdef TEST101
 
@@ -84,12 +87,12 @@ int main(int, char*[])
 
         vtkSmartPointer<Test> t = vtkSmartPointer<Test>::New();
 
-        std::cout << "t ref count:\t" << t->GetReferenceCount() << '\n'; // 1
+        std::cout << "t ref count:\t" << t->GetReferenceCount() << '\n';           // 1
         ts.emplace_back(t);
         std::cout << "t ref count:\t" << t->GetReferenceCount() << '\n';           // 2
         std::cout << "ts ref count:\t" << ts.front()->GetReferenceCount() << '\n'; // 2
 
-        t = nullptr; // 引用计数减1，并不释放
+        t = nullptr;                                                               // 引用计数减1，并不释放
 
         std::cout << "ts ref count:\t" << ts.front()->GetReferenceCount() << '\n'; // 1
         std::cout << "++++++\n";
@@ -820,3 +823,143 @@ int main(int, char*[])
 }
 
 #endif // TEST403
+
+#ifdef TEST501
+
+#include <iostream>
+#include <vector>
+#include <vtkIntArray.h>
+
+int main()
+{
+    {
+        vtkNew<vtkIntArray> arr;
+        arr->InsertNextValue(1);
+        arr->InsertNextValue(2);
+        arr->InsertNextValue(3);
+
+        std::cout << "A::number: " << arr->GetNumberOfValues() << "\t data:";
+
+        for (vtkIdType i = 0; i < arr->GetNumberOfValues(); ++i)
+        {
+            std::cout << arr->GetValue(i) << ' ';
+        }
+    }
+
+    {
+        vtkNew<vtkIntArray> arr;
+        std::vector<int> vec { 1, 2, 3 };
+
+        // 最后一个参数save设置为1，表示vtk不负责释放数据，并不是意味着vtk会拷贝vec的数据到arr中
+        arr->SetArray(vec.data(), static_cast<vtkIdType>(vec.size()), 1);
+
+        std::cout << "\nB::number: " << arr->GetNumberOfValues() << "\t data:";
+
+        for (vtkIdType i = 0; i < arr->GetNumberOfValues(); ++i)
+        {
+            std::cout << arr->GetValue(i) << ' ';
+        }
+    }
+
+    {
+        vtkNew<vtkIntArray> arr;
+        {
+            std::vector<int> vec { 1, 2, 3 };
+            // vec离开这个作用域就会被释放
+            arr->SetArray(vec.data(), static_cast<vtkIdType>(vec.size()), 1);
+        }
+
+        std::cout << "\nC::number: " << arr->GetNumberOfValues() << "\t data:";
+
+        for (vtkIdType i = 0; i < arr->GetNumberOfValues(); ++i)
+        {
+            // 打印的值是非法值，因为vec已经被释放，并且vec的值并没有深拷贝到arr中
+            // 如果SetArray的最后一个参数save设置为0，此处会崩溃，因为对已经释放的内存（vec）重复释放
+            std::cout << arr->GetValue(i) << ' ';
+        }
+    }
+
+    {
+        {
+            vtkNew<vtkIntArray> arr;
+            {
+                std::vector<int> vec { 1, 2, 3 };
+                vtkNew<vtkIntArray> tmp;
+                tmp->SetArray(vec.data(), static_cast<vtkIdType>(vec.size()), 1);
+                arr->DeepCopy(tmp); // 深拷贝一份数据到arr
+            }
+
+            std::cout << "\nD::number: " << arr->GetNumberOfValues() << "\t data:";
+
+            for (vtkIdType i = 0; i < arr->GetNumberOfValues(); ++i)
+            {
+                // 打印的值为预期值
+                std::cout << arr->GetValue(i) << ' ';
+            }
+        }
+    }
+
+    {
+        vtkNew<vtkIntArray> arr;
+        {
+            std::vector<int> vec { 1, 2, 3 };
+            arr->SetVoidArray(vec.data(), static_cast<vtkIdType>(vec.size()), 1); // 和 SetArray 效果一样
+        }
+
+        std::cout << "\nE::number: " << arr->GetNumberOfValues() << "\t data:";
+
+        for (vtkIdType i = 0; i < arr->GetNumberOfValues(); ++i)
+        {
+            std::cout << arr->GetValue(i) << ' ';
+        }
+    }
+}
+
+#endif // TEST501
+
+#ifdef TEST502
+
+#include <iostream>
+#include <vector>
+#include <vtkCellArray.h>
+#include <vtkDoubleArray.h>
+#include <vtkPoints.h>
+
+int main()
+{
+    {
+        vtkNew<vtkPoints> points;
+        points->InsertNextPoint(1., 2., 3.);
+        points->InsertNextPoint(4., 5., 6.);
+
+        std::cout << "Number: " << points->GetNumberOfPoints() << '\n';
+        for (vtkIdType i = 0; i < points->GetNumberOfPoints(); ++i)
+        {
+            double pt[3] {};
+            points->GetPoint(i, pt);
+            std::cout << pt[0] << ' ' << pt[1] << ' ' << pt[2] << '\n';
+        }
+    }
+
+    {
+        std::vector<double> vec { 1., 2., 3., 4., 5., 6. };
+
+        vtkNew<vtkDoubleArray> arr;
+        arr->SetNumberOfComponents(3); // 必须设置为3，顶点包含{x,y,z}，否则VTK会打印ERROR级别的错误日志
+        arr->SetArray(vec.data(), static_cast<vtkIdType>(vec.size()), 1);
+
+        vtkNew<vtkPoints> points;
+        points->SetData(arr);
+        points->SetDataTypeToDouble(); // 必须和 vtkXXXArray 的类型一致，如果类型不一致，points会是空的
+
+        std::cout << "Number: " << points->GetNumberOfPoints() << '\n';
+        for (vtkIdType i = 0; i < points->GetNumberOfPoints(); ++i)
+        {
+            double pt[3] {};
+            points->GetPoint(i, pt);
+            std::cout << pt[0] << ' ' << pt[1] << ' ' << pt[2] << '\n';
+        }
+    }
+}
+
+#endif // TEST502
