@@ -16,11 +16,12 @@
  *
  * 501. vtkFloatArray vtkDoubleArray 的 SetArray 函数使用
  * 502. vtkPoints 使用 SetData 函数设置顶点数据
+ * 503. vtkDoubleArray vtkDataArray GetPointer() GetVoidPointer()
  *
  * vtkSmartPointer vtkObject vtkCommand vtkTimeStamp vtkDataArray vtkDataObject vtkAlgorithm
  */
 
-#define TEST502
+#define TEST503
 
 #ifdef TEST101
 
@@ -963,3 +964,36 @@ int main()
 }
 
 #endif // TEST502
+
+#ifdef TEST503
+
+#include <algorithm>
+#include <iostream>
+#include <vector>
+#include <vtkDoubleArray.h>
+#include <vtkFloatArray.h>
+
+int main()
+{
+    vtkNew<vtkDoubleArray> d_array;
+    d_array->InsertNextValue(1.);
+    d_array->InsertNextValue(2.);
+    d_array->InsertNextValue(3.);
+
+    auto pd0 = d_array->GetPointer(0);
+    auto pd1 = d_array->GetPointer(d_array->GetNumberOfValues() - 1); // 最后一个元素的指针需要减1
+
+    std::vector<float> f_vec(static_cast<size_t>(d_array->GetNumberOfValues()));
+    // 注意:第二个参数是 d_array->GetPointer(d_array->GetNumberOfValues()) 相当于 std 容器的 end()
+    std::transform(pd0, pd1 + 1, f_vec.begin(), [](auto val) { return static_cast<float>(val); });
+
+    vtkNew<vtkFloatArray> f_array;
+    f_array->SetNumberOfValues(d_array->GetNumberOfValues());
+    std::transform(pd0, pd1 + 1, f_array->GetPointer(0), [](auto val) { return static_cast<float>(val); });
+
+    auto n_val = f_array->GetNumberOfValues();
+    auto pf0   = f_array->GetPointer(0);
+    auto pf1   = f_array->GetPointer(f_array->GetNumberOfValues() - 1);
+}
+
+#endif // TEST503
