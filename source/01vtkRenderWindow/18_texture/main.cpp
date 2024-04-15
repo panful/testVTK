@@ -1,9 +1,10 @@
 /**
  * 1. 纹理的基础使用
  * 2. 天空盒
+ * 3. PBR IBL
  */
 
-#define TEST2
+#define TEST3
 
 #ifdef TEST1
 
@@ -177,3 +178,118 @@ int main()
 }
 
 #endif // TEST2
+
+#ifdef TEST3
+
+#include <vtkActor.h>
+#include <vtkImageFlip.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkJPEGReader.h>
+#include <vtkNew.h>
+#include <vtkOpenGLRenderer.h>
+#include <vtkPBRIrradianceTexture.h>
+#include <vtkPBRLUTTexture.h>
+#include <vtkPBRPrefilterTexture.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkSkybox.h>
+#include <vtkSphereSource.h>
+#include <vtkTexture.h>
+
+void AddActor(vtkOpenGLRenderer* ren)
+{
+    vtkNew<vtkSphereSource> sphere;
+    sphere->SetThetaResolution(100);
+    sphere->SetPhiResolution(100);
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputConnection(sphere->GetOutputPort());
+
+    for (size_t x = 0; x < 5; ++x)
+    {
+        for (size_t y = 0; y < 5; ++y)
+        {
+            vtkNew<vtkActor> actorSphere;
+            actorSphere->SetPosition(static_cast<double>(x), static_cast<double>(y), 0.);
+            actorSphere->SetMapper(mapper);
+            actorSphere->GetProperty()->SetColor(1., 1., 1.);
+            actorSphere->GetProperty()->SetInterpolationToPBR();                   // PBR着色，还有 GOURAUD PHONG FLAT
+            actorSphere->GetProperty()->SetMetallic(static_cast<double>(x) / 4.);  // 设置金属系数[0.,1.]，默认为 0
+            actorSphere->GetProperty()->SetRoughness(static_cast<double>(y) / 4.); // 设置粗糙度系数[0.,1.]，光泽0 粗糙1 默认为 0.5
+            ren->AddActor(actorSphere);
+        }
+    }
+}
+
+void AddSkybox(vtkRenderer* ren)
+{
+    vtkNew<vtkTexture> textureCubemap;
+    textureCubemap->CubeMapOn(); // 开启立方体贴图
+    textureCubemap->UseSRGBColorSpaceOn();
+    textureCubemap->InterpolateOn();
+    textureCubemap->MipmapOn();
+
+    // clang-format off
+    std::string pathSkybox[6] = { 
+        "../resources/skybox/posx.jpg", 
+        "../resources/skybox/negx.jpg", 
+        "../resources/skybox/posy.jpg",
+        "../resources/skybox/negy.jpg", 
+        "../resources/skybox/posz.jpg", 
+        "../resources/skybox/negz.jpg",
+    };
+    // clang-format on
+
+    for (int i = 0; i < 6; i++)
+    {
+        vtkNew<vtkJPEGReader> jpg;
+        jpg->SetFileName(pathSkybox[i].c_str());
+
+        vtkNew<vtkImageFlip> flip;
+        flip->SetInputConnection(jpg->GetOutputPort());
+        flip->SetFilteredAxis(1);                                     // flip y axis
+        textureCubemap->SetInputConnection(i, flip->GetOutputPort()); // 立方体贴图的6个纹理图片
+    }
+
+    vtkNew<vtkSkybox> skybox;
+    skybox->SetTexture(textureCubemap);
+    skybox->SetProjectionToCube();
+
+    ren->SetEnvironmentTexture(textureCubemap, true); // 设置环境贴图（天空盒）
+    ren->AddActor(skybox);
+}
+
+int main(int argc, char* argv[])
+{
+    vtkNew<vtkOpenGLRenderer> ren;
+    ren->SetBackground(.1, .2, .3);
+    ren->UseImageBasedLightingOn();  // 使用IBL，Renderer 必须设置 EnvironmentTexture
+    ren->UseSphericalHarmonicsOff(); // 不使用球面谐波，使用辐照度纹理
+    AddActor(ren);
+    AddSkybox(ren);
+
+    // IBL(image based lighting)
+    auto pbrIrradiance = ren->GetEnvMapIrradiance();
+    auto pbrBRDFLUT    = ren->GetEnvMapLookupTable();
+    auto pbrPrefilter  = ren->GetEnvMapPrefiltered();
+
+    pbrIrradiance->SetIrradianceStep(0.3); // 对半球采样的步长，默认为 pi/64
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->SetSize(800, 600);
+    renWin->AddRenderer(ren);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST3
