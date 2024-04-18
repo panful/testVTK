@@ -1,11 +1,14 @@
 /**
- * 101. vtkCellLocator 查找距离输入点最近的单元
+ * 101. vtkCellLocator 查找距离输入点最近的单元 （八叉树 OCTree）
  * 102. vtkStaticCellLocator 使用了多线程，比 vtkCellLocator 更快
+ * 103. vtkCellTreeLocator 包含某个点的单元，线段与的单元的交点，沿线单元搜索（用于处理大型数据集）
  *
  * 201. vtkPointLocator 查找距离输入点最近的网格顶点
  * 202. vtkStaticPointLocator 使用了多线程，当数据集很大时比 vtkPointLocator 更快
- *
- * 301. vtkOBBTree 几何体与线段的交点
+ * 203. vtkOctreePointLocator 查找距离输入点最近的网格顶点 （八叉树 OCTree）
+ * 204. vtkKdTreePointLocator 查找距离输入点最近的网格顶点，指定范围（半径）、指定个数
+ * 
+ * 301. vtkOBBTree 几何体与线段的交点，相交性测试，点定位，可见性判断
  *
  * 401. 多边形每条边的外法向量
  * 402. vtkPolyDataNormals 生成多边形的法线
@@ -30,7 +33,7 @@
  * 708. vtkCleanPolyData
  */
 
-#define TEST603
+#define TEST204
 
 #ifdef TEST101
 
@@ -70,11 +73,11 @@ int main(int, char*[])
     cellLocator->SetDataSet(source->GetOutput());
     cellLocator->BuildLocator();
 
-    double point[3] { 4., 4., 0. }; // 需要查找的输入点坐标
-    double closestPoint[3] {};      // 最近点的坐标(单元上的点，不一定是单元的顶点)
-    vtkIdType cellId { 0 };         // 距离输入点最近的单元ID
-    int subId { 0 };                // 单元的子单元ID，例如三角形带会有子单元
-    double dist2 { 0.0 };           // 单元格到查找点的平方距离
+    double point[3] { 4., 4., 0. };                                           // 需要查找的输入点坐标
+    double closestPoint[3] {};                                                // 最近点的坐标(单元上的点，不一定是单元的顶点)
+    vtkIdType cellId { 0 };                                                   // 距离输入点最近的单元ID
+    int subId { 0 };                                                          // 单元的子单元ID，例如三角形带会有子单元
+    double dist2 { 0.0 };                                                     // 单元格到查找点的平方距离
 
     cellLocator->FindClosestPoint(point, closestPoint, cellId, subId, dist2); // 线程不安全
 
@@ -112,6 +115,7 @@ int main(int, char*[])
     renderer->AddActor(actor);
     renderer->AddActor(actor2);
     renderer->ResetCamera();
+    renderer->SetBackground(.1, .2, .3);
 
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
@@ -169,11 +173,11 @@ int main(int, char*[])
     cellLocator->SetDataSet(source->GetOutput());
     cellLocator->BuildLocator();
 
-    double point[3] { 4., 4., 0. }; // 需要查找的输入点坐标
-    double closestPoint[3] {};      // 最近点的坐标(单元上的点，不一定是单元的顶点)
-    vtkIdType cellId { 0 };         // 距离输入点最近的单元ID
-    int subId { 0 };                // 单元的子单元ID，例如三角形带会有子单元
-    double dist2 { 0.0 };           // 单元格到查找点的平方距离
+    double point[3] { 4., 4., 0. };                                           // 需要查找的输入点坐标
+    double closestPoint[3] {};                                                // 最近点的坐标(单元上的点，不一定是单元的顶点)
+    vtkIdType cellId { 0 };                                                   // 距离输入点最近的单元ID
+    int subId { 0 };                                                          // 单元的子单元ID，例如三角形带会有子单元
+    double dist2 { 0.0 };                                                     // 单元格到查找点的平方距离
 
     cellLocator->FindClosestPoint(point, closestPoint, cellId, subId, dist2); // 线程不安全
 
@@ -229,6 +233,51 @@ int main(int, char*[])
 }
 
 #endif // TEST102
+
+#ifdef TEST103
+
+#include <vtkCellTreeLocator.h>
+#include <vtkGenericCell.h>
+#include <vtkNew.h>
+#include <vtkSphereSource.h>
+
+int main(int, char*[])
+{
+    vtkNew<vtkSphereSource> sphereSource;
+    sphereSource->SetCenter(0.0, 0.0, 0.0);
+    sphereSource->SetRadius(1.0);
+    sphereSource->Update();
+
+    // Create the tree.
+    vtkNew<vtkCellTreeLocator> cellTree;
+    cellTree->SetDataSet(sphereSource->GetOutput());
+    cellTree->BuildLocator();
+
+    double testInside[3]  = { 0.5, 0.0, 0.0 };
+    double testOutside[3] = { 10.0, 0.0, 0.0 };
+
+    double pcoords[3], weights[3];
+
+    vtkIdType cellId { 0 };
+    vtkNew<vtkGenericCell> cell;
+
+    // 如果不在内部，返回-1，否则返回单元id
+    cellId = cellTree->FindCell(testInside, 0, cell, pcoords, weights);
+    if (cellId >= 0)
+    {
+        std::cout << "First point: in cell " << cellId << std::endl;
+    }
+
+    cellId = cellTree->FindCell(testOutside, 0, cell, pcoords, weights);
+    if (cellId == -1)
+    {
+        std::cout << "Second point: outside\n";
+    }
+
+    return 0;
+}
+
+#endif // TEST103
 
 #ifdef TEST201
 
@@ -295,6 +344,7 @@ int main(int, char*[])
     renderer->AddActor(actor);
     renderer->AddActor(actor2);
     renderer->ResetCamera();
+    renderer->SetBackground(.1, .2, .3);
 
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
@@ -397,6 +447,91 @@ int main(int, char*[])
 }
 
 #endif // TEST202
+
+#ifdef TEST203
+
+#include <vtkNew.h>
+#include <vtkOctreePointLocator.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+
+int main(int, char*[])
+{
+    // Setup point coordinates.
+    double x[3] = { 1.0, 0.0, 0.0 };
+    double y[3] = { 0.0, 1.0, 0.0 };
+    double z[3] = { 0.0, 0.0, 1.0 };
+
+    vtkNew<vtkPoints> points;
+    points->InsertNextPoint(x);
+    points->InsertNextPoint(y);
+    points->InsertNextPoint(z);
+
+    vtkNew<vtkPolyData> polydata;
+    polydata->SetPoints(points);
+
+    // Create the tree
+    vtkNew<vtkOctreePointLocator> octree;
+    octree->SetDataSet(polydata);
+    octree->BuildLocator();
+
+    double testPoint[3] = { 2.0, 0.0, 0.0 };
+
+    // Find the closest points to TestPoint.
+    vtkIdType iD = octree->FindClosestPoint(testPoint);
+    std::cout << "The closest point is point " << iD << std::endl;
+
+    // Get the coordinates of the closest point.
+    double closestPoint[3];
+    octree->GetDataSet()->GetPoint(iD, closestPoint);
+    std::cout << "Coordinates: " << closestPoint[0] << " " << closestPoint[1] << " " << closestPoint[2] << std::endl;
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST203
+
+#ifdef TEST204
+
+#include <vtkIdList.h>
+#include <vtkKdTreePointLocator.h>
+#include <vtkNew.h>
+#include <vtkPointSource.h>
+
+int main(int, char*[])
+{
+    // Create some random points
+    vtkNew<vtkPointSource> pointSource;
+    pointSource->SetNumberOfPoints(10);
+    pointSource->Update();
+
+    // Create the tree
+    vtkNew<vtkKdTreePointLocator> pointTree;
+    pointTree->SetDataSet(pointSource->GetOutput());
+    pointTree->BuildLocator();
+
+    // Find the k closest points to (0,0,0)
+    unsigned int k      = 1;
+    double testPoint[3] = { 0.0, 0.0, 0.0 };
+    vtkNew<vtkIdList> result;
+
+    pointTree->FindClosestNPoints(k, testPoint, result);
+
+    for (vtkIdType i = 0; i < k; i++)
+    {
+        vtkIdType point_ind = result->GetId(i);
+        double p[3];
+        pointSource->GetOutput()->GetPoint(point_ind, p);
+        std::cout << "Closest point " << i << ": Point " << point_ind << ": (" << p[0] << ", " << p[1] << ", " << p[2] << ")" << std::endl;
+    }
+
+    // Should return:
+    // Closest point 0: Point 2: (-0.136162, -0.0276359, 0.0369441)
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST204
 
 #ifdef TEST301
 
@@ -803,17 +938,17 @@ vtkSmartPointer<vtkPolyData> GenPolyData(PolyType type)
     polyData->SetPoints(points);
     switch (type)
     {
-    case PolyType::Vert:
-        polyData->SetVerts(cellsVert);
-        break;
-    case PolyType::Line:
-        polyData->SetLines(cellsLine);
-        break;
-    case PolyType::Poly:
-        polyData->SetPolys(cellsPoly);
-        break;
-    default:
-        break;
+        case PolyType::Vert:
+            polyData->SetVerts(cellsVert);
+            break;
+        case PolyType::Line:
+            polyData->SetLines(cellsLine);
+            break;
+        case PolyType::Poly:
+            polyData->SetPolys(cellsPoly);
+            break;
+        default:
+            break;
     }
 
     vtkNew<vtkFloatArray> scalars;
@@ -977,14 +1112,14 @@ vtkSmartPointer<vtkPolyData> GenPolyData(PrimitiveType pt)
 
     switch (pt)
     {
-    case PrimitiveType::Sphere:
-        return point->GetOutput();
-    case PrimitiveType::Plane:
-        return plane->GetOutput();
-    case PrimitiveType::Cube:
-        return cube->GetOutput();
-    default:
-        return plane->GetOutput();
+        case PrimitiveType::Sphere:
+            return point->GetOutput();
+        case PrimitiveType::Plane:
+            return plane->GetOutput();
+        case PrimitiveType::Cube:
+            return cube->GetOutput();
+        default:
+            return plane->GetOutput();
     }
 }
 } // namespace
@@ -1130,14 +1265,14 @@ vtkSmartPointer<vtkPolyData> GenPolyData(PrimitiveType pt)
 
     switch (pt)
     {
-    case PrimitiveType::Sphere:
-        return point->GetOutput();
-    case PrimitiveType::Plane:
-        return plane->GetOutput();
-    case PrimitiveType::Cube:
-        return cube->GetOutput();
-    default:
-        return plane->GetOutput();
+        case PrimitiveType::Sphere:
+            return point->GetOutput();
+        case PrimitiveType::Plane:
+            return plane->GetOutput();
+        case PrimitiveType::Cube:
+            return cube->GetOutput();
+        default:
+            return plane->GetOutput();
     }
 }
 } // namespace
@@ -1460,30 +1595,30 @@ vtkSmartPointer<vtkPolyData> GenPolyData(PrimitiveType pt)
 
     switch (pt)
     {
-    case PrimitiveType::Vert:
-        polyData->SetVerts(vert);
-        break;
-    case PrimitiveType::Verts:
-        polyData->SetVerts(verts);
-        break;
-    case PrimitiveType::Lines:
-        polyData->SetLines(lines);
-        break;
-    case PrimitiveType::Line:
-        polyData->SetLines(line);
-        break;
-    case PrimitiveType::Strip:
-        polyData->SetStrips(strips);
-        break;
-    case PrimitiveType::Poly:
-        polyData->SetPolys(polys);
-        break;
-    case PrimitiveType::Plane:
-        return plane->GetOutput();
-    case PrimitiveType::Circle:
-        return regular->GetOutput();
-    default:
-        break;
+        case PrimitiveType::Vert:
+            polyData->SetVerts(vert);
+            break;
+        case PrimitiveType::Verts:
+            polyData->SetVerts(verts);
+            break;
+        case PrimitiveType::Lines:
+            polyData->SetLines(lines);
+            break;
+        case PrimitiveType::Line:
+            polyData->SetLines(line);
+            break;
+        case PrimitiveType::Strip:
+            polyData->SetStrips(strips);
+            break;
+        case PrimitiveType::Poly:
+            polyData->SetPolys(polys);
+            break;
+        case PrimitiveType::Plane:
+            return plane->GetOutput();
+        case PrimitiveType::Circle:
+            return regular->GetOutput();
+        default:
+            break;
     }
 
     return polyData;
@@ -1776,25 +1911,25 @@ vtkSmartPointer<vtkPolyData> GenPolyData(PrimitiveType pt)
 
     switch (pt)
     {
-    case PrimitiveType::Line2:
-        polyData->SetLines(cell_lines2);
-        break;
-    case PrimitiveType::Line3:
-        polyData->SetLines(cell_lines3);
-        break;
-    case PrimitiveType::Quad:
-        polyData->SetPolys(cell_quad4);
-        break;
-    case PrimitiveType::Triangles:
-    {
-        polyData->SetPolys(cell_quad4);
-        vtkNew<vtkTriangleFilter> triangleFilter;
-        triangleFilter->SetInputData(polyData);
-        triangleFilter->Update();
-        return triangleFilter->GetOutput();
-    }
-    default:
-        break;
+        case PrimitiveType::Line2:
+            polyData->SetLines(cell_lines2);
+            break;
+        case PrimitiveType::Line3:
+            polyData->SetLines(cell_lines3);
+            break;
+        case PrimitiveType::Quad:
+            polyData->SetPolys(cell_quad4);
+            break;
+        case PrimitiveType::Triangles:
+        {
+            polyData->SetPolys(cell_quad4);
+            vtkNew<vtkTriangleFilter> triangleFilter;
+            triangleFilter->SetInputData(polyData);
+            triangleFilter->Update();
+            return triangleFilter->GetOutput();
+        }
+        default:
+            break;
     }
 
     return polyData;
@@ -1968,16 +2103,16 @@ vtkSmartPointer<vtkPolyData> GenPolyData(PrimitiveType pt)
 
     switch (pt)
     {
-    case PrimitiveType::Tri3:
-        return polyData;
-    case PrimitiveType::Plane:
-        triangleFilter->SetInputData(plane->GetOutput());
-        break;
-    case PrimitiveType::Circle:
-        triangleFilter->SetInputData(regular->GetOutput());
-        break;
-    default:
-        break;
+        case PrimitiveType::Tri3:
+            return polyData;
+        case PrimitiveType::Plane:
+            triangleFilter->SetInputData(plane->GetOutput());
+            break;
+        case PrimitiveType::Circle:
+            triangleFilter->SetInputData(regular->GetOutput());
+            break;
+        default:
+            break;
     }
 
     triangleFilter->Update();
