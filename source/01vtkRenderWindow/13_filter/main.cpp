@@ -48,7 +48,7 @@
  * 803. PerlinNoise 使用 vtkSampleFunction 生成噪声图片
  */
 
-#define TEST303
+#define TEST701
 
 #ifdef TEST001
 
@@ -3664,9 +3664,7 @@ int main(int, char*[])
 
 #ifdef TEST701
 
-#include <vtkCallbackCommand.h>
 #include <vtkLODProp3D.h>
-#include <vtkNamedColors.h>
 #include <vtkNew.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
@@ -3676,14 +3674,10 @@ int main(int, char*[])
 #include <vtkRenderer.h>
 #include <vtkSphereSource.h>
 
-namespace {
-void RefreshCallback(vtkObject* vtkNotUsed(caller), long unsigned int vtkNotUsed(eventId), void* clientData, void* vtkNotUsed(callData));
-}
+// 在函数：vtkLODProp3D::SetAllocatedRenderTime 中计算到底使用哪一个LOD，每一次Render()都会调用这个函数
 
 int main(int, char*[])
 {
-    vtkNew<vtkNamedColors> colors;
-
     // High res sphere
     vtkNew<vtkPolyDataMapper> highResMapper;
     vtkNew<vtkProperty> propertyHighRes;
@@ -3694,9 +3688,7 @@ int main(int, char*[])
         highResSphereSource->Update();
 
         highResMapper->SetInputConnection(highResSphereSource->GetOutputPort());
-
-        propertyHighRes->SetDiffuseColor(0, 1, 0);
-        propertyHighRes->SetInterpolationToFlat();
+        propertyHighRes->SetColor(1., 0., 0.);
     }
 
     // Low res sphere
@@ -3709,56 +3701,35 @@ int main(int, char*[])
         lowResSphereSource->Update();
 
         lowResMapper->SetInputConnection(lowResSphereSource->GetOutputPort());
-
-        propertyLowRes->SetDiffuseColor(1, 0, 0);
-        propertyLowRes->SetInterpolationToFlat();
+        propertyLowRes->SetColor(0., 1., 0.);
     }
 
     vtkNew<vtkLODProp3D> prop;
+    // 第三个参数是预估时间，如果为0.0，则表示没有提供渲染时间的初始猜测
     auto id1 = prop->AddLOD(lowResMapper, propertyLowRes, 0.0);
     auto id2 = prop->AddLOD(highResMapper, propertyHighRes, 0.0);
 
-    std::cout << "There are " << prop->GetNumberOfLODs() << " LODs. "
-              << "ID1: " << id1 << "\tID2: " << id2 << '\n';
+    std::cout << "There are " << prop->GetNumberOfLODs() << " LODs. " << "ID1: " << id1 << "\tID2: " << id2 << '\n';
 
-    // A renderer and render window
     vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(prop);
+    renderer->SetBackground(.1, .2, .3);
+
+    // 为Actor分配渲染时间
+    prop->SetAllocatedRenderTime(1.e-12, renderer);
+
     vtkNew<vtkRenderWindow> renderWindow;
     renderWindow->AddRenderer(renderer);
-    renderWindow->SetWindowName("LODProp3D");
+    renderWindow->SetSize(800, 600);
 
-    // prop->SetAllocatedRenderTime(1e-6,renderer);
-    prop->SetAllocatedRenderTime(1e-12, renderer);
-
-    // An interactor
     vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
     renderWindowInteractor->SetRenderWindow(renderWindow);
 
-    // Add the actors to the scene
-    renderer->AddActor(prop);
-    renderer->SetBackground(colors->GetColor3d("SlateGray").GetData());
-
-    vtkNew<vtkCallbackCommand> refreshCallback;
-    refreshCallback->SetCallback(RefreshCallback);
-    refreshCallback->SetClientData(prop);
-
-    renderWindow->AddObserver(vtkCommand::ModifiedEvent, refreshCallback);
-
     renderWindow->Render();
-
-    // Begin mouse interaction
     renderWindowInteractor->Start();
 
     return EXIT_SUCCESS;
 }
-
-namespace {
-void RefreshCallback(vtkObject* vtkNotUsed(caller), long unsigned int vtkNotUsed(eventId), void* clientData, void* vtkNotUsed(callData))
-{
-    auto lodProp = static_cast<vtkLODProp3D*>(clientData);
-    std::cout << "Last rendered LOD ID: " << lodProp->GetLastRenderedLODID() << std::endl;
-}
-} // namespace
 
 #endif // TEST701
 
