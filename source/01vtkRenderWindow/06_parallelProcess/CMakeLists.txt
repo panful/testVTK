@@ -14,6 +14,8 @@ find_package(VTK
         loguru
         ParallelMPI
         CommonSystem        # vtkTimerLog
+        IOImage             # vtkImageReader
+        # RenderingParallel   # vtkParallelRenderManager
     QUIET
 )
 

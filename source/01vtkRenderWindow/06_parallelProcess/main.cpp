@@ -4,14 +4,14 @@
  * 2. 异步创建actor std::future 多线程
  * 3. vtkMultiThreader 和 std::thread
  * 4. MPI
- * 5. 并行渲染     vtk自带Example Rendering/Parallel/Testing/Cxx/PrmMagnify.cxx             vtkParallelRenderManager
- * 6. 并行处理数据 vtk自带Example Examples/ParallelProcessing/Generic/Cxx/ParallelIso.cxx"  vtkMPIController
- * 7. vtkSMPTools
+ * 5. 使用MPI在多个进程中并行渲染 vtkParallelRenderManager
+ * 6. 使用MPI并行处理数据 vtkMPIController，在进程0上面绘制结果
+ * 7. 多线程 vtkSMPTools
  */
 
-// \Examples\Infovis\Cxx\ParallelBFS.cxx
+// windows 下执行MPI程序： mpiexec -n 8 name.exe
 
-#define TEST7
+#define TEST6
 
 #ifdef TEST1
 
@@ -274,27 +274,6 @@ int main(int argc, char* argv[])
 
 #ifdef TEST5
 
-/*=========================================================================
-
-  Program:   Visualization Toolkit
-  Module:    PrmMagnify.cxx
-
-  Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
-  All rights reserved.
-  See Copyright.txt or http://www.kitware.com/Copyright.htm for details.
-
-  Copyright 2005 Sandia Corporation. Under the terms of Contract
-  DE-AC04-94AL85000, there is a non-exclusive license for use of this work by
-  or on behalf of the U.S. Government. Redistribution and use in source and
-  binary forms, with or without modification, are permitted provided that this
-  Notice and any statement of authorship are reproduced on all copies.
-
-     This software is distributed WITHOUT ANY WARRANTY; without even
-     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-     PURPOSE.  See the above copyright notice for more information.
-
-=========================================================================*/
-
 #include "vtkActor.h"
 #include "vtkCellData.h"
 #include "vtkDataArray.h"
@@ -474,8 +453,9 @@ void vtkTestMagnifyRenderManager::ReadReducedImage()
 }
 
 //------------------------------------------------------------------------------
+// vtk自带Example Rendering/Parallel/Testing/Cxx/PrmMagnify.cxx
 
-int PrmMagnify(int argc, char* argv[])
+int main(int argc, char* argv[])
 {
     VTK_CREATE(vtkDummyController, controller);
     controller->Initialize(&argc, &argv);
@@ -483,25 +463,24 @@ int PrmMagnify(int argc, char* argv[])
     VTK_CREATE(vtkTestMagnifyRenderManager, prm);
     prm->SetController(controller);
 
-    //   VTK_CREATE(vtkSphereSource, sphere);
-    //   sphere->SetEndPhi(90.0);
-    //   sphere->SetPhiResolution(4);
+    VTK_CREATE(vtkSphereSource, sphere);
+    sphere->SetEndPhi(90.0);
+    sphere->SetPhiResolution(4);
 
-    //   VTK_CREATE(vtkIdFilter, colors);
-    //   colors->SetInputConnection(sphere->GetOutputPort());
-    //   colors->PointIdsOff();
-    //   colors->CellIdsOn();
-    //   colors->FieldDataOff();
-    //   colors->Update();
+    VTK_CREATE(vtkIdFilter, colors);
+    colors->SetInputConnection(sphere->GetOutputPort());
+    colors->PointIdsOff();
+    colors->CellIdsOn();
+    colors->FieldDataOff();
+    colors->Update();
 
-    //   VTK_CREATE(vtkPolyDataMapper, mapper);
-    //   mapper->SetInputConnection(colors->GetOutputPort());
-    //   mapper->UseLookupTableScalarRangeOff();
-    //   mapper->SetScalarRange(colors->GetOutput()->GetCellData()
-    //                          ->GetScalars()->GetRange());
+    VTK_CREATE(vtkPolyDataMapper, mapper);
+    mapper->SetInputConnection(colors->GetOutputPort());
+    mapper->UseLookupTableScalarRangeOff();
+    mapper->SetScalarRange(colors->GetOutput()->GetCellData()->GetScalars()->GetRange());
 
-    //   VTK_CREATE(vtkActor, actor);
-    //   actor->SetMapper(mapper);
+    VTK_CREATE(vtkActor, actor);
+    actor->SetMapper(mapper);
 
     VTK_CREATE(vtkImageMandelbrotSource, mandelbrot);
     mandelbrot->SetWholeExtent(0, 73, 0, 73, 0, 0);
@@ -531,46 +510,20 @@ int PrmMagnify(int argc, char* argv[])
     prm->ResetAllCameras();
     prm->SetImageReductionFactor(8);
 
-    // Run the regression test.
+    VTK_CREATE(vtkRenderWindowInteractor, iren);
+    iren->SetRenderWindow(renwin);
+
     renwin->Render();
-    int retVal = vtkRegressionTestImage(renwin);
-    if (retVal == vtkRegressionTester::DO_INTERACTOR)
-    {
-        VTK_CREATE(vtkRenderWindowInteractor, iren);
-        iren->SetRenderWindow(renwin);
-        renwin->Render();
-        iren->Start();
-        retVal = vtkRegressionTester::PASSED;
-    }
+    iren->Start();
 
     controller->Finalize();
 
-    return !retVal;
+    return 0;
 }
 
 #endif // TEST5
 
 #ifdef TEST6
-
-/*=========================================================================
-
-  Program:   Visualization Toolkit
-  Module:    ParallelIso.cxx
-
-  Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
-  All rights reserved.
-  See Copyright.txt or http://www.kitware.com/Copyright.htm for details.
-
-     This software is distributed WITHOUT ANY WARRANTY; without even
-     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-     PURPOSE.  See the above copyright notice for more information.
-
-=========================================================================*/
-// This example demonstrates the use of data parallelism in VTK. The
-// pipeline ( vtkImageReader -> vtkContourFilter -> vtkElevationFilter )
-// is created in parallel and each process is assigned 1 piece to process.
-// All satellite processes send the result to the first process which
-// collects and renders them.
 
 #include "vtkActor.h"
 #include "vtkAppendPolyData.h"
@@ -586,22 +539,15 @@ int PrmMagnify(int argc, char* argv[])
 #include "vtkMath.h"
 #include "vtkPolyData.h"
 #include "vtkPolyDataMapper.h"
-#include "vtkRegressionTestImage.h"
 #include "vtkRenderWindow.h"
 #include "vtkRenderWindowInteractor.h"
 #include "vtkRenderer.h"
-#include "vtkStreamingDemandDrivenPipeline.h"
-#include "vtkTestUtilities.h"
-#include "vtkWindowToImageFilter.h"
-
-#include "vtkDebugLeaks.h"
 
 #include <vtk_mpi.h>
 
-static const float ISO_START = 4250.0;
-static const float ISO_STEP  = -1250.0;
-static const int ISO_NUM     = 3;
-// Just pick a tag which is available
+static const float ISO_START       = 4250.0;
+static const float ISO_STEP        = -1250.0;
+static const int ISO_NUM           = 3;
 static const int ISO_VALUE_RMI_TAG = 300;
 static const int ISO_OUTPUT_TAG    = 301;
 
@@ -648,20 +594,17 @@ void MyMain(vtkMultiProcessController* controller, void* arg)
     float val;
     ParallelIsoArgs_tmp* args = reinterpret_cast<ParallelIsoArgs_tmp*>(arg);
 
-    // Obtain the id of the running process and the total
-    // number of processes
+    // 正在运行的进程id和进程总数
     myid     = controller->GetLocalProcessId();
     numProcs = controller->GetNumberOfProcesses();
 
-    // Create the reader, the data file name might have
-    // to be changed depending on where the data files are.
-    char* fname = vtkTestUtilities::ExpandDataFileName(args->argc, args->argv, "Data/headsq/quarter");
-    reader      = vtkImageReader::New();
+    std::cout << "current id: " << myid << "\tnumber of processes: " << numProcs << '\n';
+
+    reader = vtkImageReader::New();
     reader->SetDataByteOrderToLittleEndian();
     reader->SetDataExtent(0, 63, 0, 63, 1, 93);
-    reader->SetFilePrefix(fname);
+    reader->SetFilePrefix("../resources/headsq/quarter");
     reader->SetDataSpacing(3.2, 3.2, 1.5);
-    delete[] fname;
 
     // Iso-surface.
     iso = vtkContourFilter::New();
@@ -671,9 +614,9 @@ void MyMain(vtkMultiProcessController* controller, void* arg)
     iso->ComputeGradientsOff();
 
     // Compute a different color for each process.
+    val  = (myid + 1) / static_cast<float>(numProcs);
     elev = vtkElevationFilter::New();
     elev->SetInputConnection(iso->GetOutputPort());
-    val = (myid + 1) / static_cast<float>(numProcs);
     elev->SetScalarRange(val, val + 0.001);
 
     if (myid != 0)
@@ -750,13 +693,7 @@ void MyMain(vtkMultiProcessController* controller, void* arg)
         outputCopy->Delete();
         app->Update();
         renWindow->Render();
-
-        *(args->retVal) = vtkRegressionTester::Test(args->argc, args->argv, renWindow, 10);
-
-        if (*(args->retVal) == vtkRegressionTester::DO_INTERACTOR)
-        {
-            iren->Start();
-        }
+        iren->Start();
 
         // Clean up
         app->Delete();
@@ -774,6 +711,7 @@ void MyMain(vtkMultiProcessController* controller, void* arg)
     elev->Delete();
 }
 
+// vtk自带Example Examples/ParallelProcessing/Generic/Cxx/ParallelIso.cxx
 int main(int argc, char* argv[])
 {
     // This is here to avoid false leak messages from vtkDebugLeaks when
@@ -807,7 +745,7 @@ int main(int argc, char* argv[])
     return !retVal;
 }
 
-#endif // TESt6
+#endif // TEST6
 
 #ifdef TEST7
 
