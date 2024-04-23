@@ -15,11 +15,12 @@
  * 13.同一个面的正面和背面设置不同的属性
  * 14.隐藏线消除 hidden line removal(HLR)
  * 15.vtkChartXY 源码分析
+ * 16.基于视锥体覆盖的剔除（可见性）
  *
  * 201. vtkAlgorithm vtkExecutive vtkInformation 管道端口的作用
  */
 
-#define TEST9
+#define TEST16
 
 #ifdef TEST1
 
@@ -462,10 +463,8 @@ public:
                         unsigned char blueValue  = scalarPointer[offset + 2];
                         unsigned char alphaValue = scalarPointer[offset + 3];
 
-                        std::cout << "Pixel at (" << x << ", " << y << ", " << z << "):\t"
-                                  << "R: " << static_cast<int>(redValue) << ",\t"
-                                  << "G: " << static_cast<int>(greenValue) << ",\t"
-                                  << "B: " << static_cast<int>(blueValue) << ",\t"
+                        std::cout << "Pixel at (" << x << ", " << y << ", " << z << "):\t" << "R: " << static_cast<int>(redValue) << ",\t"
+                                  << "G: " << static_cast<int>(greenValue) << ",\t" << "B: " << static_cast<int>(blueValue) << ",\t"
                                   << "A: " << static_cast<int>(alphaValue) << '\n';
                     }
                 }
@@ -1693,6 +1692,102 @@ int main(int, char*[])
 }
 
 #endif // TEST15
+
+#ifdef TEST16
+
+#include <vtkActor.h>
+#include <vtkCellArray.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPoints.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkFrustumCoverageCuller.h>
+
+void AddActors(vtkRenderer* ren)
+{
+    {
+        vtkNew<vtkPoints> points;
+        points->InsertNextPoint(0, 0, 8);
+        points->InsertNextPoint(1, 0, 8);
+        points->InsertNextPoint(1, 1, 8);
+        points->InsertNextPoint(0, 1, 8);
+
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0, 1, 2, 3 });
+
+        vtkNew<vtkPolyData> polyData;
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(0, 1, 0);
+        ren->AddActor(actor);
+    }
+
+    {
+        vtkNew<vtkPoints> points;
+        points->InsertNextPoint(0, 0, 0);
+        points->InsertNextPoint(1, 0, 0);
+        points->InsertNextPoint(1, 1, 0);
+        points->InsertNextPoint(0, 1, 0);
+
+        vtkNew<vtkCellArray> cells;
+        cells->InsertNextCell({ 0, 1, 2, 3 });
+
+        vtkNew<vtkPolyData> polyData;
+        polyData->SetPoints(points);
+        polyData->SetPolys(cells);
+
+        vtkNew<vtkPolyDataMapper> mapper;
+        mapper->SetInputData(polyData);
+
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(1, 0, 0);
+        ren->AddActor(actor);
+    }
+}
+
+/**
+ * vtkFrustumCoverageCuller 根据视锥体的覆盖范围来剔除 Actor
+ * 当 Actor 的覆盖范围小于指定的值时，就会从需要渲染的 Actors 中剔除，即跳过该 Actor 的渲染
+ * vtkRenderer 中添加的 Actors 和实际真正需要渲染的 Actors 是两个列表
+ * 真正需要渲染的 Actor 列表是经过 Culler 剔除之后的 Actors
+ * 在 void vtkRenderer::AllocateTime() 函数中执行剔除操作
+ */
+
+int main()
+{
+    vtkNew<vtkRenderer> renderer;
+    AddActors(renderer);
+    renderer->ResetCamera();
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(600, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST16
 
 #ifdef TEST201
 
