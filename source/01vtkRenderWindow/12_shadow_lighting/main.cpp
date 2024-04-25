@@ -4,9 +4,10 @@
  * 2. 关闭默认的光照，让颜色的对比度看起来更明显
  * 3. 光线投射raycast
  * 4. 自带的光照只和每个三角面倾斜的程度有关，和深度值没关系，越倾斜越暗
+ * 5. 透明物体的光照
  */
 
-#define TEST1
+#define TEST5
 
 #ifdef TEST1
 
@@ -407,7 +408,7 @@ int main()
 
     vtkNew<vtkVolumeProperty> volumeProperty;
     volumeProperty->SetInterpolationTypeToLinear();
-    volumeProperty->ShadeOn(); // 打开或者关闭阴影测试
+    volumeProperty->ShadeOn();            // 打开或者关闭阴影测试
     volumeProperty->SetAmbient(0.55);
     volumeProperty->SetDiffuse(0.85);     // 漫反射
     volumeProperty->SetSpecular(0.54);    // 镜面反射
@@ -585,3 +586,76 @@ int main(int, char*[])
 }
 
 #endif // TEST4
+
+#ifdef TEST5
+
+#include <vtkActor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkProperty.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkSphereSource.h>
+
+namespace {
+class MyStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+    static MyStyle* New();
+    vtkTypeMacro(MyStyle, vtkInteractorStyleTrackballCamera);
+
+    void OnMiddleButtonUp() override
+    {
+        static bool flag { true };
+        Actor->GetProperty()->SetOpacity(flag ? .5 : 1.);
+        flag = !flag;
+        Superclass::OnMiddleButtonUp();
+    }
+
+    vtkActor* Actor { nullptr };
+};
+
+vtkStandardNewMacro(MyStyle);
+} // namespace
+
+int main(int, char*[])
+{
+    vtkNew<vtkSphereSource> source;
+    source->Update();
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    mapper->SetInputData(source->GetOutput());
+
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(0, 1, 0);
+    actor->GetProperty()->EdgeVisibilityOn();
+
+    vtkNew<vtkRenderer> renderer;
+    renderer->AddActor(actor);
+    renderer->ResetCamera();
+    renderer->SetBackground(.1, .2, .3);
+    renderer->UseDepthPeelingOn();
+    renderer->SetMaximumNumberOfPeels(100);
+    renderer->SetOcclusionRatio(0.1);
+
+    vtkNew<vtkRenderWindow> renWin;
+    renWin->AddRenderer(renderer);
+    renWin->SetSize(800, 600);
+
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renWin);
+
+    vtkNew<MyStyle> style;
+    style->Actor = actor;
+    iren->SetInteractorStyle(style);
+
+    renWin->Render();
+    iren->Start();
+
+    return 0;
+}
+
+#endif // TEST5
