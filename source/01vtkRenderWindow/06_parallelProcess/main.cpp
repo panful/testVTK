@@ -11,7 +11,7 @@
 
 // windows 下执行MPI程序： mpiexec -n 8 name.exe
 
-#define TEST6
+#define TEST5
 
 #ifdef TEST1
 
@@ -482,19 +482,19 @@ int main(int argc, char* argv[])
     VTK_CREATE(vtkActor, actor);
     actor->SetMapper(mapper);
 
-    VTK_CREATE(vtkImageMandelbrotSource, mandelbrot);
-    mandelbrot->SetWholeExtent(0, 73, 0, 73, 0, 0);
-    mandelbrot->SetMaximumNumberOfIterations(255);
+    // VTK_CREATE(vtkImageMandelbrotSource, mandelbrot);
+    // mandelbrot->SetWholeExtent(0, 73, 0, 73, 0, 0);
+    // mandelbrot->SetMaximumNumberOfIterations(255);
 
-    VTK_CREATE(vtkImageShiftScale, charImage);
-    charImage->SetInputConnection(mandelbrot->GetOutputPort());
-    charImage->SetShift(0);
-    charImage->SetScale(1);
-    charImage->SetOutputScalarTypeToUnsignedChar();
+    // VTK_CREATE(vtkImageShiftScale, charImage);
+    // charImage->SetInputConnection(mandelbrot->GetOutputPort());
+    // charImage->SetShift(0);
+    // charImage->SetScale(1);
+    // charImage->SetOutputScalarTypeToUnsignedChar();
 
-    VTK_CREATE(vtkImageActor, actor);
-    actor->GetMapper()->SetInputConnection(charImage->GetOutputPort());
-    actor->InterpolateOff();
+    // VTK_CREATE(vtkImageActor, actor);
+    // actor->GetMapper()->SetInputConnection(charImage->GetOutputPort());
+    // actor->InterpolateOff();
 
     vtkSmartPointer<vtkRenderer> renderer = prm->MakeRenderer();
     renderer->Delete(); // Remove duplicate reference.
@@ -503,7 +503,7 @@ int main(int argc, char* argv[])
 
     vtkSmartPointer<vtkRenderWindow> renwin = prm->MakeRenderWindow();
     renwin->Delete(); // Remove duplicate reference.
-    renwin->SetSize(256, 256);
+    renwin->SetSize(1024, 1024);
     renwin->AddRenderer(renderer);
     prm->SetRenderWindow(renwin);
 

@@ -15,7 +15,8 @@ find_package(VTK
         ParallelMPI
         CommonSystem        # vtkTimerLog
         IOImage             # vtkImageReader
-        # RenderingParallel   # vtkParallelRenderManager
+        RenderingParallel   # vtkParallelRenderManager
+        ImagingSources      # vtkImageMandelbrotSource
     QUIET
 )
 
