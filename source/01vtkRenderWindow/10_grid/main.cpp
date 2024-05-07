@@ -21,9 +21,10 @@
  * 502. 获取glTF模型的 vtkActor
  * 503. 加载Obj类型的模型，并导出为glTF
  * 504. glTF 相机
+ * 505. glTF 动画
  */
 
-#define TEST504
+#define TEST505
 
 #ifdef TEST101
 
@@ -1204,6 +1205,7 @@ int main()
 
 #include <vtkGLTFImporter.h>
 #include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkLightCollection.h>
 #include <vtkNew.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
@@ -1235,11 +1237,14 @@ int main(int argc, char* argv[])
     importer->SetRenderWindow(renderWindow);
     importer->Update();
 
-    auto na = importer->GetNumberOfAnimations();
-    auto nc = importer->GetNumberOfCameras();
-    std::cout << "Number of animations:\t" << na << "\nNumber of Camera:\t" << nc << '\n';
+    auto nAnimations = importer->GetNumberOfAnimations();
+    auto nCameras    = importer->GetNumberOfCameras();
+    auto outputDesc  = importer->GetOutputsDescription();
+    auto nActors     = renderer->GetActors()->GetNumberOfItems();
+    auto nLights     = renderer->GetLights()->GetNumberOfItems();
 
-    renderer->GetActors();
+    std::cout << "Number of animations:\t" << nAnimations << "\nNumber of Camera:\t" << nCameras << "\nNumber of Actors:\t" << nActors
+              << "\nNumber of Lights:\t" << nLights << "\nOutputs description:\t" << outputDesc << '\n';
 
     renderWindow->Render();
     renderWindowInteractor->Start();
@@ -1389,11 +1394,9 @@ int main(int argc, char* argv[])
     auto focalPoint = camera0->GetFocalPoint();
     auto viewUp     = camera0->GetViewUp();
 
-    auto na = importer->GetNumberOfAnimations();
-    auto nc = importer->GetNumberOfCameras();
-    std::cout << "Number of animations:\t" << na << "\nNumber of Camera:\t" << nc << '\n';
-
-    renderer->GetActors();
+    auto nCameras = importer->GetNumberOfCameras();
+    auto nActors  = renderer->GetActors()->GetNumberOfItems();
+    std::cout << "Number of Camera:\t" << nCameras << "\nNumber of Actors:\t" << nActors << '\n';
 
     renderWindow->Render();
     renderWindowInteractor->Start();
@@ -1402,3 +1405,65 @@ int main(int argc, char* argv[])
 }
 
 #endif // TEST504
+
+#ifdef TEST505
+
+#include <vtkCamera.h>
+#include <vtkDoubleArray.h>
+#include <vtkGLTFImporter.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkNew.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+
+int main(int argc, char* argv[])
+{
+    vtkNew<vtkRenderer> renderer;
+    renderer->SetBackground(.1, .2, .3);
+
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(800, 600);
+    renderWindow->AddRenderer(renderer);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    renderWindowInteractor->SetInteractorStyle(style);
+
+    vtkNew<vtkGLTFImporter> importer;
+    importer->SetFileName("../resources/gltf/animation.gltf");
+    importer->SetRenderWindow(renderWindow);
+    importer->Update();
+    importer->EnableAnimation(0); // Update 之后才能开启动画
+
+    vtkNew<vtkDoubleArray> timeSteps;
+    double frameRate { 100. }; // 一秒钟模拟的帧数(FPS)
+    int nTimeSteps { 0 };
+    double timeRange[2] {};
+    importer->GetTemporalInformation(0, frameRate, nTimeSteps, timeRange, timeSteps);
+
+    auto nAnimations = importer->GetNumberOfAnimations();
+    auto nActors     = renderer->GetActors()->GetNumberOfItems();
+
+    std::cout << "Number of Animations:\t" << nAnimations << "\nNumber of Actors:\t" << nActors << '\n';
+    std::cout << "Number of time steps:\t" << nTimeSteps << "\ntime range:\t" << timeRange[0] << ' ' << timeRange[1] << '\n';
+
+    // counter 和 timeStep 的乘积应该在 timeRange 之间
+    static int counter { 0 };
+    static double timeStep { .01 };
+    std::cout << "animation begin\n";
+    while (counter++ < 100)
+    {
+        importer->UpdateTimeStep(counter * timeStep);
+        renderWindow->Render();
+    }
+    std::cout << "animation end\n";
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+
+    return EXIT_SUCCESS;
+}
+
+#endif // TEST505
