@@ -15,7 +15,7 @@
  * 13.同一个面的正面和背面设置不同的属性
  * 14.隐藏线消除 hidden line removal(HLR)
  * 15.vtkChartXY 源码分析
- * 16.基于视锥体覆盖的剔除（可见性）
+ * 16.基于视锥体覆盖的剔除（可见性），
  *
  * 201. vtkAlgorithm vtkExecutive vtkInformation 管道端口的作用  UpdatePiece
  */
@@ -1697,6 +1697,8 @@ int main(int, char*[])
 
 #include <vtkActor.h>
 #include <vtkCellArray.h>
+#include <vtkCullerCollection.h>
+#include <vtkFrustumCoverageCuller.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkPoints.h>
 #include <vtkPolyData.h>
@@ -1705,7 +1707,6 @@ int main(int, char*[])
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
-#include <vtkFrustumCoverageCuller.h>
 
 void AddActors(vtkRenderer* ren)
 {
@@ -1770,6 +1771,13 @@ int main()
     AddActors(renderer);
     renderer->ResetCamera();
     renderer->SetBackground(.1, .2, .3);
+
+    auto pCullers = renderer->GetCullers();
+    auto nCullers = pCullers->GetNumberOfItems(); // 默认有一个剔除器
+
+    // 对需要渲染的图元进行排序，根据 Actors 到视锥体近平面的距离
+    vtkNew<vtkFrustumCoverageCuller> culler;
+    culler->SetSortingStyle(VTK_CULLER_SORT_FRONT_TO_BACK); // 设置排序方式，默认不排序
 
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
