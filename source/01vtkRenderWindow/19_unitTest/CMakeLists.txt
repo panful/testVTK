@@ -11,6 +11,10 @@ find_package(VTK
         ParallelMPI
         IOImage
         TestingRendering
+        ImagingSources      # vtkImageGridSource
+        IOPLY               # vtkPLYReader
+        CommonSystem        # vtkTimerLog
+        InteractionWidgets  # vtkWidgetRepresentation
     QUIET
 )
 
