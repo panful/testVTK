@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "iviewer.h"
 #include <vtkActor.h>

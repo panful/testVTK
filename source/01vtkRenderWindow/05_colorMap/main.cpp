@@ -1,4 +1,4 @@
-﻿/*
+/*
  * 100 上下左右四视图，格点、格心数据，线框、面显示模式的区别
  * 101 vtkLookupTable 颜色查找表
  * 102 vtkColorTransferFunction 生成颜色映射表

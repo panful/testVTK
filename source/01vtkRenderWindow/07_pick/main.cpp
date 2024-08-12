@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 01. vtkCellPicker 拾取图元的单元，CPU拾取
  * 02. vtkAreaPicker 框选拾取，CPU拾取，通过构建一个视锥体，然后用这个视锥体对需要拾取的几何体进行提取操作
  * 03. vtkPropPicker 拾取vtkProp，GPU拾取

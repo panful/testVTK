@@ -1,4 +1,4 @@
-﻿
+
 /**
  * 1. 整个渲染的流程 生成vbo和ibo DrawCall
  * 2. shader源码的生成、修改、编译、uniform的设置
@@ -20,7 +20,7 @@
  * 201. vtkAlgorithm vtkExecutive vtkInformation 管道端口的作用  UpdatePiece
  */
 
-#define TEST16
+#define TEST2
 
 #ifdef TEST1
 
@@ -174,15 +174,15 @@ vtkStandardNewMacro(MyStyle);
  * 根据vtkActor的属性生成指定的shader vtkOpenGLPolyDataMapper.cxx [2461] vtkOpenGLPolyDataMapper::ReplaceShaderValues
  * 编译shader vtkShader.cxx [43] vtkShader::Compile()
  * 设置uniform vtkShaderProgram.cxx
- * 
+ *
  * vtkRenderWindow 有一个成员 State(vtkOpenGLState*)，它又有一个成员 ShaderCache(vtkOpenGLShaderCache*)
  * ShaderCache 通过计算着色器代码的MD5值，会将该着色器代码对应的 MD5 和 ShaderProgram 保存到一个 std::map 中
  * 当渲染时会先去查找当前 Mapper 的着色器代码对应的 ShaderProgram 有没有在 std::map 中保存
  * 如果有则直接使用它，如果没有才会创建一个新的 ShaderProgram
  * 因此当一个窗口绘制多个图元，并且这些图元使用的着色器源码相同时，只会创建一个 ShaderProgram ，而不是所有的 Actor 都有一个 ShaderProgram
  * 在 vtkOpenGLShaderCache::GetShaderProgram 这个函数中判断是否需要创建一个新的 ShaderProgram
- * 
- * /
+ *
+ */
 
 int main()
 {
