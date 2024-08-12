@@ -26,13 +26,14 @@
  * 602. 世界坐标转换为屏幕坐标
  * 603. 将屏幕坐标转换为世界坐标，然后将这些顶点连接为一条线
  * 604. 屏幕坐标转换为世界坐标原理
+ * 605. vtkPerspectiveTransform 3种投影矩阵的生成
  */
 
 // vtk是行矩阵
 // https://blog.csdn.net/liushao1031177/article/details/116903698
 // https://www.cnblogs.com/ybqjymy/p/13925462.html
 
-#define TEST103
+#define TEST605
 
 #ifdef TEST101
 
@@ -963,7 +964,7 @@ int main()
 
     vtkNew<vtkRenderWindow> renWin;
     renWin->AddRenderer(renderer);
-    renWin->SetSize(800, 600);
+    renWin->SetSize(800, 800);
 
     vtkNew<vtkRenderWindowInteractor> iren;
     iren->SetRenderWindow(renWin);
@@ -1065,13 +1066,13 @@ private:
 
             if (forwardTo)
             {
-                pos = pos + translation;
-                fp  = fp + translation;
+                pos = pos - translation;
+                fp  = fp - translation;
             }
             else
             {
-                pos = pos - translation;
-                fp  = fp - translation;
+                pos = pos + translation;
+                fp  = fp + translation;
             }
 
             camera->SetPosition(pos.GetData());
@@ -1957,14 +1958,14 @@ public:
         {
             switch (this->Interactor->GetKeyCode())
             {
-            case 'r':
-            case 'R':
-            {
-                auto key = this->Interactor->GetKeyCode();
-            }
-            break;
-            default:
+                case 'r':
+                case 'R':
+                {
+                    auto key = this->Interactor->GetKeyCode();
+                }
                 break;
+                default:
+                    break;
             }
         }
         Superclass::OnChar();
@@ -2101,7 +2102,7 @@ int main()
         actor->GetProperty()->SetColor(0, 1, 0);
         actor->SetPosition(200., 200.); // 屏幕坐标，加上面设置的Center就是最终屏幕坐标
 
-        renderer->AddActor2D(actor); // AddActor 和 AddActor2D 没有区别
+        renderer->AddActor2D(actor);    // AddActor 和 AddActor2D 没有区别
     }
 
     //--------------------------------------------------------------------------
@@ -2703,3 +2704,42 @@ int main(int, char*[])
 }
 
 #endif // TEST604
+
+#ifdef TEST605
+
+#include <iostream>
+#include <vtkMatrix4x4.h>
+#include <vtkPerspectiveTransform.h>
+#include <vtkSmartPointer.h>
+
+int main()
+{
+    auto print = [](vtkMatrix4x4* matrix)
+    {
+        for (auto i = 0u; i < 4; ++i)
+        {
+            for (auto j = 0u; j < 4; ++j)
+            {
+                std::cout << matrix->GetElement(j, i) << '\t';
+            }
+            std::cout << '\n';
+        }
+        std::cout << '\n';
+    };
+
+    vtkNew<vtkPerspectiveTransform> transform;
+
+    transform->Identity();
+    transform->Ortho(-100, 100, -100, 100, -1, 1);
+    print(transform->GetMatrix());
+
+    transform->Identity();
+    transform->Perspective(45., 8. / 6., 0.1, 100.);
+    print(transform->GetMatrix());
+
+    transform->Identity();
+    transform->Frustum(-100, 100, -100, 100, -1, 1);
+    print(transform->GetMatrix());
+}
+
+#endif // TEST605
