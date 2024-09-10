@@ -7,7 +7,7 @@
  * 5. 透明物体的光照
  */
 
-#define TEST5
+#define TEST1
 
 #ifdef TEST1
 
@@ -23,6 +23,7 @@
 #include <vtkCameraPass.h>
 #include <vtkConeSource.h>
 #include <vtkCubeSource.h>
+#include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkLight.h>
 #include <vtkLightActor.h>
 #include <vtkLightCollection.h>
@@ -51,21 +52,6 @@ void AddLightActors(vtkRenderer* r);
 
 int main(int, char*[])
 {
-    vtkNew<vtkRenderWindowInteractor> interactor;
-
-    vtkNew<vtkRenderWindow> renderWindow;
-    renderWindow->SetSize(400, 400);
-    renderWindow->SetMultiSamples(0);
-
-    renderWindow->SetAlphaBitPlanes(1);
-    interactor->SetRenderWindow(renderWindow);
-
-    vtkNew<vtkOpenGLRenderer> renderer;
-    renderWindow->AddRenderer(renderer);
-    renderWindow->SetSize(640, 480);
-
-    vtkNew<vtkSequencePass> seq;
-
     vtkNew<vtkRenderPassCollection> passes;
 
     vtkNew<vtkShadowMapPass> shadows;
@@ -75,12 +61,14 @@ int main(int, char*[])
     vtkNew<vtkOpaquePass> opaque;
     passes->AddItem(opaque);
 
+    vtkNew<vtkSequencePass> seq; // 类似 render graph
     seq->SetPasses(passes);
 
     vtkNew<vtkCameraPass> cameraP;
     cameraP->SetDelegatePass(seq);
 
     // Tell the renderer to use our render pass pipeline.
+    vtkNew<vtkOpenGLRenderer> renderer;
     vtkOpenGLRenderer* glrenderer = dynamic_cast<vtkOpenGLRenderer*>(renderer.GetPointer());
     glrenderer->SetPass(cameraP);
 
@@ -90,6 +78,7 @@ int main(int, char*[])
     vtkColor3d coneColor      = colors->GetColor3d("Peacock");
     vtkColor3d sphereColor    = colors->GetColor3d("Banana");
 
+    //----------------------------------------
     vtkNew<vtkPlaneSource> rectangleSource;
     rectangleSource->SetOrigin(-5.0, 0.0, 5.0);
     rectangleSource->SetPoint1(5.0, 0.0, 5.0);
@@ -98,7 +87,6 @@ int main(int, char*[])
 
     vtkNew<vtkPolyDataMapper> rectangleMapper;
     rectangleMapper->SetInputConnection(rectangleSource->GetOutputPort());
-
     rectangleMapper->SetScalarVisibility(0);
 
     vtkNew<vtkActor> rectangleActor;
@@ -106,6 +94,7 @@ int main(int, char*[])
     rectangleActor->SetVisibility(1);
     rectangleActor->GetProperty()->SetColor(rectangleColor.GetData());
 
+    //----------------------------------------
     vtkNew<vtkCubeSource> boxSource;
     boxSource->SetXLength(2.0);
 
@@ -126,6 +115,7 @@ int main(int, char*[])
     boxActor->SetPosition(-2.0, 2.0, 0.0);
     boxActor->GetProperty()->SetColor(boxColor.GetData());
 
+    //----------------------------------------
     vtkNew<vtkConeSource> coneSource;
     coneSource->SetResolution(24);
     coneSource->SetDirection(1.0, 1.0, 1.0);
@@ -140,6 +130,7 @@ int main(int, char*[])
     coneActor->SetPosition(0.0, 1.0, 1.0);
     coneActor->GetProperty()->SetColor(coneColor.GetData());
 
+    //----------------------------------------
     vtkNew<vtkSphereSource> sphereSource;
     sphereSource->SetThetaResolution(32);
     sphereSource->SetPhiResolution(32);
@@ -150,7 +141,6 @@ int main(int, char*[])
 
     vtkNew<vtkActor> sphereActor;
     sphereActor->SetMapper(sphereMapper);
-
     sphereActor->VisibilityOn();
     sphereActor->SetPosition(2.0, 2.0, -1.0);
     sphereActor->GetProperty()->SetColor(sphereColor.GetData());
@@ -182,21 +172,22 @@ int main(int, char*[])
 
     AddLightActors(renderer);
 
-    renderer->SetBackground2(colors->GetColor3d("Black").GetData());
-    renderer->SetBackground(colors->GetColor3d("Silver").GetData());
-    renderer->SetGradientBackground(true);
-
-    renderWindow->Render();
-    renderWindow->SetWindowName("ShadowsLightsDemo");
-
+    renderer->SetBackground(.1, .2, .3);
     renderer->ResetCamera();
 
-    auto camera = renderer->GetActiveCamera();
-    camera->Azimuth(40.0);
-    camera->Elevation(10.0);
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(800, 600);
+    renderWindow->SetMultiSamples(0);
+    renderWindow->SetAlphaBitPlanes(1);
+
+    vtkNew<vtkRenderWindowInteractor> interactor;
+    interactor->SetRenderWindow(renderWindow);
+
+    vtkNew<vtkInteractorStyleTrackballCamera> style;
+    interactor->SetInteractorStyle(style);
 
     renderWindow->Render();
-
     interactor->Start();
 
     return EXIT_SUCCESS;
